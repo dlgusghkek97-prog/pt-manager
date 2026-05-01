@@ -51,13 +51,8 @@ export default function TrainerDashboard({ user, onLogout }) {
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0])
   const [allLogs, setAllLogs] = useState([])
   const [topTab, setTopTab] = useState('members')
-
-  // 트레이너 칼로리 설정
-  const [trainerMacro, setTrainerMacro] = useState(() => {
-    const saved = localStorage.getItem(`macro_result_${user.id}`)
-    return saved ? JSON.parse(saved) : null
-  })
-  const [trainerTodayDiet, setTrainerTodayDiet] = useState([])
+  const [memberMacro, setMemberMacro] = useState(null)
+  const [memberTodayDiet, setMemberTodayDiet] = useState([])
 
   useEffect(() => { loadMembers() }, [])
 
@@ -80,17 +75,27 @@ export default function TrainerDashboard({ user, onLogout }) {
       const carbs = (dLogs || []).reduce((s, r) => s + (r.carbs || 0), 0)
       const protein = (dLogs || []).reduce((s, r) => s + (r.protein || 0), 0)
       const fat = (dLogs || []).reduce((s, r) => s + (r.fat || 0), 0)
-      // 회원 macro 불러오기
       const macro = (() => { try { const s = localStorage.getItem(`macro_result_${m.id}`); return s ? JSON.parse(s) : null } catch { return null } })()
       stats[m.id] = { parts, calories, carbs, protein, fat, macro }
     }
     setMemberStats(stats)
   }
 
-  const loadTrainerTodayDiet = async () => {
+  const loadMemberLogs = async (memberId) => {
+    const { data } = await supabase.from('workout_logs').select('*').eq('member_id', memberId).order('log_date')
+    if (data) setAllLogs(data)
+    return data
+  }
+
+  const loadTrainerLogs = async () => {
+    const { data } = await supabase.from('trainer_workout_logs').select('*').eq('trainer_id', user.id).order('log_date')
+    if (data) setAllLogs(data)
+  }
+
+  const loadMemberTodayDiet = async (memberId) => {
     const today = new Date().toISOString().split('T')[0]
-    const { data } = await supabase.from('trainer_diet_logs').select('*').eq('trainer_id', user.id).eq('log_date', today)
-    setTrainerTodayDiet(data || [])
+    const { data } = await supabase.from('diet_logs').select('*').eq('member_id', memberId).eq('log_date', today)
+    setMemberTodayDiet(data || [])
   }
 
   const addMember = async () => {
@@ -106,22 +111,15 @@ export default function TrainerDashboard({ user, onLogout }) {
     alert(`아래 내용을 카카오톡으로 전송해주세요!\n\n안녕하세요 ${name}님!\nPT Manager 접속 코드: ${code}\n접속 주소: ${window.location.href}`)
   }
 
-  const loadMemberLogs = async (memberId) => {
-    const { data } = await supabase.from('workout_logs').select('*').eq('member_id', memberId).order('log_date')
-    if (data) setAllLogs(data)
-  }
-
-  const loadTrainerLogs = async () => {
-    const { data } = await supabase.from('trainer_workout_logs').select('*').eq('trainer_id', user.id).order('log_date')
-    if (data) setAllLogs(data)
-  }
-
   const openMember = (member) => {
     setSelectedMember(member)
     setView('memberDetail')
     setMemberView('workout')
     loadMemberLogs(member.id)
     loadMemberExercises(member.id, new Date().toISOString().split('T')[0])
+    loadMemberTodayDiet(member.id)
+    const macro = (() => { try { const s = localStorage.getItem(`macro_result_${member.id}`); return s ? JSON.parse(s) : null } catch { return null } })()
+    setMemberMacro(macro)
   }
 
   const loadMemberExercises = async (memberId, date) => {
@@ -157,6 +155,48 @@ export default function TrainerDashboard({ user, onLogout }) {
     )
   }
 
+  const MemberMacroCard = ({ macro, todayDiet }) => {
+    if (!macro) return null
+    const todayCalories = todayDiet.reduce((s, l) => s + (l.calories || 0), 0)
+    const todayCarbs = todayDiet.reduce((s, l) => s + (l.carbs || 0), 0)
+    const todayProtein = todayDiet.reduce((s, l) => s + (l.protein || 0), 0)
+    const todayFat = todayDiet.reduce((s, l) => s + (l.fat || 0), 0)
+    const fields = [
+      { label: '칼로리', field: 'target', unit: 'kcal', current: todayCalories, color: '#FCD34D' },
+      { label: '탄수화물', field: 'carbs', unit: 'g', current: todayCarbs, color: '#93C5FD' },
+      { label: '단백질', field: 'protein', unit: 'g', current: todayProtein, color: '#FCA5A5' },
+      { label: '지방', field: 'fat', unit: 'g', current: todayFat, color: '#FDBA74' },
+    ]
+    return (
+      <div style={{ background: THEME.primary, borderRadius: '14px', padding: '12px 14px', marginBottom: '12px' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
+          <span style={{ fontSize: '13px', fontWeight: '600', color: '#FFF' }}>🎯 목표 수치</span>
+          <span style={{ fontSize: '10px', color: 'rgba(255,255,255,0.6)' }}>오늘 달성률</span>
+        </div>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: '6px' }}>
+          {fields.map(({ label, field, unit, current, color }) => {
+            const target = macro[field]
+            const pct = target > 0 ? Math.min(Math.round(current / target * 100), 100) : 0
+            const over = target > 0 && current > target
+            return (
+              <div key={field} style={{ background: 'rgba(255,255,255,0.12)', borderRadius: '8px', padding: '8px', textAlign: 'center' }}>
+                <p style={{ fontSize: '9px', color: 'rgba(255,255,255,0.7)', margin: '0 0 4px' }}>{label}</p>
+                <p style={{ fontSize: '14px', fontWeight: '700', color, margin: '0 0 2px' }}>{target}</p>
+                <p style={{ fontSize: '9px', color: 'rgba(255,255,255,0.5)', margin: '0 0 5px' }}>{unit}</p>
+                <div style={{ background: 'rgba(255,255,255,0.2)', borderRadius: '4px', height: '4px', marginBottom: '3px' }}>
+                  <div style={{ width: `${pct}%`, background: over ? '#FF6B6B' : color, height: '4px', borderRadius: '4px' }} />
+                </div>
+                <p style={{ fontSize: '9px', color: over ? '#FF6B6B' : color, margin: 0, fontWeight: '600' }}>
+                  {Math.round(current)}{unit} ({pct}%)
+                </p>
+              </div>
+            )
+          })}
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div style={S.container}>
       <div style={S.wrap}>
@@ -170,27 +210,17 @@ export default function TrainerDashboard({ user, onLogout }) {
           </div>
         </div>
 
-        {/* 상단 탭: 회원관리 / 내기록 */}
         {view === 'members' && (
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px', marginBottom: '12px' }}>
-            <button
-              onClick={() => setTopTab('members')}
-              style={{ background: topTab === 'members' ? THEME.primary : '#FFF', color: topTab === 'members' ? '#FFF' : THEME.textSub, border: topTab === 'members' ? 'none' : `0.5px solid ${THEME.border}`, borderRadius: '10px', padding: '11px', fontSize: '13px', fontWeight: topTab === 'members' ? '500' : '400', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}
-            >
-              <IconMembers color={topTab === 'members' ? '#FFF' : THEME.textSub} />
-              회원 관리
+            <button onClick={() => setTopTab('members')} style={{ background: topTab === 'members' ? THEME.primary : '#FFF', color: topTab === 'members' ? '#FFF' : THEME.textSub, border: topTab === 'members' ? 'none' : `0.5px solid ${THEME.border}`, borderRadius: '10px', padding: '11px', fontSize: '13px', fontWeight: topTab === 'members' ? '500' : '400', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}>
+              <IconMembers color={topTab === 'members' ? '#FFF' : THEME.textSub} />회원 관리
             </button>
-            <button
-              onClick={() => { setTopTab('myRecord'); loadTrainerLogs(); loadTrainerTodayDiet() }}
-              style={{ background: topTab === 'myRecord' ? THEME.primary : '#FFF', color: topTab === 'myRecord' ? '#FFF' : THEME.textSub, border: topTab === 'myRecord' ? 'none' : `0.5px solid ${THEME.border}`, borderRadius: '10px', padding: '11px', fontSize: '13px', fontWeight: topTab === 'myRecord' ? '500' : '400', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}
-            >
-              <IconNote color={topTab === 'myRecord' ? '#FFF' : THEME.textSub} />
-              내 기록
+            <button onClick={() => { setTopTab('myRecord'); loadTrainerLogs() }} style={{ background: topTab === 'myRecord' ? THEME.primary : '#FFF', color: topTab === 'myRecord' ? '#FFF' : THEME.textSub, border: topTab === 'myRecord' ? 'none' : `0.5px solid ${THEME.border}`, borderRadius: '10px', padding: '11px', fontSize: '13px', fontWeight: topTab === 'myRecord' ? '500' : '400', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}>
+              <IconNote color={topTab === 'myRecord' ? '#FFF' : THEME.textSub} />내 기록
             </button>
           </div>
         )}
 
-        {/* 회원 목록 */}
         {view === 'members' && topTab === 'members' && (
           <div style={S.card}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px' }}>
@@ -234,7 +264,6 @@ export default function TrainerDashboard({ user, onLogout }) {
 
                   return (
                     <div key={member.id} style={{ background: THEME.cardAlt, borderRadius: '12px', border: `0.5px solid ${THEME.border}`, overflow: 'hidden', cursor: 'pointer' }} onClick={() => openMember(member)}>
-                      {/* 이름/코드 행 */}
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 12px 10px' }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                           <div style={{ width: '38px', height: '38px', borderRadius: '50%', background: THEME.primary, color: '#FFF', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '15px', fontWeight: '700', flexShrink: 0 }}>{member.name.charAt(0)}</div>
@@ -249,12 +278,9 @@ export default function TrainerDashboard({ user, onLogout }) {
                         </div>
                       </div>
 
-                      {/* 당일 현황 */}
                       {hasData ? (
                         <div style={{ borderTop: `0.5px solid ${THEME.border}`, padding: '10px 12px', display: 'flex', gap: '10px' }}>
-                          {/* 왼쪽: 칼로리+탄단지 */}
                           <div style={{ flex: '1.3', minWidth: 0 }}>
-                            {/* 칼로리 */}
                             <div style={{ marginBottom: '8px' }}>
                               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '3px' }}>
                                 <span style={{ fontSize: '10px', color: THEME.textSub }}>오늘 칼로리</span>
@@ -272,11 +298,7 @@ export default function TrainerDashboard({ user, onLogout }) {
                               <NutrientBar label="지방" current={stat.fat} target={stat.macro.fat} color="#E8A020" />
                             </>)}
                           </div>
-
-                          {/* 구분선 */}
                           <div style={{ width: '0.5px', background: THEME.border, flexShrink: 0 }} />
-
-                          {/* 오른쪽: 운동 */}
                           <div style={{ flex: 1, minWidth: 0, paddingLeft: '8px' }}>
                             <p style={{ fontSize: '10px', color: THEME.textSub, margin: '0 0 6px' }}>오늘 운동</p>
                             {activeParts.length === 0 ? (
@@ -306,7 +328,6 @@ export default function TrainerDashboard({ user, onLogout }) {
           </div>
         )}
 
-        {/* 내 기록 */}
         {view === 'members' && topTab === 'myRecord' && (
           <>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '6px', marginBottom: '12px' }}>
@@ -323,17 +344,18 @@ export default function TrainerDashboard({ user, onLogout }) {
             </div>
             {trainerView === 'workout' && <WorkoutLog user={trainerAsUser} selectedDate={selectedDate} setSelectedDate={setSelectedDate} exercises={exercises} setExercises={setExercises} onUpdate={loadTrainerLogs} tableOverride="trainer_workout_logs" trainerIdField="trainer_id" />}
             {trainerView === 'stats' && <WorkoutStats allLogs={allLogs} />}
-            {trainerView === 'diet' && <DietLog user={trainerAsUser} onDietUpdate={loadTrainerTodayDiet} tableOverride="trainer_diet_logs" trainerIdField="trainer_id" />}
+            {trainerView === 'diet' && <DietLog user={trainerAsUser} onDietUpdate={() => {}} tableOverride="trainer_diet_logs" trainerIdField="trainer_id" />}
           </>
         )}
 
-        {/* 회원 상세 */}
         {view === 'memberDetail' && selectedMember && (
           <>
             <div style={{ background: THEME.primaryLight, border: `1px solid ${THEME.primary}`, borderRadius: '12px', padding: '12px 16px', marginBottom: '12px' }}>
               <p style={{ fontSize: '16px', fontWeight: '700', color: THEME.primary, margin: '0 0 2px' }}>{selectedMember.name}</p>
               <p style={{ fontSize: '13px', color: THEME.textSub, margin: 0 }}>{selectedMember.goal} · {selectedMember.gender} · {selectedMember.code}</p>
             </div>
+
+            <MemberMacroCard macro={memberMacro} todayDiet={memberTodayDiet} />
 
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '6px', marginBottom: '12px' }}>
               {[
@@ -348,9 +370,9 @@ export default function TrainerDashboard({ user, onLogout }) {
               ))}
             </div>
 
-            {memberView === 'workout' && <WorkoutLog user={selectedMember} selectedDate={selectedDate} setSelectedDate={setSelectedDate} exercises={exercises} setExercises={setExercises} onUpdate={() => loadMemberLogs(selectedMember.id)} />}
+            {memberView === 'workout' && <WorkoutLog user={selectedMember} selectedDate={selectedDate} setSelectedDate={setSelectedDate} exercises={exercises} setExercises={setExercises} onUpdate={async () => { await loadMemberLogs(selectedMember.id) }} />}
             {memberView === 'stats' && <WorkoutStats allLogs={allLogs} />}
-            {memberView === 'diet' && <DietLog user={selectedMember} />}
+            {memberView === 'diet' && <DietLog user={selectedMember} onDietUpdate={() => loadMemberTodayDiet(selectedMember.id)} />}
           </>
         )}
       </div>

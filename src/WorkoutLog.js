@@ -118,16 +118,20 @@ export default function WorkoutLog({ user, selectedDate, setSelectedDate, exerci
   }
 
   const uploadMedia = async (exIdx, file) => {
-    const ext = file.name.split('.').pop()
-    const fileName = `${user.id}/${selectedDate}_${Date.now()}.${ext}`
-    const { error } = await supabase.storage.from('workout-media').upload(fileName, file)
-    if (!error) {
+    try {
+      const ext = file.name.split('.').pop().toLowerCase()
+      const fileName = `${user.id}/${selectedDate}_${Date.now()}.${ext}`
+      const { error: uploadError } = await supabase.storage.from('workout-media').upload(fileName, file, { upsert: true })
+      if (uploadError) {
+        alert('업로드 실패: ' + uploadError.message)
+        return
+      }
       const { data: urlData } = supabase.storage.from('workout-media').getPublicUrl(fileName)
       const u = JSON.parse(JSON.stringify(exercises))
       u[exIdx].sets[0].media_url = urlData.publicUrl
       setExercises(u)
-    } else {
-      alert('업로드 실패: ' + error.message)
+    } catch (e) {
+      alert('업로드 중 오류: ' + e.message)
     }
   }
 
@@ -215,8 +219,8 @@ export default function WorkoutLog({ user, selectedDate, setSelectedDate, exerci
                 />
                 <div style={{ borderRadius: '6px', overflow: 'hidden', aspectRatio: '3/4', border: `0.5px dashed ${THEME.border}` }}>
                   {ex.sets[0]?.media_url ? (
-                    ex.sets[0].media_url.match(/\.(mp4|mov|avi)$/i) ? (
-                      <video src={ex.sets[0].media_url} controls style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
+                    ex.sets[0].media_url.match(/\.(mp4|mov|avi|webm)$/i) ? (
+                      <video src={ex.sets[0].media_url} controls playsInline style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
                     ) : (
                       <img src={ex.sets[0].media_url} alt="운동 사진" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
                     )
