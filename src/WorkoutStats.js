@@ -5,18 +5,15 @@ export default function WorkoutStats({ allLogs }) {
   const [statsTab, setStatsTab] = useState('daily')
   const today = new Date()
   const todayStr = today.toISOString().split('T')[0]
-
-  // 년/월 선택
   const [viewYear, setViewYear] = useState(today.getFullYear())
   const [viewMonth, setViewMonth] = useState(today.getMonth() + 1)
+  const [expandedDay, setExpandedDay] = useState(null)
 
   const yearStr = String(viewYear)
   const monthStr = String(viewMonth).padStart(2, '0')
-
-  // 선택된 달의 로그
   const monthLogs = allLogs.filter(r => r.log_date && r.log_date.startsWith(`${yearStr}-${monthStr}`))
 
-  // 일간 - 선택된 달의 날짜별 그룹핑
+  // 일간
   const byDay = {}
   monthLogs.forEach(row => {
     if (!byDay[row.log_date]) byDay[row.log_date] = { total: 0, parts: {} }
@@ -25,7 +22,7 @@ export default function WorkoutStats({ allLogs }) {
   })
   const monthDays = Object.keys(byDay).sort()
 
-  // 주간 - 선택된 달 주차별
+  // 주간
   const weeklyByPart = Array.from({ length: 5 }, () => { const o = {}; PARTS.forEach(p => o[p] = 0); return o })
   const weeklyTotals = [0, 0, 0, 0, 0]
   monthLogs.forEach(row => {
@@ -34,7 +31,7 @@ export default function WorkoutStats({ allLogs }) {
     weeklyTotals[wk] += row.volume || 0
   })
 
-  // 월간 - 선택된 년도 1~12월별
+  // 월간
   const monthlyByMonth = {}
   for (let m = 1; m <= 12; m++) {
     const mStr = String(m).padStart(2, '0')
@@ -47,14 +44,11 @@ export default function WorkoutStats({ allLogs }) {
     if (row.body_part) monthlyByMonth[mStr].parts[row.body_part] = (monthlyByMonth[mStr].parts[row.body_part] || 0) + (row.volume || 0)
   })
 
-  const totalAll = allLogs.reduce((sum, r) => sum + (r.volume || 0), 0)
   const todayTotal = (allLogs.filter(r => r.log_date === todayStr)).reduce((sum, r) => sum + (r.volume || 0), 0)
   const thisWeekStart = new Date(today); thisWeekStart.setDate(today.getDate() - today.getDay() + 1)
-  const thisWeekLogs = allLogs.filter(r => r.log_date >= thisWeekStart.toISOString().split('T')[0] && r.log_date <= todayStr)
-  const thisWeekTotal = thisWeekLogs.reduce((sum, r) => sum + (r.volume || 0), 0)
+  const thisWeekTotal = allLogs.filter(r => r.log_date >= thisWeekStart.toISOString().split('T')[0] && r.log_date <= todayStr).reduce((sum, r) => sum + (r.volume || 0), 0)
   const thisMonthStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}`
   const thisMonthTotal = allLogs.filter(r => r.log_date && r.log_date.startsWith(thisMonthStr)).reduce((sum, r) => sum + (r.volume || 0), 0)
-
   const maxMonthVol = Math.max(...Object.values(monthlyByMonth).map(m => m.total), 1)
   const maxWeekVol = Math.max(...weeklyTotals, 1)
 
@@ -101,33 +95,62 @@ export default function WorkoutStats({ allLogs }) {
         ))}
       </div>
 
-      {/* 일간 */}
+      {/* 일간 - 날짜 카드 클릭하면 부위별 펼쳐짐 */}
       {statsTab === 'daily' && (
         <div style={S.card}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
-            <p style={{ ...S.cardTitle, margin: 0 }}>📅 {viewYear}년 {viewMonth}월 일별 기록</p>
+            <p style={{ ...S.cardTitle, margin: 0 }}>📅 {viewYear}년 {viewMonth}월</p>
             <YearMonthPicker />
           </div>
           {monthDays.length === 0 ? (
             <p style={{ color: THEME.textSub, fontSize: '13px', textAlign: 'center', padding: '16px 0' }}>운동 기록이 없습니다</p>
           ) : (
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '8px' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
               {monthDays.map(date => {
                 const d = byDay[date]
-                const dayNum = date.split('-')[2]
-                const activeParts = Object.entries(d.parts).filter(([, v]) => v > 0)
+                const dayNum = parseInt(date.split('-')[2])
                 const isToday = date === todayStr
+                const isExpanded = expandedDay === date
+                const activeParts = Object.entries(d.parts).filter(([, v]) => v > 0).sort((a, b) => b[1] - a[1])
+                const maxPartVol = Math.max(...activeParts.map(([, v]) => v), 1)
+
                 return (
-                  <div key={date} style={{ background: isToday ? THEME.primary : THEME.cardAlt, borderRadius: '12px', padding: '10px', textAlign: 'center' }}>
-                    <p style={{ fontSize: '13px', fontWeight: '700', color: isToday ? '#FFF' : THEME.text, margin: '0 0 4px' }}>{parseInt(dayNum)}일</p>
-                    <p style={{ fontSize: '12px', fontWeight: '700', color: isToday ? '#FCD34D' : THEME.primary, margin: '0 0 6px' }}>
-                      {d.total >= 1000 ? (d.total / 1000).toFixed(1) + 't' : d.total + 'kg'}
-                    </p>
-                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '2px', justifyContent: 'center' }}>
-                      {activeParts.map(([part]) => (
-                        <span key={part} style={{ fontSize: '9px', background: PART_COLORS[part], color: '#FFF', padding: '1px 4px', borderRadius: '6px' }}>{part}</span>
-                      ))}
+                  <div key={date} style={{ borderRadius: '12px', overflow: 'hidden', border: `1px solid ${isToday ? THEME.primary : THEME.border}` }}>
+                    {/* 날짜 헤더 */}
+                    <div
+                      onClick={() => setExpandedDay(isExpanded ? null : date)}
+                      style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 14px', background: isToday ? THEME.primary : '#FFF', cursor: 'pointer' }}
+                    >
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                        <span style={{ fontSize: '15px', fontWeight: '700', color: isToday ? '#FFF' : THEME.text }}>{dayNum}일</span>
+                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '3px' }}>
+                          {activeParts.map(([part]) => (
+                            <span key={part} style={{ fontSize: '10px', background: PART_COLORS[part], color: '#FFF', padding: '1px 5px', borderRadius: '6px' }}>{part}</span>
+                          ))}
+                        </div>
+                      </div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <span style={{ fontSize: '13px', fontWeight: '700', color: isToday ? '#FCD34D' : THEME.primary }}>
+                          {d.total >= 1000 ? (d.total / 1000).toFixed(1) + 't' : d.total + 'kg'}
+                        </span>
+                        <span style={{ fontSize: '12px', color: isToday ? 'rgba(255,255,255,0.7)' : THEME.textSub }}>{isExpanded ? '▲' : '▼'}</span>
+                      </div>
                     </div>
+
+                    {/* 부위별 볼륨 펼침 */}
+                    {isExpanded && (
+                      <div style={{ padding: '12px 14px', background: THEME.cardAlt, borderTop: `1px solid ${THEME.border}` }}>
+                        {activeParts.map(([part, vol]) => (
+                          <div key={part} style={S.barRow}>
+                            <span style={{ ...S.barLabel, width: '36px' }}>{part}</span>
+                            <div style={S.barBg}>
+                              <div style={{ ...S.barFill, width: `${vol / maxPartVol * 100}%`, background: PART_COLORS[part] }} />
+                            </div>
+                            <span style={S.barVal}>{vol.toLocaleString()}kg</span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 )
               })}
@@ -172,7 +195,7 @@ export default function WorkoutStats({ allLogs }) {
       {statsTab === 'monthly' && (
         <div style={S.card}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
-            <p style={{ ...S.cardTitle, margin: 0 }}>📆 {viewYear}년 월별 기록</p>
+            <p style={{ ...S.cardTitle, margin: 0 }}>📆 {viewYear}년 월별</p>
             <YearMonthPicker />
           </div>
           {Object.values(monthlyByMonth).every(d => d.total === 0) ? (

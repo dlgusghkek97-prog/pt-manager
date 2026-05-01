@@ -7,8 +7,8 @@ export default function WorkoutLog({ user, selectedDate, setSelectedDate, exerci
   const TABLE = tableOverride || 'workout_logs'
   const ID_FIELD = trainerIdField || 'member_id'
 
-  const loadExercises = async (memberId, date) => {
-    const { data } = await supabase.from(TABLE).select('*').eq(ID_FIELD, memberId).eq('log_date', date).order('slot').order('id')
+  const loadExercises = async (uid, date) => {
+    const { data } = await supabase.from(TABLE).select('*').eq(ID_FIELD, uid).eq('log_date', date).order('slot').order('id')
     if (data && data.length > 0) {
       const grouped = {}
       data.forEach(row => {
@@ -57,51 +57,21 @@ export default function WorkoutLog({ user, selectedDate, setSelectedDate, exerci
     const u = [...exercises]; u[exIdx].sets[setIdx][field] = value; setExercises(u)
   }
 
-  const saveSet = async (exIdx, setIdx) => {
-    const ex = exercises[exIdx]; const set = ex.sets[setIdx]
-    if (!ex.body_part || !ex.exercise_name || !set.weight || !set.reps) {
-      alert('부위, 운동명, 무게, 횟수를 모두 입력해주세요.')
-      return
-    }
-    const payload = {
-      [ID_FIELD]: user.id,
-      log_date: selectedDate,
-      slot: ex.slot,
-      body_part: ex.body_part,
-      exercise_name: ex.exercise_name,
-      weight: parseFloat(set.weight),
-      sets: 1,
-      reps: parseInt(set.reps),
-      volume: parseFloat(set.weight) * parseInt(set.reps),
-      memo: ex.memo,
-      media_url: set.media_url || null
-    }
-    if (set.id) {
-      const { error } = await supabase.from(TABLE).update(payload).eq('id', set.id)
-      if (error) { alert('저장 실패: ' + error.message); return }
-    } else {
-      const { data, error } = await supabase.from(TABLE).insert(payload).select().single()
-      if (error) { alert('저장 실패: ' + error.message); return }
-      if (data) {
-        const u = [...exercises]
-        u[exIdx].sets[setIdx].id = data.id
-        u[exIdx].sets[setIdx].volume = data.volume
-        setExercises(u)
-      }
-    }
-    if (onUpdate) onUpdate()
-  }
-
   const saveAllSets = async () => {
+    const uid = user.id
     let savedCount = 0
-    for (let exIdx = 0; exIdx < exercises.length; exIdx++) {
-      const ex = exercises[exIdx]
+    const updated = [...exercises]
+
+    for (let exIdx = 0; exIdx < updated.length; exIdx++) {
+      const ex = updated[exIdx]
       if (!ex.body_part || !ex.exercise_name) continue
+
       for (let setIdx = 0; setIdx < ex.sets.length; setIdx++) {
         const set = ex.sets[setIdx]
         if (!set.weight || !set.reps) continue
+
         const payload = {
-          [ID_FIELD]: user.id,
+          [ID_FIELD]: uid,
           log_date: selectedDate,
           slot: ex.slot,
           body_part: ex.body_part,
@@ -110,26 +80,25 @@ export default function WorkoutLog({ user, selectedDate, setSelectedDate, exerci
           sets: 1,
           reps: parseInt(set.reps),
           volume: parseFloat(set.weight) * parseInt(set.reps),
-          memo: ex.memo,
+          memo: ex.memo || '',
           media_url: set.media_url || null
         }
+
         if (set.id) {
-          await supabase.from(TABLE).update(payload).eq('id', set.id)
+          const { error } = await supabase.from(TABLE).update(payload).eq('id', set.id)
+          if (!error) savedCount++
         } else {
-          const { data } = await supabase.from(TABLE).insert(payload).select().single()
-          if (data) {
-            exercises[exIdx].sets[setIdx].id = data.id
-            exercises[exIdx].sets[setIdx].volume = data.volume
+          const { data, error } = await supabase.from(TABLE).insert(payload).select().single()
+          if (!error && data) {
+            updated[exIdx].sets[setIdx].id = data.id
+            updated[exIdx].sets[setIdx].volume = data.volume
+            savedCount++
           }
         }
-        savedCount++
-      }
-      // memo 저장
-      for (const set of ex.sets) {
-        if (set.id) await supabase.from(TABLE).update({ memo: ex.memo }).eq('id', set.id)
       }
     }
-    setExercises([...exercises])
+
+    setExercises([...updated])
     if (onUpdate) onUpdate()
     alert(`✅ ${savedCount}개 세트 저장 완료!`)
   }
@@ -137,7 +106,7 @@ export default function WorkoutLog({ user, selectedDate, setSelectedDate, exerci
   const uploadMedia = async (exIdx, setIdx, file) => {
     const ext = file.name.split('.').pop()
     const fileName = `${user.id}/${selectedDate}_${Date.now()}.${ext}`
-    const { data, error } = await supabase.storage.from('workout-media').upload(fileName, file)
+    const { error } = await supabase.storage.from('workout-media').upload(fileName, file)
     if (!error) {
       const { data: urlData } = supabase.storage.from('workout-media').getPublicUrl(fileName)
       updateSetField(exIdx, setIdx, 'media_url', urlData.publicUrl)
@@ -145,12 +114,10 @@ export default function WorkoutLog({ user, selectedDate, setSelectedDate, exerci
   }
 
   const getSetVolume = (set) => (!set.weight || !set.reps) ? '' : (parseFloat(set.weight) * parseInt(set.reps)).toLocaleString() + 'kg'
-
   const dailyTotal = exercises.reduce((sum, ex) => sum + ex.sets.reduce((s2, s) => s2 + (s.weight && s.reps ? parseFloat(s.weight) * parseInt(s.reps) : 0), 0), 0)
 
   return (
     <div>
-      {/* 오늘 요약 */}
       <div style={S.card}>
         <p style={S.cardTitle}>📅 오늘 운동 요약</p>
         {exercises.filter(ex => ex.exercise_name).length === 0 ? (
@@ -176,7 +143,6 @@ export default function WorkoutLog({ user, selectedDate, setSelectedDate, exerci
         )}
       </div>
 
-      {/* 운동 기록 */}
       <div style={S.card}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px' }}>
           <p style={{ ...S.cardTitle, margin: 0 }}>🏋️ 운동 기록</p>
@@ -196,7 +162,7 @@ export default function WorkoutLog({ user, selectedDate, setSelectedDate, exerci
 
             <input
               style={{ width: '100%', padding: '6px 10px', borderRadius: '6px', border: `1px solid ${THEME.border}`, fontSize: '12px', marginBottom: '10px', boxSizing: 'border-box', color: THEME.textSub, background: '#FFF' }}
-              placeholder="📝 특이사항 (예: 오른쪽 무릎 불편, 폼 개선됨)"
+              placeholder="📝 특이사항"
               value={ex.memo}
               onChange={e => updateExField(exIdx, 'memo', e.target.value)}
             />
@@ -231,20 +197,12 @@ export default function WorkoutLog({ user, selectedDate, setSelectedDate, exerci
                 <button style={S.delSetBtn} onClick={() => removeSet(exIdx, setIdx)}>－</button>
               </div>
             ))}
-
             <button style={S.addSetBtn} onClick={() => addSet(exIdx)}>➕ 세트 추가</button>
           </div>
         ))}
 
         <button style={S.addExBtn} onClick={addExercise}>➕ 종목 추가</button>
-
-        {/* 전체 저장 버튼 */}
-        <button
-          style={{ ...S.btnPrimary, marginTop: '12px', fontSize: '15px' }}
-          onClick={saveAllSets}
-        >
-          💾 전체 저장
-        </button>
+        <button style={{ ...S.btnPrimary, marginTop: '12px', fontSize: '15px' }} onClick={saveAllSets}>💾 전체 저장</button>
       </div>
     </div>
   )
