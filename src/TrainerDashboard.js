@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react'
 import { supabase } from './supabase'
-import { S, generateCode } from './utils'
+import { S, THEME, PART_COLORS, generateCode } from './utils'
 import WorkoutLog from './WorkoutLog'
 import WorkoutStats from './WorkoutStats'
 import DietLog from './DietLog'
@@ -8,6 +8,7 @@ import DietLog from './DietLog'
 export default function TrainerDashboard({ user, onLogout }) {
   const [view, setView] = useState('members')
   const [members, setMembers] = useState([])
+  const [memberStats, setMemberStats] = useState({}) // 당일 통계
   const [showAddMember, setShowAddMember] = useState(false)
   const [newMemberName, setNewMemberName] = useState('')
   const [newMemberGoal, setNewMemberGoal] = useState('다이어트')
@@ -25,7 +26,26 @@ export default function TrainerDashboard({ user, onLogout }) {
 
   const loadMembers = async () => {
     const { data } = await supabase.from('members').select('*').eq('trainer_id', user.id).order('created_at', { ascending: false })
-    if (data) setMembers(data)
+    if (data) {
+      setMembers(data)
+      loadTodayStats(data)
+    }
+  }
+
+  const loadTodayStats = async (memberList) => {
+    const today = new Date().toISOString().split('T')[0]
+    const stats = {}
+    for (const m of memberList) {
+      const [{ data: wLogs }, { data: dLogs }] = await Promise.all([
+        supabase.from('workout_logs').select('body_part, volume').eq('member_id', m.id).eq('log_date', today),
+        supabase.from('diet_logs').select('calories').eq('member_id', m.id).eq('log_date', today)
+      ])
+      const parts = {}
+      ;(wLogs || []).forEach(r => { if (r.body_part) parts[r.body_part] = (parts[r.body_part] || 0) + (r.volume || 0) })
+      const calories = (dLogs || []).reduce((sum, r) => sum + (r.calories || 0), 0)
+      stats[m.id] = { parts, calories }
+    }
+    setMemberStats(stats)
   }
 
   const addMember = async () => {
@@ -56,8 +76,7 @@ export default function TrainerDashboard({ user, onLogout }) {
     setView('memberDetail')
     setMemberView('workout')
     loadMemberLogs(member.id)
-    const today = new Date().toISOString().split('T')[0]
-    loadMemberExercises(member.id, today)
+    loadMemberExercises(member.id, new Date().toISOString().split('T')[0])
   }
 
   const loadMemberExercises = async (memberId, date) => {
@@ -74,27 +93,25 @@ export default function TrainerDashboard({ user, onLogout }) {
     }
   }
 
-  // 트레이너 본인 운동기록용 가상 user 객체
   const trainerAsUser = { id: user.id, name: '트레이너', goal: '벌크업', gender: '남성', type: 'trainer_self' }
 
   return (
     <div style={S.container}>
       <div style={S.wrap}>
         <div style={S.header}>
-          <h1 style={S.headerTitle}>💪 PT Manager</h1>
+          <h1 style={S.headerTitle}>🏋️ PT Manager</h1>
           <div style={{ display: 'flex', gap: '8px' }}>
             {view !== 'members' && (
               <button style={S.logoutBtn} onClick={() => { setView('members'); setSelectedMember(null) }}>← 목록</button>
             )}
-            <button style={S.logoutBtn} onClick={onLogout}>로그아웃</button>
+            <button style={S.logoutBtn} onClick={onLogout}>🚪 로그아웃</button>
           </div>
         </div>
 
-        {/* 메인 탭 */}
         {view === 'members' && (
           <div style={S.tabBar}>
-            <button style={memberView === 'members' ? S.tabActive : S.tab} onClick={() => setMemberView('members')}>회원 관리</button>
-            <button style={memberView === 'myRecord' ? S.tabActive : S.tab} onClick={() => { setMemberView('myRecord'); loadTrainerLogs() }}>내 기록</button>
+            <button style={memberView === 'members' ? S.tabActive : S.tab} onClick={() => setMemberView('members')}>👥 회원 관리</button>
+            <button style={memberView === 'myRecord' ? S.tabActive : S.tab} onClick={() => { setMemberView('myRecord'); loadTrainerLogs() }}>📋 내 기록</button>
           </div>
         )}
 
@@ -102,53 +119,85 @@ export default function TrainerDashboard({ user, onLogout }) {
         {view === 'members' && memberView === 'members' && (
           <div style={S.card}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px' }}>
-              <p style={{ ...S.cardTitle, margin: 0 }}>회원 관리</p>
-              <button style={S.addBtn} onClick={() => { setShowAddMember(!showAddMember); setGeneratedCode('') }}>+ 회원 추가</button>
+              <p style={{ ...S.cardTitle, margin: 0 }}>👥 회원 관리</p>
+              <button style={S.addBtn} onClick={() => { setShowAddMember(!showAddMember); setGeneratedCode('') }}>➕ 회원 추가</button>
             </div>
 
             {showAddMember && (
-              <div style={{ background: '#F4F4F4', borderRadius: '12px', padding: '14px', marginBottom: '14px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                <input style={S.input} type="text" placeholder="회원 이름" value={newMemberName} onChange={e => setNewMemberName(e.target.value)} />
+              <div style={{ background: THEME.cardAlt, borderRadius: '12px', padding: '14px', marginBottom: '14px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                <input style={S.input} type="text" placeholder="🙍 회원 이름" value={newMemberName} onChange={e => setNewMemberName(e.target.value)} />
                 <select style={S.input} value={newMemberGoal} onChange={e => setNewMemberGoal(e.target.value)}>
-                  <option value="다이어트">다이어트</option>
-                  <option value="벌크업">벌크업</option>
-                  <option value="체형교정">체형교정</option>
-                  <option value="재활">재활</option>
+                  <option value="다이어트">🥗 다이어트</option>
+                  <option value="벌크업">💪 벌크업</option>
+                  <option value="체형교정">🧘 체형교정</option>
+                  <option value="재활">🏥 재활</option>
                 </select>
                 <select style={S.input} value={newMemberGender} onChange={e => setNewMemberGender(e.target.value)}>
-                  <option value="여성">여성</option>
-                  <option value="남성">남성</option>
+                  <option value="여성">👩 여성</option>
+                  <option value="남성">👨 남성</option>
                 </select>
-                <button style={S.btnPrimary} onClick={addMember} disabled={loading}>{loading ? '추가 중...' : '코드 발급하기'}</button>
+                <button style={S.btnPrimary} onClick={addMember} disabled={loading}>{loading ? '⏳ 추가 중...' : '🔑 코드 발급하기'}</button>
                 {generatedCode && (
-                  <div style={{ background: '#1A1A2E', borderRadius: '12px', padding: '16px', textAlign: 'center' }}>
-                    <p style={{ color: '#888', fontSize: '12px', margin: '0 0 4px' }}>발급된 코드</p>
-                    <p style={{ color: '#E8C547', fontSize: '32px', fontWeight: '700', letterSpacing: '6px', margin: '0 0 12px' }}>{generatedCode}</p>
-                    <button style={{ background: '#FEE500', color: '#1A1A2E', border: 'none', padding: '10px', borderRadius: '8px', cursor: 'pointer', fontSize: '14px', fontWeight: '700', width: '100%' }} onClick={() => shareKakao(generatedCode, newMemberName)}>카카오톡으로 전송</button>
+                  <div style={{ background: THEME.primary, borderRadius: '12px', padding: '16px', textAlign: 'center' }}>
+                    <p style={{ color: 'rgba(255,255,255,0.7)', fontSize: '12px', margin: '0 0 4px' }}>발급된 코드</p>
+                    <p style={{ color: '#FFF', fontSize: '32px', fontWeight: '700', letterSpacing: '6px', margin: '0 0 12px' }}>{generatedCode}</p>
+                    <button style={{ background: '#FEE500', color: '#1A1A2E', border: 'none', padding: '10px', borderRadius: '8px', cursor: 'pointer', fontSize: '14px', fontWeight: '700', width: '100%' }} onClick={() => shareKakao(generatedCode, newMemberName)}>💬 카카오톡으로 전송</button>
                   </div>
                 )}
               </div>
             )}
 
             {members.length === 0 ? (
-              <p style={{ color: '#888', textAlign: 'center', padding: '20px 0', fontSize: '14px' }}>등록된 회원이 없습니다.</p>
+              <p style={{ color: THEME.textSub, textAlign: 'center', padding: '20px 0', fontSize: '14px' }}>등록된 회원이 없습니다.</p>
             ) : (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                {members.map(member => (
-                  <div key={member.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px', background: '#F4F4F4', borderRadius: '12px', cursor: 'pointer' }} onClick={() => openMember(member)}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                      <div style={{ width: '40px', height: '40px', borderRadius: '50%', background: '#1A1A2E', color: '#E8C547', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '16px', fontWeight: '700' }}>{member.name.charAt(0)}</div>
-                      <div>
-                        <p style={{ fontSize: '15px', fontWeight: '700', color: '#1A1A2E', margin: '0 0 2px' }}>{member.name}</p>
-                        <p style={{ fontSize: '12px', color: '#888', margin: 0 }}>{member.goal} · {member.gender}</p>
+                {members.map(member => {
+                  const stat = memberStats[member.id] || { parts: {}, calories: 0 }
+                  const activeParts = Object.entries(stat.parts).filter(([, v]) => v > 0)
+                  return (
+                    <div key={member.id} style={{ padding: '12px', background: THEME.cardAlt, borderRadius: '12px', cursor: 'pointer', border: `1px solid ${THEME.border}` }} onClick={() => openMember(member)}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: activeParts.length > 0 || stat.calories > 0 ? '10px' : '0' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                          <div style={{ width: '40px', height: '40px', borderRadius: '50%', background: THEME.primary, color: '#FFF', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '16px', fontWeight: '700' }}>{member.name.charAt(0)}</div>
+                          <div>
+                            <p style={{ fontSize: '15px', fontWeight: '700', color: THEME.text, margin: '0 0 2px' }}>{member.name}</p>
+                            <p style={{ fontSize: '12px', color: THEME.textSub, margin: 0 }}>{member.goal} · {member.gender}</p>
+                          </div>
+                        </div>
+                        <div style={{ textAlign: 'right' }}>
+                          <p style={{ fontSize: '14px', fontWeight: '700', color: THEME.text, letterSpacing: '2px', margin: '0 0 4px' }}>{member.code}</p>
+                          <button style={{ background: '#FEE500', color: '#1A1A2E', border: 'none', padding: '4px 10px', borderRadius: '6px', cursor: 'pointer', fontSize: '12px', fontWeight: '700' }} onClick={e => { e.stopPropagation(); shareKakao(member.code, member.name) }}>💬 전송</button>
+                        </div>
                       </div>
+
+                      {/* 당일 현황 */}
+                      {(activeParts.length > 0 || stat.calories > 0) && (
+                        <div style={{ display: 'flex', gap: '8px', alignItems: 'center', paddingTop: '10px', borderTop: `1px solid ${THEME.border}` }}>
+                          <div style={{ flex: 1 }}>
+                            <p style={{ fontSize: '10px', color: THEME.textSub, margin: '0 0 4px' }}>📅 오늘 운동</p>
+                            {activeParts.length === 0 ? (
+                              <p style={{ fontSize: '11px', color: THEME.textSub, margin: 0 }}>기록 없음</p>
+                            ) : (
+                              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '3px' }}>
+                                {activeParts.map(([part, vol]) => (
+                                  <span key={part} style={{ fontSize: '10px', background: PART_COLORS[part], color: '#FFF', padding: '2px 6px', borderRadius: '8px' }}>
+                                    {part} {vol >= 1000 ? (vol / 1000).toFixed(1) + 't' : vol + 'kg'}
+                                  </span>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                          <div style={{ textAlign: 'right' }}>
+                            <p style={{ fontSize: '10px', color: THEME.textSub, margin: '0 0 2px' }}>🍽️ 오늘 칼로리</p>
+                            <p style={{ fontSize: '14px', fontWeight: '700', color: stat.calories > 0 ? THEME.primary : THEME.textSub, margin: 0 }}>
+                              {stat.calories > 0 ? `${Math.round(stat.calories)}kcal` : '기록 없음'}
+                            </p>
+                          </div>
+                        </div>
+                      )}
                     </div>
-                    <div style={{ textAlign: 'right' }}>
-                      <p style={{ fontSize: '14px', fontWeight: '700', color: '#1A1A2E', letterSpacing: '2px', margin: '0 0 4px' }}>{member.code}</p>
-                      <button style={{ background: '#FEE500', color: '#1A1A2E', border: 'none', padding: '4px 10px', borderRadius: '6px', cursor: 'pointer', fontSize: '12px', fontWeight: '700' }} onClick={e => { e.stopPropagation(); shareKakao(member.code, member.name) }}>코드 전송</button>
-                    </div>
-                  </div>
-                ))}
+                  )
+                })}
               </div>
             )}
           </div>
@@ -158,22 +207,11 @@ export default function TrainerDashboard({ user, onLogout }) {
         {view === 'members' && memberView === 'myRecord' && (
           <>
             <div style={S.tabBar}>
-              <button style={trainerView === 'workout' ? S.tabActive : S.tab} onClick={() => setTrainerView('workout')}>운동 기록</button>
-              <button style={trainerView === 'stats' ? S.tabActive : S.tab} onClick={() => setTrainerView('stats')}>운동 통계</button>
-              <button style={trainerView === 'diet' ? S.tabActive : S.tab} onClick={() => setTrainerView('diet')}>식단</button>
+              <button style={trainerView === 'workout' ? S.tabActive : S.tab} onClick={() => setTrainerView('workout')}>🏋️ 운동 기록</button>
+              <button style={trainerView === 'stats' ? S.tabActive : S.tab} onClick={() => setTrainerView('stats')}>📊 운동 통계</button>
+              <button style={trainerView === 'diet' ? S.tabActive : S.tab} onClick={() => setTrainerView('diet')}>🍽️ 식단</button>
             </div>
-            {trainerView === 'workout' && (
-              <WorkoutLog
-                user={trainerAsUser}
-                selectedDate={selectedDate}
-                setSelectedDate={setSelectedDate}
-                exercises={exercises}
-                setExercises={setExercises}
-                onUpdate={loadTrainerLogs}
-                tableOverride="trainer_workout_logs"
-                trainerIdField="trainer_id"
-              />
-            )}
+            {trainerView === 'workout' && <WorkoutLog user={trainerAsUser} selectedDate={selectedDate} setSelectedDate={setSelectedDate} exercises={exercises} setExercises={setExercises} onUpdate={loadTrainerLogs} tableOverride="trainer_workout_logs" trainerIdField="trainer_id" />}
             {trainerView === 'stats' && <WorkoutStats allLogs={allLogs} />}
             {trainerView === 'diet' && <DietLog user={trainerAsUser} tableOverride="trainer_diet_logs" trainerIdField="trainer_id" />}
           </>
@@ -182,29 +220,18 @@ export default function TrainerDashboard({ user, onLogout }) {
         {/* 회원 상세 */}
         {view === 'memberDetail' && selectedMember && (
           <>
-            <div style={{ background: '#E8C547', borderRadius: '12px', padding: '12px 16px', marginBottom: '12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <div>
-                <p style={{ fontSize: '16px', fontWeight: '700', color: '#1A1A2E', margin: '0 0 2px' }}>{selectedMember.name}</p>
-                <p style={{ fontSize: '13px', color: '#555', margin: 0 }}>{selectedMember.goal} · {selectedMember.gender} · {selectedMember.code}</p>
-              </div>
+            <div style={{ background: THEME.primaryLight, border: `1px solid ${THEME.primary}`, borderRadius: '12px', padding: '12px 16px', marginBottom: '12px' }}>
+              <p style={{ fontSize: '16px', fontWeight: '700', color: THEME.primary, margin: '0 0 2px' }}>{selectedMember.name}</p>
+              <p style={{ fontSize: '13px', color: THEME.textSub, margin: 0 }}>{selectedMember.goal} · {selectedMember.gender} · {selectedMember.code}</p>
             </div>
 
             <div style={S.tabBar}>
-              <button style={memberView === 'workout' ? S.tabActive : S.tab} onClick={() => setMemberView('workout')}>운동 기록</button>
-              <button style={memberView === 'stats' ? S.tabActive : S.tab} onClick={() => setMemberView('stats')}>운동 통계</button>
-              <button style={memberView === 'diet' ? S.tabActive : S.tab} onClick={() => setMemberView('diet')}>식단</button>
+              <button style={memberView === 'workout' ? S.tabActive : S.tab} onClick={() => setMemberView('workout')}>🏋️ 운동 기록</button>
+              <button style={memberView === 'stats' ? S.tabActive : S.tab} onClick={() => setMemberView('stats')}>📊 운동 통계</button>
+              <button style={memberView === 'diet' ? S.tabActive : S.tab} onClick={() => setMemberView('diet')}>🍽️ 식단</button>
             </div>
 
-            {memberView === 'workout' && (
-              <WorkoutLog
-                user={selectedMember}
-                selectedDate={selectedDate}
-                setSelectedDate={setSelectedDate}
-                exercises={exercises}
-                setExercises={setExercises}
-                onUpdate={() => loadMemberLogs(selectedMember.id)}
-              />
-            )}
+            {memberView === 'workout' && <WorkoutLog user={selectedMember} selectedDate={selectedDate} setSelectedDate={setSelectedDate} exercises={exercises} setExercises={setExercises} onUpdate={() => loadMemberLogs(selectedMember.id)} />}
             {memberView === 'stats' && <WorkoutStats allLogs={allLogs} />}
             {memberView === 'diet' && <DietLog user={selectedMember} />}
           </>
