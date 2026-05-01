@@ -5,7 +5,7 @@ import { S, THEME } from './utils'
 const MEAL_TYPES = ['아침', '점심', '저녁', '간식']
 const MEAL_ICONS = { '아침': '🌅', '점심': '☀️', '저녁': '🌙', '간식': '🍎' }
 
-export default function DietLog({ user, macro, tableOverride, trainerIdField }) {
+export default function DietLog({ user, onDietUpdate, tableOverride, trainerIdField }) {
   const TABLE = tableOverride || 'diet_logs'
   const ID_FIELD = trainerIdField || 'member_id'
 
@@ -13,8 +13,8 @@ export default function DietLog({ user, macro, tableOverride, trainerIdField }) 
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0])
   const [dietLogs, setDietLogs] = useState([])
   const [allDietLogs, setAllDietLogs] = useState([])
+  const [inputVals, setInputVals] = useState({})
   const [statsTab, setStatsTab] = useState('daily')
-  const [inputVals, setInputVals] = useState({}) // {meal_type: {carbs, protein, fat, calories}}
 
   const today = new Date()
   const [viewYear, setViewYear] = useState(today.getFullYear())
@@ -26,11 +26,10 @@ export default function DietLog({ user, macro, tableOverride, trainerIdField }) 
     const { data } = await supabase.from(TABLE).select('*').eq(ID_FIELD, user.id).eq('log_date', date).order('meal_type')
     const logs = data || []
     setDietLogs(logs)
-    // inputVals 동기화
     const vals = {}
     MEAL_TYPES.forEach(meal => {
       const log = logs.find(l => l.meal_type === meal)
-      vals[meal] = { carbs: log?.carbs || '', protein: log?.protein || '', fat: log?.fat || '', calories: log?.calories || '' }
+      vals[meal] = { carbs: log?.carbs ?? '', protein: log?.protein ?? '', fat: log?.fat ?? '', calories: log?.calories ?? '' }
     })
     setInputVals(vals)
   }
@@ -54,18 +53,17 @@ export default function DietLog({ user, macro, tableOverride, trainerIdField }) 
       const calories = parseFloat(vals.calories) || Math.round(carbs * 4 + protein * 4 + fat * 9)
       if (carbs === 0 && protein === 0 && fat === 0 && calories === 0) continue
 
-      const payload = { [ID_FIELD]: user.id, log_date: selectedDate, meal_type: meal, carbs, protein, fat, calories }
       const existing = dietLogs.find(l => l.meal_type === meal)
-
       if (existing) {
         await supabase.from(TABLE).update({ carbs, protein, fat, calories }).eq('id', existing.id)
       } else {
-        await supabase.from(TABLE).insert(payload)
+        await supabase.from(TABLE).insert({ [ID_FIELD]: user.id, log_date: selectedDate, meal_type: meal, carbs, protein, fat, calories })
       }
       count++
     }
     await loadDietLogs(selectedDate)
     await loadAllDietLogs()
+    if (onDietUpdate) onDietUpdate()
     alert(`✅ ${count}개 식사 저장 완료!`)
   }
 
@@ -75,29 +73,7 @@ export default function DietLog({ user, macro, tableOverride, trainerIdField }) 
   const todayFat = getDayTotal('fat')
   const todayCalories = getDayTotal('calories')
 
-  const ProgressBar = ({ label, current, target, color }) => {
-    const pct = target > 0 ? Math.min(current / target * 100, 100) : 0
-    const over = target > 0 && current > target
-    return (
-      <div style={{ marginBottom: '10px' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
-          <span style={{ fontSize: '12px', fontWeight: '700', color: '#FFF' }}>{label}</span>
-          <span style={{ fontSize: '12px', color: over ? '#FFB3B3' : '#CCC' }}>
-            {Math.round(current)}{label === '칼로리' ? 'kcal' : 'g'} / {target}{label === '칼로리' ? 'kcal' : 'g'}
-            {over && <span style={{ color: '#FFB3B3', marginLeft: '4px' }}>초과!</span>}
-          </span>
-        </div>
-        <div style={{ background: 'rgba(255,255,255,0.2)', borderRadius: '6px', height: '10px' }}>
-          <div style={{ width: `${pct}%`, background: over ? '#FF6B6B' : color, height: '10px', borderRadius: '6px', transition: 'width 0.3s' }} />
-        </div>
-        <div style={{ textAlign: 'right', marginTop: '2px' }}>
-          <span style={{ fontSize: '11px', color: over ? '#FF6B6B' : color, fontWeight: '700' }}>{Math.round(pct)}%</span>
-        </div>
-      </div>
-    )
-  }
-
-  // 통계 계산
+  // 통계
   const yearStr = String(viewYear)
   const monthStr = String(viewMonth).padStart(2, '0')
   const byDay = {}
@@ -111,7 +87,7 @@ export default function DietLog({ user, macro, tableOverride, trainerIdField }) 
   const monthDays = Object.keys(byDay).filter(d => d.startsWith(`${yearStr}-${monthStr}`)).sort()
 
   const weeklyByWeek = Array.from({ length: 5 }, () => ({ carbs: 0, protein: 0, fat: 0, calories: 0 }))
-  allDietLogs.filter(r => r.log_date && r.log_date.startsWith(`${yearStr}-${monthStr}`)).forEach(row => {
+  allDietLogs.filter(r => r.log_date?.startsWith(`${yearStr}-${monthStr}`)).forEach(row => {
     const day = parseInt(row.log_date.split('-')[2])
     const wk = day <= 7 ? 0 : day <= 14 ? 1 : day <= 21 ? 2 : day <= 28 ? 3 : 4
     weeklyByWeek[wk].carbs += row.carbs || 0
@@ -125,7 +101,7 @@ export default function DietLog({ user, macro, tableOverride, trainerIdField }) 
     const mStr = String(m).padStart(2, '0')
     monthlyByMonth[mStr] = { carbs: 0, protein: 0, fat: 0, calories: 0 }
   }
-  allDietLogs.filter(r => r.log_date && r.log_date.startsWith(yearStr)).forEach(row => {
+  allDietLogs.filter(r => r.log_date?.startsWith(yearStr)).forEach(row => {
     const mStr = row.log_date.split('-')[1]
     monthlyByMonth[mStr].carbs += row.carbs || 0
     monthlyByMonth[mStr].protein += row.protein || 0
@@ -138,7 +114,7 @@ export default function DietLog({ user, macro, tableOverride, trainerIdField }) 
   const thisWeekStart = new Date(today); thisWeekStart.setDate(today.getDate() - today.getDay() + 1)
   const sumField = (logs, field) => logs.reduce((sum, r) => sum + (r[field] || 0), 0)
   const thisWeekLogs = allDietLogs.filter(r => r.log_date >= thisWeekStart.toISOString().split('T')[0])
-  const thisMonthLogs = allDietLogs.filter(r => r.log_date && r.log_date.startsWith(thisMonthStr))
+  const thisMonthLogs = allDietLogs.filter(r => r.log_date?.startsWith(thisMonthStr))
 
   const yearOptions = []
   for (let y = today.getFullYear(); y >= today.getFullYear() - 3; y--) yearOptions.push(y)
@@ -175,20 +151,6 @@ export default function DietLog({ user, macro, tableOverride, trainerIdField }) 
 
   return (
     <div>
-      {/* 목표 달성률 */}
-      {macro && (
-        <div style={{ background: THEME.primary, borderRadius: '16px', padding: '16px', marginBottom: '12px' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
-            <p style={{ fontSize: '14px', fontWeight: '700', color: '#FFF', margin: 0 }}>🎯 오늘 목표 달성률</p>
-            <span style={{ fontSize: '12px', color: 'rgba(255,255,255,0.7)' }}>목표 {macro.target}kcal</span>
-          </div>
-          <ProgressBar label="칼로리" current={todayCalories} target={macro.target} color="#FCD34D" />
-          <ProgressBar label="탄수화물" current={todayCarbs} target={macro.carbs} color="#93C5FD" />
-          <ProgressBar label="단백질" current={todayProtein} target={macro.protein} color="#FCA5A5" />
-          <ProgressBar label="지방" current={todayFat} target={macro.fat} color="#FCD34D" />
-        </div>
-      )}
-
       {/* 탭 */}
       <div style={{ display: 'flex', gap: '6px', marginBottom: '10px' }}>
         {['record', 'stats'].map((t, i) => (

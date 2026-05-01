@@ -213,7 +213,7 @@ export default function TrainerDashboard({ user, onLogout }) {
             </div>
             {trainerView === 'workout' && <WorkoutLog user={trainerAsUser} selectedDate={selectedDate} setSelectedDate={setSelectedDate} exercises={exercises} setExercises={setExercises} onUpdate={loadTrainerLogs} tableOverride="trainer_workout_logs" trainerIdField="trainer_id" />}
             {trainerView === 'stats' && <WorkoutStats allLogs={allLogs} />}
-            {trainerView === 'diet' && <DietLog user={trainerAsUser} tableOverride="trainer_diet_logs" trainerIdField="trainer_id" />}
+            {trainerView === 'diet' && <DietLog user={trainerAsUser} tableOverride="trainer_diet_logs" trainerIdField="trainer_id" onDietUpdate={() => {}} />}
           </>
         )}
 
