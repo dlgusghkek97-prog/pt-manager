@@ -47,20 +47,31 @@ export const calcMacro = ({ goal, gender, weight, muscle, activity, intensity, c
   return { bmr, tdee, target, protein, fat, carbs }
 }
 
-// 테마 컬러
 export const THEME = {
-  bg: '#F5F3EF',         // 전체 배경 그레이베이지
-  card: '#FFFFFF',       // 카드 흰색
-  cardAlt: '#F0EDE8',    // 보조 카드
-  primary: '#2E7D52',    // 딥 그린 (포인트)
-  primaryLight: '#E8F5EE', // 연한 그린
+  bg: '#F5F3EF',
+  card: '#FFFFFF',
+  cardAlt: '#F0EDE8',
+  primary: '#2E7D52',
+  primaryLight: '#E8F5EE',
   primaryDark: '#1B5E38',
-  text: '#1C1C1C',       // 기본 텍스트
-  textSub: '#6B7280',    // 보조 텍스트
-  border: '#E5E1DA',     // 경계선
-  accent: '#F59E0B',     // 강조 (amber)
+  text: '#1C1C1C',
+  textSub: '#6B7280',
+  border: '#E5E1DA',
   danger: '#E84747',
   yellow: '#F59E0B',
+}
+
+// SVG 아이콘 모음
+export const ICONS = {
+  workout: `<svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M6.5 6.5h11M6.5 17.5h11M3 12h18M7 9.5V6.5M17 9.5V6.5M7 17.5v-3M17 17.5v-3"/></svg>`,
+  stats: `<svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="12" width="4" height="9" rx="1"/><rect x="10" y="7" width="4" height="14" rx="1"/><rect x="17" y="3" width="4" height="18" rx="1"/></svg>`,
+  diet: `<svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M12 2a5 5 0 0 1 5 5c0 3-5 7-5 7S7 10 7 7a5 5 0 0 1 5-5z"/><path d="M5 21h14M8 17l1-3h6l1 3"/></svg>`,
+  trainer: `<svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/></svg>`,
+  camera: `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>`,
+  morning: `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#E8A020" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/></svg>`,
+  lunch: `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#F59E0B" stroke-width="2"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="3"/></svg>`,
+  dinner: `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#6B7280" stroke-width="2"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9z"/></svg>`,
+  snack: `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#E84747" stroke-width="2"><path d="M12 2a7 7 0 0 0-7 7c0 5 7 13 7 13s7-8 7-13a7 7 0 0 0-7-7z"/><circle cx="12" cy="9" r="2.5"/></svg>`,
 }
 
 export const S = {
@@ -69,9 +80,6 @@ export const S = {
   header: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px' },
   headerTitle: { color: THEME.primary, fontSize: '20px', fontWeight: '700', margin: 0 },
   logoutBtn: { background: 'transparent', border: `1px solid ${THEME.primary}`, color: THEME.primary, padding: '6px 14px', borderRadius: '8px', cursor: 'pointer', fontSize: '13px' },
-  tabBar: { display: 'flex', gap: '8px', marginBottom: '12px' },
-  tab: { flex: 1, padding: '10px', borderRadius: '8px', border: `1px solid ${THEME.border}`, background: '#FFF', color: THEME.textSub, fontSize: '13px', cursor: 'pointer' },
-  tabActive: { flex: 1, padding: '10px', borderRadius: '8px', border: 'none', background: THEME.primary, color: '#FFF', fontSize: '13px', fontWeight: '700', cursor: 'pointer' },
   card: { background: THEME.card, borderRadius: '16px', padding: '16px', marginBottom: '12px', boxShadow: '0 1px 4px rgba(0,0,0,0.07)' },
   cardTitle: { fontSize: '15px', fontWeight: '700', color: THEME.text, margin: '0 0 12px' },
   addBtn: { background: THEME.primary, color: '#FFF', border: 'none', padding: '8px 14px', borderRadius: '8px', cursor: 'pointer', fontSize: '13px', fontWeight: '700' },

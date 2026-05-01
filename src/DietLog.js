@@ -3,7 +3,16 @@ import { supabase } from './supabase'
 import { S, THEME } from './utils'
 
 const MEAL_TYPES = ['아침', '점심', '저녁', '간식']
-const MEAL_ICONS = { '아침': '🌅', '점심': '☀️', '저녁': '🌙', '간식': '🍎' }
+
+const MealIcon = ({ meal }) => {
+  if (meal === '아침') return <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#E8A020" strokeWidth="2" strokeLinecap="round"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/></svg>
+  if (meal === '점심') return <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#F59E0B" strokeWidth="2"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="3"/></svg>
+  if (meal === '저녁') return <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#6B7280" strokeWidth="2"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9z"/></svg>
+  return <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#E84747" strokeWidth="2"><path d="M12 2a7 7 0 0 0-7 7c0 5 7 13 7 13s7-8 7-13a7 7 0 0 0-7-7z"/><circle cx="12" cy="9" r="2.5"/></svg>
+}
+
+const StatsIcon = () => <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="12" width="4" height="9" rx="1"/><rect x="10" y="7" width="4" height="14" rx="1"/><rect x="17" y="3" width="4" height="18" rx="1"/></svg>
+const DietTabIcon = () => <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M12 2a5 5 0 0 1 5 5c0 3-5 7-5 7S7 10 7 7a5 5 0 0 1 5-5z"/><path d="M5 21h14M8 17l1-3h6l1 3"/></svg>
 
 export default function DietLog({ user, onDietUpdate, tableOverride, trainerIdField }) {
   const TABLE = tableOverride || 'diet_logs'
@@ -149,40 +158,47 @@ export default function DietLog({ user, onDietUpdate, tableOverride, trainerIdFi
     </div>
   )
 
+  // 공통 grid 스타일
+  const gridStyle = { display: 'grid', gridTemplateColumns: '54px 1fr 1fr 1fr 1fr', gap: '4px', alignItems: 'center' }
+
   return (
     <div>
       {/* 탭 */}
-      <div style={{ display: 'flex', gap: '6px', marginBottom: '10px' }}>
-        {['record', 'stats'].map((t, i) => (
-          <button key={t} style={{ flex: 1, padding: '9px', borderRadius: '8px', border: dietTab === t ? 'none' : `1px solid ${THEME.border}`, background: dietTab === t ? THEME.primary : '#FFF', color: dietTab === t ? '#FFF' : THEME.textSub, fontSize: '12px', fontWeight: dietTab === t ? '700' : '400', cursor: 'pointer' }} onClick={() => setDietTab(t)}>
-            {['🍽️ 식단 기록', '📊 통계'][i]}
-          </button>
-        ))}
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px', marginBottom: '10px' }}>
+        <button onClick={() => setDietTab('record')} style={{ padding: '9px', borderRadius: '8px', border: dietTab === 'record' ? 'none' : `1px solid ${THEME.border}`, background: dietTab === 'record' ? THEME.primary : '#FFF', color: dietTab === 'record' ? '#FFF' : THEME.textSub, fontSize: '12px', fontWeight: dietTab === 'record' ? '600' : '400', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '5px' }}>
+          <DietTabIcon />식단 기록
+        </button>
+        <button onClick={() => setDietTab('stats')} style={{ padding: '9px', borderRadius: '8px', border: dietTab === 'stats' ? 'none' : `1px solid ${THEME.border}`, background: dietTab === 'stats' ? THEME.primary : '#FFF', color: dietTab === 'stats' ? '#FFF' : THEME.textSub, fontSize: '12px', fontWeight: dietTab === 'stats' ? '600' : '400', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '5px' }}>
+          <StatsIcon />통계
+        </button>
       </div>
 
       {/* 식단 기록 */}
       {dietTab === 'record' && (
         <div style={S.card}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px' }}>
-            <p style={{ ...S.cardTitle, margin: 0 }}>🍽️ 식단 기록</p>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+            <p style={{ ...S.cardTitle, margin: 0 }}>식단 기록</p>
             <input type="date" value={selectedDate} onChange={e => { setSelectedDate(e.target.value); loadDietLogs(e.target.value) }} style={S.dateInput} />
           </div>
 
-          <div style={{ display: 'flex', gap: '6px', padding: '6px 8px', background: THEME.cardAlt, borderRadius: '8px', marginBottom: '8px' }}>
-            <span style={{ flex: 1.2, fontSize: '12px', fontWeight: '700', color: THEME.textSub }}>식사</span>
-            <span style={{ flex: 1, fontSize: '12px', color: '#4472C4', textAlign: 'center', fontWeight: '700' }}>탄</span>
-            <span style={{ flex: 1, fontSize: '12px', color: THEME.danger, textAlign: 'center', fontWeight: '700' }}>단</span>
-            <span style={{ flex: 1, fontSize: '12px', color: '#E8A020', textAlign: 'center', fontWeight: '700' }}>지</span>
-            <span style={{ flex: 1, fontSize: '12px', color: THEME.textSub, textAlign: 'center', fontWeight: '700' }}>kcal</span>
+          {/* 헤더 */}
+          <div style={{ ...gridStyle, padding: '5px 4px', background: THEME.cardAlt, borderRadius: '8px', marginBottom: '8px' }}>
+            <span style={{ fontSize: '11px', color: THEME.textSub, fontWeight: '600', paddingLeft: '2px' }}>식사</span>
+            <span style={{ fontSize: '11px', color: '#4472C4', textAlign: 'center', fontWeight: '600' }}>탄</span>
+            <span style={{ fontSize: '11px', color: THEME.danger, textAlign: 'center', fontWeight: '600' }}>단</span>
+            <span style={{ fontSize: '11px', color: '#E8A020', textAlign: 'center', fontWeight: '600' }}>지</span>
+            <span style={{ fontSize: '11px', color: THEME.textSub, textAlign: 'center', fontWeight: '600' }}>kcal</span>
           </div>
 
           {MEAL_TYPES.map(meal => (
-            <div key={meal} style={{ display: 'flex', gap: '6px', alignItems: 'center', marginBottom: '8px' }}>
-              <span style={{ flex: 1.2, fontSize: '13px', fontWeight: '700', color: THEME.text }}>{MEAL_ICONS[meal]} {meal}</span>
+            <div key={meal} style={{ ...gridStyle, marginBottom: '7px' }}>
+              <span style={{ fontSize: '12px', fontWeight: '600', color: THEME.text, display: 'flex', alignItems: 'center', gap: '3px' }}>
+                <MealIcon meal={meal} />{meal}
+              </span>
               {['carbs', 'protein', 'fat', 'calories'].map(field => (
                 <input
                   key={field}
-                  style={{ ...S.numInput, flex: 1, background: '#FAFAFA' }}
+                  style={{ padding: '6px 2px', borderRadius: '6px', border: `0.5px solid ${THEME.border}`, fontSize: '12px', textAlign: 'center', width: '100%', boxSizing: 'border-box', background: '#FAFAFA' }}
                   type="number"
                   placeholder="0"
                   value={inputVals[meal]?.[field] ?? ''}
@@ -192,12 +208,13 @@ export default function DietLog({ user, onDietUpdate, tableOverride, trainerIdFi
             </div>
           ))}
 
-          <div style={{ display: 'flex', gap: '6px', padding: '10px 8px', background: THEME.primary, borderRadius: '8px', marginTop: '4px', marginBottom: '10px' }}>
-            <span style={{ flex: 1.2, fontSize: '13px', fontWeight: '700', color: '#FFF' }}>합계</span>
-            <span style={{ flex: 1, fontSize: '13px', fontWeight: '700', color: '#93C5FD', textAlign: 'center' }}>{Math.round(todayCarbs)}g</span>
-            <span style={{ flex: 1, fontSize: '13px', fontWeight: '700', color: '#FCA5A5', textAlign: 'center' }}>{Math.round(todayProtein)}g</span>
-            <span style={{ flex: 1, fontSize: '13px', fontWeight: '700', color: '#FCD34D', textAlign: 'center' }}>{Math.round(todayFat)}g</span>
-            <span style={{ flex: 1, fontSize: '13px', fontWeight: '700', color: '#FFF', textAlign: 'center' }}>{Math.round(todayCalories)}</span>
+          {/* 합계 */}
+          <div style={{ ...gridStyle, padding: '9px 8px', background: THEME.primary, borderRadius: '8px', marginTop: '4px', marginBottom: '10px' }}>
+            <span style={{ fontSize: '12px', fontWeight: '600', color: '#FFF' }}>합계</span>
+            <span style={{ fontSize: '12px', fontWeight: '600', color: '#93C5FD', textAlign: 'center' }}>{Math.round(todayCarbs)}g</span>
+            <span style={{ fontSize: '12px', fontWeight: '600', color: '#FCA5A5', textAlign: 'center' }}>{Math.round(todayProtein)}g</span>
+            <span style={{ fontSize: '12px', fontWeight: '600', color: '#FCD34D', textAlign: 'center' }}>{Math.round(todayFat)}g</span>
+            <span style={{ fontSize: '12px', fontWeight: '600', color: '#FFF', textAlign: 'center' }}>{Math.round(todayCalories)}</span>
           </div>
 
           <button style={{ ...S.btnPrimary, fontSize: '15px' }} onClick={saveAll}>💾 저장</button>
@@ -220,10 +237,10 @@ export default function DietLog({ user, onDietUpdate, tableOverride, trainerIdFi
             ))}
           </div>
 
-          <div style={{ display: 'flex', gap: '6px', marginBottom: '10px' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '6px', marginBottom: '10px' }}>
             {['daily', 'weekly', 'monthly'].map((t, i) => (
-              <button key={t} style={{ flex: 1, padding: '8px', borderRadius: '8px', border: statsTab === t ? 'none' : `1px solid ${THEME.border}`, background: statsTab === t ? THEME.primary : '#FFF', color: statsTab === t ? '#FFF' : THEME.textSub, fontSize: '12px', fontWeight: statsTab === t ? '700' : '400', cursor: 'pointer' }} onClick={() => setStatsTab(t)}>
-                {['📅 일간', '📊 주간', '📆 월간'][i]}
+              <button key={t} style={{ padding: '8px', borderRadius: '8px', border: statsTab === t ? 'none' : `1px solid ${THEME.border}`, background: statsTab === t ? THEME.primary : '#FFF', color: statsTab === t ? '#FFF' : THEME.textSub, fontSize: '12px', fontWeight: statsTab === t ? '600' : '400', cursor: 'pointer' }} onClick={() => setStatsTab(t)}>
+                {['일간', '주간', '월간'][i]}
               </button>
             ))}
           </div>
@@ -231,7 +248,7 @@ export default function DietLog({ user, onDietUpdate, tableOverride, trainerIdFi
           {statsTab === 'daily' && (
             <div style={S.card}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
-                <p style={{ ...S.cardTitle, margin: 0 }}>📅 {viewYear}년 {viewMonth}월</p>
+                <p style={{ ...S.cardTitle, margin: 0 }}>{viewYear}년 {viewMonth}월</p>
                 <YearMonthPicker />
               </div>
               {monthDays.length === 0 ? <p style={{ color: THEME.textSub, fontSize: '13px', textAlign: 'center', padding: '16px 0' }}>식단 기록이 없습니다</p> : (
@@ -255,7 +272,7 @@ export default function DietLog({ user, onDietUpdate, tableOverride, trainerIdFi
           {statsTab === 'weekly' && (
             <div style={S.card}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
-                <p style={{ ...S.cardTitle, margin: 0 }}>📊 {viewYear}년 {viewMonth}월 주차별</p>
+                <p style={{ ...S.cardTitle, margin: 0 }}>{viewYear}년 {viewMonth}월 주차별</p>
                 <YearMonthPicker />
               </div>
               {weeklyByWeek.every(w => w.calories === 0) ? <p style={{ color: THEME.textSub, fontSize: '13px', textAlign: 'center', padding: '16px 0' }}>식단 기록이 없습니다</p>
@@ -266,7 +283,7 @@ export default function DietLog({ user, onDietUpdate, tableOverride, trainerIdFi
           {statsTab === 'monthly' && (
             <div style={S.card}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
-                <p style={{ ...S.cardTitle, margin: 0 }}>📆 {viewYear}년 월별</p>
+                <p style={{ ...S.cardTitle, margin: 0 }}>{viewYear}년 월별</p>
                 <YearMonthPicker />
               </div>
               {Object.entries(monthlyByMonth).filter(([, d]) => d.calories > 0).length === 0
