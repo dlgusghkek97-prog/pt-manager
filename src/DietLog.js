@@ -46,6 +46,7 @@ export default function DietLog({ user, onDietUpdate, tableOverride, trainerIdFi
   const loadAllDietLogs = async () => {
     const { data } = await supabase.from(TABLE).select('*').eq(ID_FIELD, user.id).order('log_date')
     setAllDietLogs(data || [])
+    return data
   }
 
   const handleInput = (meal, field, value) => {
@@ -61,7 +62,6 @@ export default function DietLog({ user, onDietUpdate, tableOverride, trainerIdFi
       const fat = parseFloat(vals.fat) || 0
       const calories = parseFloat(vals.calories) || Math.round(carbs * 4 + protein * 4 + fat * 9)
       if (carbs === 0 && protein === 0 && fat === 0 && calories === 0) continue
-
       const existing = dietLogs.find(l => l.meal_type === meal)
       if (existing) {
         await supabase.from(TABLE).update({ carbs, protein, fat, calories }).eq('id', existing.id)
@@ -72,7 +72,7 @@ export default function DietLog({ user, onDietUpdate, tableOverride, trainerIdFi
     }
     await loadDietLogs(selectedDate)
     await loadAllDietLogs()
-    if (onDietUpdate) onDietUpdate()
+    if (onDietUpdate) await onDietUpdate()
     alert(`✅ ${count}개 식사 저장 완료!`)
   }
 
@@ -82,7 +82,6 @@ export default function DietLog({ user, onDietUpdate, tableOverride, trainerIdFi
   const todayFat = getDayTotal('fat')
   const todayCalories = getDayTotal('calories')
 
-  // 통계
   const yearStr = String(viewYear)
   const monthStr = String(viewMonth).padStart(2, '0')
   const byDay = {}
@@ -158,12 +157,10 @@ export default function DietLog({ user, onDietUpdate, tableOverride, trainerIdFi
     </div>
   )
 
-  // 공통 grid 스타일
   const gridStyle = { display: 'grid', gridTemplateColumns: '54px 1fr 1fr 1fr 1fr', gap: '4px', alignItems: 'center' }
 
   return (
     <div>
-      {/* 탭 */}
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px', marginBottom: '10px' }}>
         <button onClick={() => setDietTab('record')} style={{ padding: '9px', borderRadius: '8px', border: dietTab === 'record' ? 'none' : `1px solid ${THEME.border}`, background: dietTab === 'record' ? THEME.primary : '#FFF', color: dietTab === 'record' ? '#FFF' : THEME.textSub, fontSize: '12px', fontWeight: dietTab === 'record' ? '600' : '400', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '5px' }}>
           <DietTabIcon />식단 기록
@@ -173,7 +170,6 @@ export default function DietLog({ user, onDietUpdate, tableOverride, trainerIdFi
         </button>
       </div>
 
-      {/* 식단 기록 */}
       {dietTab === 'record' && (
         <div style={S.card}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
@@ -181,7 +177,6 @@ export default function DietLog({ user, onDietUpdate, tableOverride, trainerIdFi
             <input type="date" value={selectedDate} onChange={e => { setSelectedDate(e.target.value); loadDietLogs(e.target.value) }} style={S.dateInput} />
           </div>
 
-          {/* 헤더 */}
           <div style={{ ...gridStyle, padding: '5px 4px', background: THEME.cardAlt, borderRadius: '8px', marginBottom: '8px' }}>
             <span style={{ fontSize: '11px', color: THEME.textSub, fontWeight: '600', paddingLeft: '2px' }}>식사</span>
             <span style={{ fontSize: '11px', color: '#4472C4', textAlign: 'center', fontWeight: '600' }}>탄</span>
@@ -208,7 +203,6 @@ export default function DietLog({ user, onDietUpdate, tableOverride, trainerIdFi
             </div>
           ))}
 
-          {/* 합계 */}
           <div style={{ ...gridStyle, padding: '9px 8px', background: THEME.primary, borderRadius: '8px', marginTop: '4px', marginBottom: '10px' }}>
             <span style={{ fontSize: '12px', fontWeight: '600', color: '#FFF' }}>합계</span>
             <span style={{ fontSize: '12px', fontWeight: '600', color: '#93C5FD', textAlign: 'center' }}>{Math.round(todayCarbs)}g</span>
@@ -221,7 +215,6 @@ export default function DietLog({ user, onDietUpdate, tableOverride, trainerIdFi
         </div>
       )}
 
-      {/* 통계 */}
       {dietTab === 'stats' && (
         <>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '8px', marginBottom: '12px' }}>

@@ -69,6 +69,7 @@ export default function MemberDashboard({ user, onLogout }) {
   const loadAllLogs = async () => {
     const { data } = await supabase.from('workout_logs').select('*').eq('member_id', user.id).order('log_date')
     if (data) setAllLogs(data)
+    return data
   }
 
   const loadTrainerLogs = async () => {
@@ -116,14 +117,12 @@ export default function MemberDashboard({ user, onLogout }) {
         <p style={{ fontSize: '13px', color: THEME.textSub, margin: 0 }}>칼로리 설정을 눌러 목표를 설정해주세요</p>
       </div>
     )
-
     const fields = [
       { label: '칼로리', field: 'target', unit: 'kcal', current: todayCalories, color: '#FCD34D' },
       { label: '탄수화물', field: 'carbs', unit: 'g', current: todayCarbs, color: '#93C5FD' },
       { label: '단백질', field: 'protein', unit: 'g', current: todayProtein, color: '#FCA5A5' },
       { label: '지방', field: 'fat', unit: 'g', current: todayFat, color: '#FDBA74' },
     ]
-
     return (
       <div style={{ background: THEME.primary, borderRadius: '14px', padding: '12px 14px', marginBottom: '12px' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
@@ -146,7 +145,7 @@ export default function MemberDashboard({ user, onLogout }) {
                 />
                 <p style={{ fontSize: '9px', color: 'rgba(255,255,255,0.5)', margin: '2px 0 5px' }}>{unit}</p>
                 <div style={{ background: 'rgba(255,255,255,0.2)', borderRadius: '4px', height: '4px', marginBottom: '3px' }}>
-                  <div style={{ width: `${pct}%`, background: over ? '#FF6B6B' : color, height: '4px', borderRadius: '4px', transition: 'width 0.3s' }} />
+                  <div style={{ width: `${pct}%`, background: over ? '#FF6B6B' : color, height: '4px', borderRadius: '4px' }} />
                 </div>
                 <p style={{ fontSize: '9px', color: over ? '#FF6B6B' : color, margin: 0, fontWeight: '600' }}>
                   {Math.round(current)}{unit} ({pct}%)
@@ -226,10 +225,17 @@ export default function MemberDashboard({ user, onLogout }) {
         <TabBar tabs={mainTabs} active={memberView} onSelect={(key) => { setMemberView(key); if (key === 'diet') loadTodayDiet() }} />
 
         {memberView === 'workout' && (
-          <WorkoutLog user={user} selectedDate={selectedDate} setSelectedDate={setSelectedDate} exercises={exercises} setExercises={setExercises} onUpdate={loadAllLogs} />
+          <WorkoutLog
+            user={user}
+            selectedDate={selectedDate}
+            setSelectedDate={setSelectedDate}
+            exercises={exercises}
+            setExercises={setExercises}
+            onUpdate={async () => { await loadAllLogs() }}
+          />
         )}
         {memberView === 'stats' && <WorkoutStats allLogs={allLogs} />}
-        {memberView === 'diet' && <DietLog user={user} onDietUpdate={loadTodayDiet} />}
+        {memberView === 'diet' && <DietLog user={user} onDietUpdate={async () => { await loadTodayDiet() }} />}
 
         {memberView === 'trainer' && (
           <>
@@ -237,7 +243,14 @@ export default function MemberDashboard({ user, onLogout }) {
               <p style={{ fontSize: '14px', fontWeight: '700', color: THEME.primary, margin: '0 0 2px' }}>👨‍💼 트레이너 기록</p>
               <p style={{ fontSize: '12px', color: THEME.textSub, margin: 0 }}>트레이너의 운동 및 식단 기록을 확인하세요</p>
             </div>
-            <TabBar tabs={[{ key: 'workout', label: '운동 통계', icon: IconStats }, { key: 'diet', label: '식단', icon: IconDiet }]} active={trainerView} onSelect={setTrainerView} />
+            <TabBar
+              tabs={[
+                { key: 'workout', label: '운동 통계', icon: IconStats },
+                { key: 'diet', label: '식단', icon: IconDiet },
+              ]}
+              active={trainerView}
+              onSelect={setTrainerView}
+            />
             {trainerView === 'workout' && <WorkoutStats allLogs={trainerLogs} />}
             {trainerView === 'diet' && (
               <div style={S.card}>
