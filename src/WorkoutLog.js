@@ -3,7 +3,6 @@ import { supabase } from './supabase'
 import { PARTS, PART_COLORS, S, THEME } from './utils'
 
 export default function WorkoutLog({ user, selectedDate, setSelectedDate, exercises, setExercises, onUpdate, tableOverride, trainerIdField }) {
-
   const TABLE = tableOverride || 'workout_logs'
   const ID_FIELD = trainerIdField || 'member_id'
 
@@ -60,7 +59,7 @@ export default function WorkoutLog({ user, selectedDate, setSelectedDate, exerci
   const saveAllSets = async () => {
     const uid = user.id
     let savedCount = 0
-    const updated = [...exercises]
+    const updated = JSON.parse(JSON.stringify(exercises))
 
     for (let exIdx = 0; exIdx < updated.length; exIdx++) {
       const ex = updated[exIdx]
@@ -85,9 +84,11 @@ export default function WorkoutLog({ user, selectedDate, setSelectedDate, exerci
         }
 
         if (set.id) {
-          const { error } = await supabase.from(TABLE).update(payload).eq('id', set.id)
-          if (!error) savedCount++
+          // 기존 레코드 수정
+          await supabase.from(TABLE).update(payload).eq('id', set.id)
+          savedCount++
         } else {
+          // 새 레코드 삽입
           const { data, error } = await supabase.from(TABLE).insert(payload).select().single()
           if (!error && data) {
             updated[exIdx].sets[setIdx].id = data.id
@@ -98,7 +99,7 @@ export default function WorkoutLog({ user, selectedDate, setSelectedDate, exerci
       }
     }
 
-    setExercises([...updated])
+    setExercises(updated)
     if (onUpdate) onUpdate()
     alert(`✅ ${savedCount}개 세트 저장 완료!`)
   }
@@ -118,6 +119,7 @@ export default function WorkoutLog({ user, selectedDate, setSelectedDate, exerci
 
   return (
     <div>
+      {/* 오늘 요약 */}
       <div style={S.card}>
         <p style={S.cardTitle}>📅 오늘 운동 요약</p>
         {exercises.filter(ex => ex.exercise_name).length === 0 ? (
@@ -143,6 +145,7 @@ export default function WorkoutLog({ user, selectedDate, setSelectedDate, exerci
         )}
       </div>
 
+      {/* 운동 기록 */}
       <div style={S.card}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px' }}>
           <p style={{ ...S.cardTitle, margin: 0 }}>🏋️ 운동 기록</p>
@@ -150,54 +153,79 @@ export default function WorkoutLog({ user, selectedDate, setSelectedDate, exerci
         </div>
 
         {exercises.map((ex, exIdx) => (
-          <div key={exIdx} style={S.exBox}>
-            <div style={S.exHeader}>
-              <select style={S.partSel} value={ex.body_part} onChange={e => updateExField(exIdx, 'body_part', e.target.value)}>
-                <option value="">🏷️ 부위 선택</option>
+          <div key={exIdx} style={{ ...S.exBox, padding: '10px' }}>
+            {/* 종목 헤더 - 부위/운동명 작게 */}
+            <div style={{ display: 'flex', gap: '6px', alignItems: 'center', marginBottom: '8px' }}>
+              <select
+                style={{ ...S.partSel, flex: '0 0 80px', fontSize: '11px', padding: '5px 4px' }}
+                value={ex.body_part}
+                onChange={e => updateExField(exIdx, 'body_part', e.target.value)}
+              >
+                <option value="">부위</option>
                 {PARTS.map(p => <option key={p} value={p}>{p}</option>)}
               </select>
-              <input style={S.exNameInput} placeholder="운동명 (예: 런지)" value={ex.exercise_name} onChange={e => updateExField(exIdx, 'exercise_name', e.target.value)} />
+              <input
+                style={{ ...S.exNameInput, flex: 1, fontSize: '11px', padding: '5px 6px' }}
+                placeholder="운동명"
+                value={ex.exercise_name}
+                onChange={e => updateExField(exIdx, 'exercise_name', e.target.value)}
+              />
               <button style={S.delExBtn} onClick={() => removeExercise(exIdx)}>✕</button>
             </div>
 
-            <input
-              style={{ width: '100%', padding: '6px 10px', borderRadius: '6px', border: `1px solid ${THEME.border}`, fontSize: '12px', marginBottom: '10px', boxSizing: 'border-box', color: THEME.textSub, background: '#FFF' }}
-              placeholder="📝 특이사항"
-              value={ex.memo}
-              onChange={e => updateExField(exIdx, 'memo', e.target.value)}
-            />
-
-            <div style={S.setHeaderRow}>
-              <span style={{ flex: 0.4, fontSize: '11px', color: THEME.textSub, textAlign: 'center' }}>세트</span>
-              <span style={{ flex: 1, fontSize: '11px', color: THEME.textSub, textAlign: 'center' }}>무게(kg)</span>
-              <span style={{ flex: 1, fontSize: '11px', color: THEME.textSub, textAlign: 'center' }}>횟수</span>
-              <span style={{ flex: 1, fontSize: '11px', color: THEME.textSub, textAlign: 'center' }}>볼륨</span>
-              <span style={{ flex: 0.8, fontSize: '11px', color: THEME.textSub, textAlign: 'center' }}>미디어</span>
-              <span style={{ flex: 0.4 }}></span>
-            </div>
-
-            {ex.sets.map((set, setIdx) => (
-              <div key={setIdx} style={S.setRow}>
-                <span style={{ flex: 0.4, fontSize: '12px', color: THEME.textSub, textAlign: 'center' }}>{setIdx + 1}</span>
-                <input style={S.numInput} type="number" placeholder="0" value={set.weight} onChange={e => updateSetField(exIdx, setIdx, 'weight', e.target.value)} />
-                <input style={S.numInput} type="number" placeholder="0" value={set.reps} onChange={e => updateSetField(exIdx, setIdx, 'reps', e.target.value)} />
-                <span style={{ flex: 1, fontSize: '12px', fontWeight: '700', color: THEME.primary, textAlign: 'center' }}>{getSetVolume(set)}</span>
-                <div style={{ flex: 0.8, textAlign: 'center' }}>
-                  {set.media_url ? (
-                    set.media_url.match(/\.(mp4|mov|avi)$/i)
-                      ? <video src={set.media_url} style={{ width: '40px', height: '40px', borderRadius: '6px', objectFit: 'cover' }} />
-                      : <img src={set.media_url} alt="" style={{ width: '40px', height: '40px', borderRadius: '6px', objectFit: 'cover' }} />
-                  ) : (
-                    <label style={{ cursor: 'pointer', fontSize: '18px' }}>
-                      📷
-                      <input type="file" accept="image/*,video/*" style={{ display: 'none' }} onChange={e => e.target.files[0] && uploadMedia(exIdx, setIdx, e.target.files[0])} />
-                    </label>
-                  )}
+            {/* 세트 + 특이사항/사진 가로 배치 */}
+            <div style={{ display: 'flex', gap: '8px' }}>
+              {/* 왼쪽: 세트 목록 */}
+              <div style={{ flex: 1 }}>
+                <div style={{ display: 'flex', gap: '4px', marginBottom: '4px' }}>
+                  <span style={{ flex: 0.3, fontSize: '10px', color: THEME.textSub, textAlign: 'center' }}>세트</span>
+                  <span style={{ flex: 1, fontSize: '10px', color: THEME.textSub, textAlign: 'center' }}>무게</span>
+                  <span style={{ flex: 1, fontSize: '10px', color: THEME.textSub, textAlign: 'center' }}>횟수</span>
+                  <span style={{ flex: 1, fontSize: '10px', color: THEME.textSub, textAlign: 'center' }}>볼륨</span>
+                  <span style={{ flex: 0.3 }}></span>
                 </div>
-                <button style={S.delSetBtn} onClick={() => removeSet(exIdx, setIdx)}>－</button>
+
+                {ex.sets.map((set, setIdx) => (
+                  <div key={setIdx} style={{ display: 'flex', gap: '4px', alignItems: 'center', marginBottom: '5px' }}>
+                    <span style={{ flex: 0.3, fontSize: '11px', color: THEME.textSub, textAlign: 'center' }}>{setIdx + 1}</span>
+                    <input style={{ ...S.numInput, flex: 1, fontSize: '12px', padding: '5px 2px' }} type="number" placeholder="0" value={set.weight} onChange={e => updateSetField(exIdx, setIdx, 'weight', e.target.value)} />
+                    <input style={{ ...S.numInput, flex: 1, fontSize: '12px', padding: '5px 2px' }} type="number" placeholder="0" value={set.reps} onChange={e => updateSetField(exIdx, setIdx, 'reps', e.target.value)} />
+                    <span style={{ flex: 1, fontSize: '11px', fontWeight: '700', color: THEME.primary, textAlign: 'center' }}>{getSetVolume(set)}</span>
+                    <button style={{ ...S.delSetBtn, flex: 0.3, padding: '5px 4px' }} onClick={() => removeSet(exIdx, setIdx)}>－</button>
+                  </div>
+                ))}
+
+                <button style={S.addSetBtn} onClick={() => addSet(exIdx)}>➕ 세트 추가</button>
               </div>
-            ))}
-            <button style={S.addSetBtn} onClick={() => addSet(exIdx)}>➕ 세트 추가</button>
+
+              {/* 오른쪽: 특이사항 + 사진 세로 배치 */}
+              <div style={{ flex: '0 0 90px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                <textarea
+                  style={{ flex: 1, padding: '6px', borderRadius: '6px', border: `1px solid ${THEME.border}`, fontSize: '11px', color: THEME.textSub, background: '#FFF', resize: 'none', minHeight: '70px', boxSizing: 'border-box', fontFamily: 'inherit' }}
+                  placeholder="특이사항"
+                  value={ex.memo}
+                  onChange={e => updateExField(exIdx, 'memo', e.target.value)}
+                />
+                {/* 세트별 사진 - 첫 번째 세트 기준 */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                  {ex.sets.map((set, setIdx) => (
+                    <div key={setIdx} style={{ textAlign: 'center' }}>
+                      {set.media_url ? (
+                        set.media_url.match(/\.(mp4|mov|avi)$/i)
+                          ? <video src={set.media_url} style={{ width: '100%', aspectRatio: '3/4', borderRadius: '6px', objectFit: 'cover' }} />
+                          : <img src={set.media_url} alt="" style={{ width: '100%', aspectRatio: '3/4', borderRadius: '6px', objectFit: 'cover' }} />
+                      ) : (
+                        <label style={{ cursor: 'pointer', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', background: THEME.cardAlt, borderRadius: '6px', aspectRatio: '3/4', fontSize: '20px', border: `1px dashed ${THEME.border}` }}>
+                          📷
+                          <span style={{ fontSize: '9px', color: THEME.textSub, marginTop: '2px' }}>{setIdx + 1}세트</span>
+                          <input type="file" accept="image/*,video/*" style={{ display: 'none' }} onChange={e => e.target.files[0] && uploadMedia(exIdx, setIdx, e.target.files[0])} />
+                        </label>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
           </div>
         ))}
 
