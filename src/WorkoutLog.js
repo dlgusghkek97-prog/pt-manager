@@ -72,6 +72,7 @@ export default function WorkoutLog({ user, selectedDate, setSelectedDate, exerci
   const saveAllSets = async () => {
     const uid = user.id
     let savedCount = 0
+    const errors = []
     const updated = JSON.parse(JSON.stringify(exercises))
 
     for (let exIdx = 0; exIdx < updated.length; exIdx++) {
@@ -99,11 +100,21 @@ export default function WorkoutLog({ user, selectedDate, setSelectedDate, exerci
         }
 
         if (set.id) {
-          await supabase.from(TABLE).update(payload).eq('id', set.id)
+          const { error: updErr } = await supabase.from(TABLE).update(payload).eq('id', set.id)
+          if (updErr) {
+            console.error(`[WorkoutLog] UPDATE 실패:`, updErr, 'payload:', payload)
+            errors.push(`UPDATE 실패: ${updErr.message}`)
+            continue
+          }
           savedCount++
         } else {
           const { data, error } = await supabase.from(TABLE).insert(payload).select().single()
-          if (!error && data) {
+          if (error) {
+            console.error(`[WorkoutLog] INSERT 실패:`, error, 'payload:', payload)
+            errors.push(`INSERT 실패: ${error.message}`)
+            continue
+          }
+          if (data) {
             updated[exIdx].sets[setIdx].id = data.id
             updated[exIdx].sets[setIdx].volume = data.volume
             savedCount++
@@ -114,7 +125,12 @@ export default function WorkoutLog({ user, selectedDate, setSelectedDate, exerci
 
     setExercises(updated)
     if (onUpdate) await onUpdate()
-    alert(`✅ ${savedCount}개 세트 저장 완료!`)
+
+    if (errors.length > 0) {
+      alert(`⚠️ 저장 실패\n\n${errors.join('\n')}`)
+    } else {
+      alert(`✅ ${savedCount}개 세트 저장 완료!`)
+    }
   }
 
   const uploadMedia = async (exIdx, file) => {
@@ -137,7 +153,7 @@ export default function WorkoutLog({ user, selectedDate, setSelectedDate, exerci
 
   const getSetVolume = (set) => {
     const w = parseFloat(set.weight); const r = parseInt(set.reps)
-    if (isNaN(w) || isNaN(r) || set.weight === '' || set.reps === '') return '-'
+    if (isNaN(w) || isNaN(r) || set.weight === '' || set.reps === '') return '—'
     return (w * r).toLocaleString() + 'kg'
   }
 
@@ -145,6 +161,18 @@ export default function WorkoutLog({ user, selectedDate, setSelectedDate, exerci
     const w = parseFloat(s.weight); const r = parseInt(s.reps)
     return s2 + (!isNaN(w) && !isNaN(r) ? w * r : 0)
   }, 0), 0)
+
+  // 공통 input 스타일
+  const inputBase = {
+    width: '100%',
+    padding: '7px 9px',
+    borderRadius: '6px',
+    border: `0.5px solid ${THEME.border}`,
+    fontSize: '12px',
+    background: '#FFF',
+    boxSizing: 'border-box',
+    fontFamily: 'inherit'
+  }
 
   return (
     <div>
@@ -180,44 +208,92 @@ export default function WorkoutLog({ user, selectedDate, setSelectedDate, exerci
         </div>
 
         {exercises.map((ex, exIdx) => (
-          <div key={exIdx} style={{ ...S.exBox, marginBottom: '12px' }}>
-            <div style={{ display: 'flex', gap: '5px', alignItems: 'center', marginBottom: '8px' }}>
-              <select style={{ flex: '0 0 60px', padding: '6px 3px', borderRadius: '6px', border: `0.5px solid ${THEME.border}`, fontSize: '11px', background: '#FFF' }} value={ex.body_part} onChange={e => updateExField(exIdx, 'body_part', e.target.value)}>
+          <div key={exIdx} style={{ background: '#FAFAF7', border: `0.5px solid ${THEME.border}`, borderRadius: '12px', padding: '12px', marginBottom: '10px' }}>
+            {/* 1줄: 부위 / 운동명 / X */}
+            <div style={{ display: 'grid', gridTemplateColumns: '70px 1fr 32px', gap: '6px', marginBottom: '7px' }}>
+              <select style={inputBase} value={ex.body_part} onChange={e => updateExField(exIdx, 'body_part', e.target.value)}>
                 <option value="">부위</option>
                 {PARTS.map(p => <option key={p} value={p}>{p}</option>)}
               </select>
-              <input style={{ flex: 1, padding: '6px 7px', borderRadius: '6px', border: `0.5px solid ${THEME.border}`, fontSize: '11px' }} placeholder="운동명" value={ex.exercise_name} onChange={e => updateExField(exIdx, 'exercise_name', e.target.value)} />
-              <input style={{ flex: 1, padding: '6px 7px', borderRadius: '6px', border: `0.5px solid ${THEME.border}`, fontSize: '11px', color: THEME.textSub, background: '#FFF' }} placeholder="특이사항 (예: 무릎 불편)" value={ex.memo} onChange={e => updateExField(exIdx, 'memo', e.target.value)} />
-              <button style={S.delExBtn} onClick={() => removeExercise(exIdx)}>✕</button>
+              <input style={inputBase} placeholder="운동명" value={ex.exercise_name} onChange={e => updateExField(exIdx, 'exercise_name', e.target.value)} />
+              <button
+                style={{ background: '#FBE7E7', color: '#C53030', border: 'none', borderRadius: '6px', padding: '4px 0', cursor: 'pointer', fontSize: '11px' }}
+                onClick={() => removeExercise(exIdx)}
+              >✕</button>
             </div>
 
-            <div style={{ display: 'flex', gap: '8px', alignItems: 'flex-start' }}>
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ display: 'grid', gridTemplateColumns: '16px 1fr 1fr 1fr 20px', gap: '3px', marginBottom: '4px' }}>
-                  {['#', '무게', '횟수', '볼륨', ''].map((h, i) => (
-                    <span key={i} style={{ fontSize: '10px', color: THEME.textSub, textAlign: 'center' }}>{h}</span>
-                  ))}
+            {/* 2줄: 특이사항 (단독) */}
+            <div style={{ marginBottom: '10px' }}>
+              <input
+                style={{ ...inputBase, color: THEME.textSub }}
+                placeholder="특이사항 (예: 무릎 불편)"
+                value={ex.memo}
+                onChange={e => updateExField(exIdx, 'memo', e.target.value)}
+              />
+            </div>
+
+            {/* 본문: 좌(세트) + 우(설명/사진) */}
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 90px', gap: '10px', alignItems: 'stretch' }}>
+
+              {/* 세트 영역 */}
+              <div>
+                <div style={{ display: 'grid', gridTemplateColumns: '16px 1fr 1fr 56px 22px', gap: '5px', marginBottom: '4px', alignItems: 'center' }}>
+                  <span style={{ fontSize: '10px', color: THEME.textSub, textAlign: 'center', fontWeight: '500' }}>#</span>
+                  <span style={{ fontSize: '10px', color: THEME.textSub, textAlign: 'center', fontWeight: '500' }}>무게</span>
+                  <span style={{ fontSize: '10px', color: THEME.textSub, textAlign: 'center', fontWeight: '500' }}>횟수</span>
+                  <span style={{ fontSize: '10px', color: THEME.textSub, textAlign: 'right', fontWeight: '500', paddingRight: '2px' }}>볼륨</span>
+                  <span></span>
                 </div>
                 {ex.sets.map((set, setIdx) => (
-                  <div key={setIdx} style={{ display: 'grid', gridTemplateColumns: '16px 1fr 1fr 1fr 20px', gap: '3px', marginBottom: '4px', alignItems: 'center' }}>
+                  <div key={setIdx} style={{ display: 'grid', gridTemplateColumns: '16px 1fr 1fr 56px 22px', gap: '5px', marginBottom: '4px', alignItems: 'center' }}>
                     <span style={{ fontSize: '11px', color: THEME.textSub, textAlign: 'center' }}>{setIdx + 1}</span>
-                    <input style={{ padding: '5px 2px', borderRadius: '5px', border: `0.5px solid ${THEME.border}`, fontSize: '12px', textAlign: 'center', width: '100%', boxSizing: 'border-box' }} type="number" placeholder="0" value={set.weight} onChange={e => updateSetField(exIdx, setIdx, 'weight', e.target.value)} />
-                    <input style={{ padding: '5px 2px', borderRadius: '5px', border: `0.5px solid ${THEME.border}`, fontSize: '12px', textAlign: 'center', width: '100%', boxSizing: 'border-box' }} type="number" placeholder="0" value={set.reps} onChange={e => updateSetField(exIdx, setIdx, 'reps', e.target.value)} />
-                    <span style={{ fontSize: '11px', fontWeight: '700', color: THEME.primary, textAlign: 'center' }}>{getSetVolume(set)}</span>
-                    <button style={{ background: '#F0F0F0', color: '#888', border: 'none', borderRadius: '4px', padding: '4px', cursor: 'pointer', fontSize: '12px' }} onClick={() => removeSet(exIdx, setIdx)}>－</button>
+                    <input
+                      style={{ padding: '6px 4px', borderRadius: '5px', border: `0.5px solid ${THEME.border}`, fontSize: '12px', textAlign: 'center', width: '100%', boxSizing: 'border-box', background: '#FFF' }}
+                      type="number" placeholder="0"
+                      value={set.weight}
+                      onChange={e => updateSetField(exIdx, setIdx, 'weight', e.target.value)}
+                    />
+                    <input
+                      style={{ padding: '6px 4px', borderRadius: '5px', border: `0.5px solid ${THEME.border}`, fontSize: '12px', textAlign: 'center', width: '100%', boxSizing: 'border-box', background: '#FFF' }}
+                      type="number" placeholder="0"
+                      value={set.reps}
+                      onChange={e => updateSetField(exIdx, setIdx, 'reps', e.target.value)}
+                    />
+                    <span style={{ fontSize: '11px', fontWeight: '500', color: THEME.primary, textAlign: 'right', paddingRight: '2px' }}>{getSetVolume(set)}</span>
+                    <button
+                      style={{ background: '#F0EFEC', color: '#888', border: 'none', borderRadius: '4px', padding: '3px 0', cursor: 'pointer', fontSize: '11px' }}
+                      onClick={() => removeSet(exIdx, setIdx)}
+                    >−</button>
                   </div>
                 ))}
-                <button style={{ ...S.addSetBtn, fontSize: '11px', padding: '5px' }} onClick={() => addSet(exIdx)}>➕ 세트 추가</button>
+                <button
+                  style={{ background: 'transparent', border: `0.5px dashed ${THEME.border}`, borderRadius: '6px', padding: '6px', fontSize: '11px', color: THEME.textSub, width: '100%', cursor: 'pointer', marginTop: '4px' }}
+                  onClick={() => addSet(exIdx)}
+                >＋ 세트 추가</button>
               </div>
 
-              <div style={{ flex: '0 0 90px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
+              {/* 설명 + 사진 */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
                 <textarea
-                  style={{ padding: '6px', borderRadius: '6px', border: `0.5px solid ${THEME.border}`, fontSize: '10px', color: THEME.textSub, background: '#FFF', resize: 'none', height: '50px', boxSizing: 'border-box', fontFamily: 'inherit', lineHeight: '1.4' }}
-                  placeholder={'운동 설명\n(예: 등 넓게 잡고\n천천히)'}
+                  style={{
+                    padding: '7px',
+                    borderRadius: '6px',
+                    border: `0.5px solid ${THEME.border}`,
+                    fontSize: '9.5px',
+                    color: THEME.textSub,
+                    background: '#FFF',
+                    resize: 'none',
+                    height: '44px',
+                    boxSizing: 'border-box',
+                    fontFamily: 'inherit',
+                    lineHeight: '1.35',
+                    width: '100%'
+                  }}
+                  placeholder={'운동 설명 (예: 등 넓게 잡고 천천히)'}
                   value={ex.description || ''}
                   onChange={e => updateExField(exIdx, 'description', e.target.value)}
                 />
-                <div style={{ borderRadius: '6px', overflow: 'hidden', aspectRatio: '3/4', border: `0.5px dashed ${THEME.border}` }}>
+                <div style={{ borderRadius: '8px', overflow: 'hidden', aspectRatio: '3/4', border: `0.5px dashed ${THEME.border}` }}>
                   {ex.sets[0]?.media_url ? (
                     ex.sets[0].media_url.match(/\.(mp4|mov|avi|webm)$/i) ? (
                       <video src={ex.sets[0].media_url} controls playsInline style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
@@ -225,9 +301,9 @@ export default function WorkoutLog({ user, selectedDate, setSelectedDate, exerci
                       <img src={ex.sets[0].media_url} alt="운동 사진" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
                     )
                   ) : (
-                    <label style={{ cursor: 'pointer', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', background: THEME.cardAlt, width: '100%', height: '100%' }}>
+                    <label style={{ cursor: 'pointer', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', background: '#FFF', width: '100%', height: '100%' }}>
                       <CameraIcon />
-                      <span style={{ fontSize: '9px', color: THEME.textSub, marginTop: '4px' }}>사진/영상</span>
+                      <span style={{ fontSize: '9px', color: THEME.textSub, marginTop: '3px' }}>사진/영상</span>
                       <input type="file" accept="image/*,video/*" style={{ display: 'none' }} onChange={e => e.target.files[0] && uploadMedia(exIdx, e.target.files[0])} />
                     </label>
                   )}
@@ -244,7 +320,7 @@ export default function WorkoutLog({ user, selectedDate, setSelectedDate, exerci
           </div>
         ))}
 
-        <button style={S.addExBtn} onClick={addExercise}>➕ 종목 추가</button>
+        <button style={S.addExBtn} onClick={addExercise}>＋ 종목 추가</button>
         <button style={{ ...S.btnPrimary, marginTop: '12px', fontSize: '15px' }} onClick={saveAllSets}>💾 전체 저장</button>
       </div>
     </div>

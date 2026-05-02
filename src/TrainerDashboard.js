@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react'
 import { supabase } from './supabase'
-import { S, THEME, PART_COLORS, generateCode } from './utils'
+import { S, THEME, PART_COLORS, generateCode, calcMacro, CYCLE_PHASES } from './utils'
 import WorkoutLog from './WorkoutLog'
 import WorkoutStats from './WorkoutStats'
 import DietLog from './DietLog'
@@ -54,11 +54,87 @@ export default function TrainerDashboard({ user, onLogout }) {
   const [memberMacro, setMemberMacro] = useState(null)
   const [memberTodayDiet, setMemberTodayDiet] = useState([])
 
-  useEffect(() => { loadMembers() }, [])
+  const [trainerMacro, setTrainerMacro] = useState(null)
+  const [trainerTodayDiet, setTrainerTodayDiet] = useState([])
+  const [showCalcModal, setShowCalcModal] = useState(false)
+
+  const [goal, setGoal] = useState(() => localStorage.getItem(`tmacro_goal_${user.id}`) || '벌크업')
+  const [gender, setGender] = useState(() => localStorage.getItem(`tmacro_gender_${user.id}`) || '남성')
+  const [weight, setWeight] = useState(() => localStorage.getItem(`tmacro_weight_${user.id}`) || '')
+  const [muscle, setMuscle] = useState(() => localStorage.getItem(`tmacro_muscle_${user.id}`) || '')
+  const [activity, setActivity] = useState(() => localStorage.getItem(`tmacro_activity_${user.id}`) || '보통 운동 (주 4~5회)')
+  const [intensity, setIntensity] = useState(() => localStorage.getItem(`tmacro_intensity_${user.id}`) || '일반')
+  const [cyclePhase, setCyclePhase] = useState(() => localStorage.getItem(`tmacro_cycle_${user.id}`) || '')
+
+  useEffect(() => { loadMembers(); loadTrainerMacro(); loadTrainerTodayDiet() }, [])
 
   const loadMembers = async () => {
     const { data } = await supabase.from('members').select('*').eq('trainer_id', user.id).order('created_at', { ascending: false })
     if (data) { setMembers(data); loadTodayStats(data) }
+  }
+
+  const loadTrainerMacro = async () => {
+    const { data, error } = await supabase
+      .from('trainers')
+      .select('target_calories, target_carbs, target_protein, target_fat')
+      .eq('id', user.id)
+      .single()
+    if (error) { console.error('[TrainerDashboard] loadTrainerMacro error:', error); return }
+    if (data && (data.target_calories || data.target_carbs || data.target_protein || data.target_fat)) {
+      setTrainerMacro({
+        target: data.target_calories || 0,
+        carbs: data.target_carbs || 0,
+        protein: data.target_protein || 0,
+        fat: data.target_fat || 0
+      })
+    }
+  }
+
+  const loadTrainerTodayDiet = async () => {
+    const today = new Date().toISOString().split('T')[0]
+    const { data, error } = await supabase
+      .from('trainer_diet_logs')
+      .select('*')
+      .eq('trainer_id', user.id)
+      .eq('log_date', today)
+    if (error) { console.error('[TrainerDashboard] loadTrainerTodayDiet error:', error); return }
+    setTrainerTodayDiet(data || [])
+  }
+
+  const saveTrainerMacro = async (macro) => {
+    const { error } = await supabase
+      .from('trainers')
+      .update({
+        target_calories: macro.target || 0,
+        target_carbs: macro.carbs || 0,
+        target_protein: macro.protein || 0,
+        target_fat: macro.fat || 0
+      })
+      .eq('id', user.id)
+    if (error) { console.error('[TrainerDashboard] saveTrainerMacro error:', error); alert('목표 저장 실패: ' + error.message); return false }
+    return true
+  }
+
+  const calculateTrainerMacro = async () => {
+    if (!weight || !muscle) { alert('체중과 골격근량을 입력해주세요.'); return }
+    const result = calcMacro({ goal, gender, weight: parseFloat(weight), muscle: parseFloat(muscle), activity, intensity, cyclePhase })
+    const ok = await saveTrainerMacro(result)
+    if (!ok) return
+    setTrainerMacro(result)
+    localStorage.setItem(`tmacro_goal_${user.id}`, goal)
+    localStorage.setItem(`tmacro_gender_${user.id}`, gender)
+    localStorage.setItem(`tmacro_weight_${user.id}`, weight)
+    localStorage.setItem(`tmacro_muscle_${user.id}`, muscle)
+    localStorage.setItem(`tmacro_activity_${user.id}`, activity)
+    localStorage.setItem(`tmacro_intensity_${user.id}`, intensity)
+    localStorage.setItem(`tmacro_cycle_${user.id}`, cyclePhase)
+    setShowCalcModal(false)
+  }
+
+  const updateTrainerMacroField = async (field, value) => {
+    const updated = { ...trainerMacro, [field]: parseInt(value) || 0 }
+    setTrainerMacro(updated)
+    await saveTrainerMacro(updated)
   }
 
   const loadTodayStats = async (memberList) => {
@@ -138,23 +214,6 @@ export default function TrainerDashboard({ user, onLogout }) {
 
   const trainerAsUser = { id: user.id, name: '트레이너', goal: '벌크업', gender: '남성', type: 'trainer_self' }
 
-  const NutrientBar = ({ label, current, target, color }) => {
-    const pct = target > 0 ? Math.min(Math.round(current / target * 100), 100) : 0
-    return (
-      <div style={{ marginBottom: '5px' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2px' }}>
-          <span style={{ fontSize: '10px', color: THEME.textSub }}>{label}</span>
-          <span style={{ fontSize: '10px', color, fontWeight: '600' }}>
-            {Math.round(current)}g <span style={{ color: THEME.textSub, fontWeight: '400' }}>/ {target}g</span> ({pct}%)
-          </span>
-        </div>
-        <div style={{ background: '#E5E1DA', borderRadius: '3px', height: '3px' }}>
-          <div style={{ width: `${pct}%`, background: color, height: '3px', borderRadius: '3px' }} />
-        </div>
-      </div>
-    )
-  }
-
   const MemberMacroCard = ({ macro, todayDiet }) => {
     if (!macro) return null
     const todayCalories = todayDiet.reduce((s, l) => s + (l.calories || 0), 0)
@@ -197,12 +256,145 @@ export default function TrainerDashboard({ user, onLogout }) {
     )
   }
 
+  const TrainerMacroCard = () => {
+    if (!trainerMacro) return (
+      <div style={{ background: THEME.cardAlt, borderRadius: '12px', padding: '10px 14px', marginBottom: '12px', textAlign: 'center', border: `1px dashed ${THEME.border}` }}>
+        <p style={{ fontSize: '13px', color: THEME.textSub, margin: 0 }}>🧮 칼로리 설정을 눌러 목표를 설정해주세요</p>
+      </div>
+    )
+    const todayCalories = trainerTodayDiet.reduce((s, l) => s + (l.calories || 0), 0)
+    const todayCarbs = trainerTodayDiet.reduce((s, l) => s + (l.carbs || 0), 0)
+    const todayProtein = trainerTodayDiet.reduce((s, l) => s + (l.protein || 0), 0)
+    const todayFat = trainerTodayDiet.reduce((s, l) => s + (l.fat || 0), 0)
+    const fields = [
+      { label: '칼로리', field: 'target', unit: 'kcal', current: todayCalories, color: '#FCD34D' },
+      { label: '탄수화물', field: 'carbs', unit: 'g', current: todayCarbs, color: '#93C5FD' },
+      { label: '단백질', field: 'protein', unit: 'g', current: todayProtein, color: '#FCA5A5' },
+      { label: '지방', field: 'fat', unit: 'g', current: todayFat, color: '#FDBA74' },
+    ]
+    return (
+      <div style={{ background: THEME.primary, borderRadius: '14px', padding: '12px 14px', marginBottom: '12px' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
+          <span style={{ fontSize: '13px', fontWeight: '600', color: '#FFF' }}>🎯 목표 수치</span>
+          <span style={{ fontSize: '10px', color: 'rgba(255,255,255,0.6)' }}>탭해서 수정</span>
+        </div>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: '6px' }}>
+          {fields.map(({ label, field, unit, current, color }) => {
+            const target = trainerMacro[field]
+            const pct = target > 0 ? Math.min(Math.round(current / target * 100), 100) : 0
+            const over = target > 0 && current > target
+            return (
+              <div key={field} style={{ background: 'rgba(255,255,255,0.12)', borderRadius: '8px', padding: '8px', textAlign: 'center' }}>
+                <p style={{ fontSize: '9px', color: 'rgba(255,255,255,0.7)', margin: '0 0 4px' }}>{label}</p>
+                <input
+                  type="number"
+                  value={trainerMacro[field]}
+                  onChange={e => updateTrainerMacroField(field, e.target.value)}
+                  style={{ width: '100%', background: 'transparent', border: 'none', borderBottom: `1px solid ${color}`, color, fontSize: '14px', fontWeight: '700', textAlign: 'center', padding: '2px 0', boxSizing: 'border-box', outline: 'none' }}
+                />
+                <p style={{ fontSize: '9px', color: 'rgba(255,255,255,0.5)', margin: '2px 0 5px' }}>{unit}</p>
+                <div style={{ background: 'rgba(255,255,255,0.2)', borderRadius: '4px', height: '4px', marginBottom: '3px' }}>
+                  <div style={{ width: `${pct}%`, background: over ? '#FF6B6B' : color, height: '4px', borderRadius: '4px' }} />
+                </div>
+                <p style={{ fontSize: '9px', color: over ? '#FF6B6B' : color, margin: 0, fontWeight: '600' }}>
+                  {Math.round(current)}{unit} ({pct}%)
+                </p>
+              </div>
+            )
+          })}
+        </div>
+      </div>
+    )
+  }
+
+  // 🆕 회원 카드 (2열 그리드용 - 식단/운동 분할)
+  const MemberCard = ({ member, stat }) => {
+    const activeParts = Object.entries(stat.parts).filter(([, v]) => v > 0)
+    const calPct = stat.macro?.target > 0 ? Math.min(Math.round(stat.calories / stat.macro.target * 100), 100) : 0
+    const carbsPct = stat.macro?.carbs > 0 ? Math.min(Math.round(stat.carbs / stat.macro.carbs * 100), 100) : 0
+    const proteinPct = stat.macro?.protein > 0 ? Math.min(Math.round(stat.protein / stat.macro.protein * 100), 100) : 0
+    const fatPct = stat.macro?.fat > 0 ? Math.min(Math.round(stat.fat / stat.macro.fat * 100), 100) : 0
+    const fatOver = stat.macro?.fat > 0 && stat.fat > stat.macro.fat
+
+    return (
+      <div style={{ background: THEME.cardAlt, borderRadius: '10px', border: `0.5px solid ${THEME.border}`, padding: '10px', cursor: 'pointer' }} onClick={() => openMember(member)}>
+        {/* 헤더: 아바타 + 이름 */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '7px', marginBottom: '7px' }}>
+          <div style={{ width: '28px', height: '28px', borderRadius: '50%', background: THEME.primary, color: '#FFF', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '12px', fontWeight: '500', flexShrink: 0 }}>{member.name.charAt(0)}</div>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <p style={{ fontSize: '12px', fontWeight: '500', color: THEME.text, margin: 0, lineHeight: 1.2 }}>{member.name}</p>
+            <p style={{ fontSize: '9px', color: THEME.textSub, margin: '1px 0 0' }}>{member.goal} · {member.gender}</p>
+          </div>
+        </div>
+
+        {/* 코드 + 전송 */}
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '5px 0', borderTop: `0.5px solid ${THEME.border}`, borderBottom: `0.5px solid ${THEME.border}` }}>
+          <span style={{ fontSize: '10px', fontWeight: '500', color: THEME.text, letterSpacing: '1px' }}>{member.code}</span>
+          <button
+            style={{ background: '#FEE500', color: '#1A1A2E', border: 'none', padding: '2px 7px', borderRadius: '4px', cursor: 'pointer', fontSize: '9px', fontWeight: '500' }}
+            onClick={e => { e.stopPropagation(); shareKakao(member.code, member.name) }}
+          >전송</button>
+        </div>
+
+        {/* 식단 영역 */}
+        <div style={{ padding: '6px 0' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: '3px' }}>
+            <span style={{ fontSize: '9px', color: THEME.textSub, fontWeight: '500' }}>🥗 오늘 식단</span>
+            {stat.macro && <span style={{ fontSize: '9px', color: THEME.primary, fontWeight: '500' }}>{calPct}%</span>}
+          </div>
+          {stat.macro ? (
+            <>
+              <div style={{ background: '#E5E1DA', height: '3px', borderRadius: '2px' }}>
+                <div style={{ width: `${calPct}%`, height: '3px', borderRadius: '2px', background: THEME.primary }} />
+              </div>
+              <div style={{ fontSize: '9px', color: THEME.text, marginTop: '3px' }}>
+                <strong>{Math.round(stat.calories)}</strong>
+                <span style={{ color: THEME.textSub }}> / {stat.macro.target} kcal</span>
+              </div>
+              <div style={{ fontSize: '9px', color: THEME.textSub, marginTop: '4px', lineHeight: '1.55' }}>
+                <span style={{ color: '#4472C4' }}>탄</span> {carbsPct}% &nbsp;
+                <span style={{ color: '#E84747' }}>단</span> {proteinPct}% &nbsp;
+                <span style={{ color: '#E8A020' }}>지</span> <span style={{ color: fatOver ? '#FF6B6B' : '#E8A020' }}>{fatPct}%</span>
+              </div>
+            </>
+          ) : (
+            <p style={{ fontSize: '10px', color: THEME.textSub, margin: 0 }}>{stat.calories > 0 ? `${Math.round(stat.calories)}kcal` : '기록 없음'}</p>
+          )}
+        </div>
+
+        {/* 점선 구분 */}
+        <div style={{ borderTop: `0.5px dashed ${THEME.border}`, margin: '4px 0' }} />
+
+        {/* 운동 영역 */}
+        <div style={{ padding: '6px 0 0' }}>
+          <p style={{ fontSize: '9px', color: THEME.textSub, fontWeight: '500', margin: '0 0 4px' }}>💪 오늘 운동</p>
+          {activeParts.length === 0 ? (
+            <p style={{ fontSize: '10px', color: THEME.textSub, margin: 0 }}>기록 없음</p>
+          ) : (
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '3px' }}>
+              {activeParts.map(([part, vol]) => (
+                <span key={part} style={{ fontSize: '9px', color: '#FFF', background: PART_COLORS[part], padding: '2px 6px', borderRadius: '4px' }}>
+                  {part} {vol >= 1000 ? (vol / 1000).toFixed(1) + 't' : vol + 'kg'}
+                </span>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div style={S.container}>
       <div style={S.wrap}>
         <div style={S.header}>
           <h1 style={S.headerTitle}>PT Manager</h1>
           <div style={{ display: 'flex', gap: '8px' }}>
+            {view === 'members' && topTab === 'myRecord' && (
+              <button onClick={() => setShowCalcModal(true)} style={{ background: THEME.primaryLight, border: `1px solid ${THEME.primary}`, color: THEME.primary, padding: '6px 10px', borderRadius: '8px', cursor: 'pointer', fontSize: '12px', fontWeight: '600' }}>
+                🧮 칼로리 설정
+              </button>
+            )}
             {view !== 'members' && (
               <button style={S.logoutBtn} onClick={() => { setView('members'); setSelectedMember(null) }}>← 목록</button>
             )}
@@ -210,12 +402,54 @@ export default function TrainerDashboard({ user, onLogout }) {
           </div>
         </div>
 
+        {showCalcModal && (
+          <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.5)', zIndex: 1000, display: 'flex', alignItems: 'flex-end', justifyContent: 'center' }}>
+            <div style={{ background: '#FFF', borderRadius: '20px 20px 0 0', padding: '20px', width: '100%', maxWidth: '480px', maxHeight: '85vh', overflowY: 'auto' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+                <p style={{ fontSize: '16px', fontWeight: '700', color: THEME.text, margin: 0 }}>🧮 칼로리 계산기</p>
+                <button onClick={() => setShowCalcModal(false)} style={{ background: 'none', border: 'none', fontSize: '20px', cursor: 'pointer', color: THEME.textSub }}>✕</button>
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', marginBottom: '8px' }}>
+                <select style={{ ...S.input, padding: '10px' }} value={goal} onChange={e => setGoal(e.target.value)}>
+                  <option value="다이어트">🥗 다이어트</option>
+                  <option value="벌크업">💪 벌크업</option>
+                </select>
+                <select style={{ ...S.input, padding: '10px' }} value={gender} onChange={e => setGender(e.target.value)}>
+                  <option value="여성">👩 여성</option>
+                  <option value="남성">👨 남성</option>
+                </select>
+                <input style={{ ...S.input, padding: '10px' }} type="number" placeholder="체중 (kg)" value={weight} onChange={e => setWeight(e.target.value)} />
+                <input style={{ ...S.input, padding: '10px' }} type="number" placeholder="골격근량 (kg)" value={muscle} onChange={e => setMuscle(e.target.value)} />
+              </div>
+              <select style={{ ...S.input, padding: '10px', marginBottom: '8px' }} value={activity} onChange={e => setActivity(e.target.value)}>
+                <option value="가벼운 운동 (주 2~3회)">🚶 가벼운 운동 (주 2~3회)</option>
+                <option value="보통 운동 (주 4~5회)">🏃 보통 운동 (주 4~5회)</option>
+                <option value="고강도 운동 (주 6회+)">🔥 고강도 운동 (주 6회+)</option>
+              </select>
+              <select style={{ ...S.input, padding: '10px', marginBottom: '8px' }} value={intensity} onChange={e => setIntensity(e.target.value)}>
+                <option value="완만">🐢 완만 {goal === '벌크업' ? '(+300kcal)' : '(-300kcal)'}</option>
+                <option value="일반">⚡ 일반 {goal === '벌크업' ? '(+400kcal)' : '(-500kcal)'}</option>
+                <option value="공격적">🚀 공격적 {goal === '벌크업' ? '(+500kcal)' : '(-700kcal)'}</option>
+              </select>
+              {gender === '여성' && (
+                <select style={{ ...S.input, padding: '10px', marginBottom: '12px' }} value={cyclePhase} onChange={e => setCyclePhase(e.target.value)}>
+                  <option value="">🌸 생리 주기 (선택사항)</option>
+                  {Object.entries(CYCLE_PHASES).map(([phase, adj]) => (
+                    <option key={phase} value={phase}>{phase} ({adj > 0 ? '+' : ''}{adj}kcal)</option>
+                  ))}
+                </select>
+              )}
+              <button style={S.btnPrimary} onClick={calculateTrainerMacro}>🧮 계산 및 저장</button>
+            </div>
+          </div>
+        )}
+
         {view === 'members' && (
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px', marginBottom: '12px' }}>
             <button onClick={() => setTopTab('members')} style={{ background: topTab === 'members' ? THEME.primary : '#FFF', color: topTab === 'members' ? '#FFF' : THEME.textSub, border: topTab === 'members' ? 'none' : `0.5px solid ${THEME.border}`, borderRadius: '10px', padding: '11px', fontSize: '13px', fontWeight: topTab === 'members' ? '500' : '400', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}>
               <IconMembers color={topTab === 'members' ? '#FFF' : THEME.textSub} />회원 관리
             </button>
-            <button onClick={() => { setTopTab('myRecord'); loadTrainerLogs() }} style={{ background: topTab === 'myRecord' ? THEME.primary : '#FFF', color: topTab === 'myRecord' ? '#FFF' : THEME.textSub, border: topTab === 'myRecord' ? 'none' : `0.5px solid ${THEME.border}`, borderRadius: '10px', padding: '11px', fontSize: '13px', fontWeight: topTab === 'myRecord' ? '500' : '400', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}>
+            <button onClick={() => { setTopTab('myRecord'); loadTrainerLogs(); loadTrainerTodayDiet() }} style={{ background: topTab === 'myRecord' ? THEME.primary : '#FFF', color: topTab === 'myRecord' ? '#FFF' : THEME.textSub, border: topTab === 'myRecord' ? 'none' : `0.5px solid ${THEME.border}`, borderRadius: '10px', padding: '11px', fontSize: '13px', fontWeight: topTab === 'myRecord' ? '500' : '400', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}>
               <IconNote color={topTab === 'myRecord' ? '#FFF' : THEME.textSub} />내 기록
             </button>
           </div>
@@ -252,76 +486,14 @@ export default function TrainerDashboard({ user, onLogout }) {
               </div>
             )}
 
+            {/* 🆕 2열 그리드 */}
             {members.length === 0 ? (
               <p style={{ color: THEME.textSub, textAlign: 'center', padding: '20px 0', fontSize: '14px' }}>등록된 회원이 없습니다.</p>
             ) : (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
                 {members.map(member => {
                   const stat = memberStats[member.id] || { parts: {}, calories: 0, carbs: 0, protein: 0, fat: 0, macro: null }
-                  const activeParts = Object.entries(stat.parts).filter(([, v]) => v > 0)
-                  const hasData = activeParts.length > 0 || stat.calories > 0
-                  const calPct = stat.macro?.target > 0 ? Math.min(Math.round(stat.calories / stat.macro.target * 100), 100) : 0
-
-                  return (
-                    <div key={member.id} style={{ background: THEME.cardAlt, borderRadius: '12px', border: `0.5px solid ${THEME.border}`, overflow: 'hidden', cursor: 'pointer' }} onClick={() => openMember(member)}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 12px 10px' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                          <div style={{ width: '38px', height: '38px', borderRadius: '50%', background: THEME.primary, color: '#FFF', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '15px', fontWeight: '700', flexShrink: 0 }}>{member.name.charAt(0)}</div>
-                          <div>
-                            <p style={{ fontSize: '14px', fontWeight: '700', color: THEME.text, margin: '0 0 2px' }}>{member.name}</p>
-                            <p style={{ fontSize: '11px', color: THEME.textSub, margin: 0 }}>{member.goal} · {member.gender}</p>
-                          </div>
-                        </div>
-                        <div style={{ textAlign: 'right' }}>
-                          <p style={{ fontSize: '13px', fontWeight: '700', color: THEME.text, letterSpacing: '2px', margin: '0 0 4px' }}>{member.code}</p>
-                          <button style={{ background: '#FEE500', color: '#1A1A2E', border: 'none', padding: '3px 10px', borderRadius: '6px', cursor: 'pointer', fontSize: '11px', fontWeight: '700' }} onClick={e => { e.stopPropagation(); shareKakao(member.code, member.name) }}>전송</button>
-                        </div>
-                      </div>
-
-                      {hasData ? (
-                        <div style={{ borderTop: `0.5px solid ${THEME.border}`, padding: '10px 12px', display: 'flex', gap: '10px' }}>
-                          <div style={{ flex: '1.3', minWidth: 0 }}>
-                            <div style={{ marginBottom: '8px' }}>
-                              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '3px' }}>
-                                <span style={{ fontSize: '10px', color: THEME.textSub }}>오늘 칼로리</span>
-                                <span style={{ fontSize: '10px', fontWeight: '700', color: THEME.primary }}>{calPct}%</span>
-                              </div>
-                              <div style={{ background: '#E5E1DA', borderRadius: '3px', height: '5px', marginBottom: '3px' }}>
-                                <div style={{ width: `${calPct}%`, background: THEME.primary, height: '5px', borderRadius: '3px' }} />
-                              </div>
-                              <span style={{ fontSize: '10px', fontWeight: '700', color: THEME.text }}>{Math.round(stat.calories)}kcal</span>
-                              <span style={{ fontSize: '10px', color: THEME.textSub }}> / {stat.macro?.target || '?'}kcal</span>
-                            </div>
-                            {stat.macro && (<>
-                              <NutrientBar label="탄수화물" current={stat.carbs} target={stat.macro.carbs} color="#4472C4" />
-                              <NutrientBar label="단백질" current={stat.protein} target={stat.macro.protein} color="#E84747" />
-                              <NutrientBar label="지방" current={stat.fat} target={stat.macro.fat} color="#E8A020" />
-                            </>)}
-                          </div>
-                          <div style={{ width: '0.5px', background: THEME.border, flexShrink: 0 }} />
-                          <div style={{ flex: 1, minWidth: 0, paddingLeft: '8px' }}>
-                            <p style={{ fontSize: '10px', color: THEME.textSub, margin: '0 0 6px' }}>오늘 운동</p>
-                            {activeParts.length === 0 ? (
-                              <p style={{ fontSize: '11px', color: THEME.textSub, margin: 0 }}>기록 없음</p>
-                            ) : (
-                              <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
-                                {activeParts.map(([part, vol]) => (
-                                  <div key={part} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                    <span style={{ fontSize: '10px', color: '#FFF', background: PART_COLORS[part], padding: '2px 7px', borderRadius: '6px' }}>{part}</span>
-                                    <span style={{ fontSize: '11px', fontWeight: '700', color: THEME.text }}>{vol >= 1000 ? (vol / 1000).toFixed(1) + 't' : vol + 'kg'}</span>
-                                  </div>
-                                ))}
-                              </div>
-                            )}
-                          </div>
-                        </div>
-                      ) : (
-                        <div style={{ borderTop: `0.5px solid ${THEME.border}`, padding: '8px 12px' }}>
-                          <span style={{ fontSize: '11px', color: THEME.textSub }}>오늘 운동 · 식단 기록 없음</span>
-                        </div>
-                      )}
-                    </div>
-                  )
+                  return <MemberCard key={member.id} member={member} stat={stat} />
                 })}
               </div>
             )}
@@ -330,6 +502,8 @@ export default function TrainerDashboard({ user, onLogout }) {
 
         {view === 'members' && topTab === 'myRecord' && (
           <>
+            <TrainerMacroCard />
+
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '6px', marginBottom: '12px' }}>
               {[
                 { key: 'workout', label: '운동 기록', Icon: IconWorkout },
@@ -344,7 +518,7 @@ export default function TrainerDashboard({ user, onLogout }) {
             </div>
             {trainerView === 'workout' && <WorkoutLog user={trainerAsUser} selectedDate={selectedDate} setSelectedDate={setSelectedDate} exercises={exercises} setExercises={setExercises} onUpdate={loadTrainerLogs} tableOverride="trainer_workout_logs" trainerIdField="trainer_id" />}
             {trainerView === 'stats' && <WorkoutStats allLogs={allLogs} />}
-            {trainerView === 'diet' && <DietLog user={trainerAsUser} onDietUpdate={() => {}} tableOverride="trainer_diet_logs" trainerIdField="trainer_id" />}
+            {trainerView === 'diet' && <DietLog user={trainerAsUser} onDietUpdate={loadTrainerTodayDiet} tableOverride="trainer_diet_logs" trainerIdField="trainer_id" />}
           </>
         )}
 

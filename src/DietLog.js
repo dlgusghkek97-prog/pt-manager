@@ -14,6 +14,49 @@ const MealIcon = ({ meal }) => {
 const StatsIcon = () => <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="12" width="4" height="9" rx="1"/><rect x="10" y="7" width="4" height="14" rx="1"/><rect x="17" y="3" width="4" height="18" rx="1"/></svg>
 const DietTabIcon = () => <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M12 2a5 5 0 0 1 5 5c0 3-5 7-5 7S7 10 7 7a5 5 0 0 1 5-5z"/><path d="M5 21h14M8 17l1-3h6l1 3"/></svg>
 
+// 🆕 일간 그리드 카드: 하루치 탄단지 막대 (목표 점선 + 실제값)
+const DayGridCard = ({ date, data, target, isToday }) => {
+  const cap = (val, max) => Math.min(Math.max(val, 0), max)
+  // 목표 대비 비율 (max 50px)
+  const carbsTargetH = target?.carbs ? 50 : 0
+  const carbsH = target?.carbs ? cap((data.carbs / target.carbs) * 50, 50) : 0
+  const proTargetH = target?.protein ? 50 : 0
+  const proH = target?.protein ? cap((data.protein / target.protein) * 50, 50) : 0
+  const fatTargetH = target?.fat ? 50 : 0
+  const fatH = target?.fat ? cap((data.fat / target.fat) * 50, 50) : 0
+
+  return (
+    <div style={{
+      background: isToday ? THEME.primary : THEME.cardAlt,
+      borderRadius: '10px',
+      padding: '8px 6px 7px',
+      textAlign: 'center'
+    }}>
+      <div style={{ fontSize: '11px', fontWeight: '600', color: isToday ? '#FFF' : THEME.text, marginBottom: '3px' }}>
+        {date.split('-')[2]}일
+      </div>
+      <svg viewBox="0 0 60 60" xmlns="http://www.w3.org/2000/svg" style={{ width: '100%', height: '56px', display: 'block' }}>
+        <line x1="0" y1="54" x2="60" y2="54" stroke={isToday ? 'rgba(255,255,255,0.3)' : '#D3D1C7'} strokeWidth="0.6"/>
+        {/* 탄수화물 */}
+        {target?.carbs > 0 && <line x1="-2" y1="4" x2="22" y2="4" stroke={isToday ? '#FFF' : '#185FA5'} strokeWidth="0.9" strokeDasharray="2,1.5" opacity={isToday ? '0.6' : '0.5'}/>}
+        {target?.carbs > 0 && <rect x="0" y="4" width="20" height={carbsTargetH} fill={isToday ? '#FFF' : '#378ADD'} opacity={isToday ? '0.2' : '0.18'} rx="2"/>}
+        <rect x="0" y={54 - carbsH} width="20" height={carbsH} fill={isToday ? '#93C5FD' : '#378ADD'} rx="2"/>
+        {/* 단백질 */}
+        {target?.protein > 0 && <line x1="18" y1="4" x2="42" y2="4" stroke={isToday ? '#FFF' : '#A32D2D'} strokeWidth="0.9" strokeDasharray="2,1.5" opacity={isToday ? '0.6' : '0.5'}/>}
+        {target?.protein > 0 && <rect x="20" y="4" width="20" height={proTargetH} fill={isToday ? '#FFF' : '#E24B4A'} opacity={isToday ? '0.2' : '0.18'} rx="2"/>}
+        <rect x="20" y={54 - proH} width="20" height={proH} fill={isToday ? '#FCA5A5' : '#E24B4A'} rx="2"/>
+        {/* 지방 */}
+        {target?.fat > 0 && <line x1="38" y1="4" x2="62" y2="4" stroke={isToday ? '#FFF' : '#854F0B'} strokeWidth="0.9" strokeDasharray="2,1.5" opacity={isToday ? '0.6' : '0.5'}/>}
+        {target?.fat > 0 && <rect x="40" y="4" width="20" height={fatTargetH} fill={isToday ? '#FFF' : '#EF9F27'} opacity={isToday ? '0.2' : '0.18'} rx="2"/>}
+        <rect x="40" y={54 - fatH} width="20" height={fatH} fill={isToday ? '#FDBA74' : '#EF9F27'} rx="2"/>
+      </svg>
+      <div style={{ fontSize: '10px', color: isToday ? '#FCD34D' : '#BA7517', fontWeight: '600', marginTop: '4px' }}>
+        {Math.round(data.calories)}k
+      </div>
+    </div>
+  )
+}
+
 export default function DietLog({ user, onDietUpdate, tableOverride, trainerIdField }) {
   const TABLE = tableOverride || 'diet_logs'
   const ID_FIELD = trainerIdField || 'member_id'
@@ -24,27 +67,51 @@ export default function DietLog({ user, onDietUpdate, tableOverride, trainerIdFi
   const [allDietLogs, setAllDietLogs] = useState([])
   const [inputVals, setInputVals] = useState({})
   const [statsTab, setStatsTab] = useState('daily')
+  const [saving, setSaving] = useState(false)
 
   const today = new Date()
   const [viewYear, setViewYear] = useState(today.getFullYear())
   const [viewMonth, setViewMonth] = useState(today.getMonth() + 1)
 
+  // 🆕 본인 macro 가져오기 (회원 본인의 목표수치)
+  const macro = (() => { try { const s = localStorage.getItem(`macro_result_${user.id}`); return s ? JSON.parse(s) : null } catch { return null } })()
+  const macroTarget = macro ? { carbs: macro.carbs, protein: macro.protein, fat: macro.fat, calories: macro.target } : null
+
   useEffect(() => { loadDietLogs(selectedDate); loadAllDietLogs() }, [])
 
+  useEffect(() => {
+    if (dietTab === 'stats') loadAllDietLogs()
+  }, [dietTab])
+
   const loadDietLogs = async (date) => {
-    const { data } = await supabase.from(TABLE).select('*').eq(ID_FIELD, user.id).eq('log_date', date).order('meal_type')
+    const { data, error } = await supabase
+      .from(TABLE).select('*')
+      .eq(ID_FIELD, user.id)
+      .eq('log_date', date)
+      .order('meal_type')
+
+    if (error) { console.error('[DietLog] loadDietLogs error:', error); return }
+
     const logs = data || []
     setDietLogs(logs)
     const vals = {}
     MEAL_TYPES.forEach(meal => {
       const log = logs.find(l => l.meal_type === meal)
-      vals[meal] = { carbs: log?.carbs ?? '', protein: log?.protein ?? '', fat: log?.fat ?? '', calories: log?.calories ?? '' }
+      vals[meal] = {
+        carbs: log?.carbs ?? '', protein: log?.protein ?? '',
+        fat: log?.fat ?? '', calories: log?.calories ?? ''
+      }
     })
     setInputVals(vals)
   }
 
   const loadAllDietLogs = async () => {
-    const { data } = await supabase.from(TABLE).select('*').eq(ID_FIELD, user.id).order('log_date')
+    const { data, error } = await supabase
+      .from(TABLE).select('*')
+      .eq(ID_FIELD, user.id)
+      .order('log_date')
+
+    if (error) { console.error('[DietLog] loadAllDietLogs error:', error); return null }
     setAllDietLogs(data || [])
     return data
   }
@@ -54,26 +121,47 @@ export default function DietLog({ user, onDietUpdate, tableOverride, trainerIdFi
   }
 
   const saveAll = async () => {
+    if (saving) return
+    setSaving(true)
     let count = 0
-    for (const meal of MEAL_TYPES) {
-      const vals = inputVals[meal] || {}
-      const carbs = parseFloat(vals.carbs) || 0
-      const protein = parseFloat(vals.protein) || 0
-      const fat = parseFloat(vals.fat) || 0
-      const calories = parseFloat(vals.calories) || Math.round(carbs * 4 + protein * 4 + fat * 9)
-      if (carbs === 0 && protein === 0 && fat === 0 && calories === 0) continue
-      const existing = dietLogs.find(l => l.meal_type === meal)
-      if (existing) {
-        await supabase.from(TABLE).update({ carbs, protein, fat, calories }).eq('id', existing.id)
-      } else {
-        await supabase.from(TABLE).insert({ [ID_FIELD]: user.id, log_date: selectedDate, meal_type: meal, carbs, protein, fat, calories })
+    const errors = []
+
+    try {
+      for (const meal of MEAL_TYPES) {
+        const vals = inputVals[meal] || {}
+        const carbs = parseFloat(vals.carbs) || 0
+        const protein = parseFloat(vals.protein) || 0
+        const fat = parseFloat(vals.fat) || 0
+        const calories = parseFloat(vals.calories) || Math.round(carbs * 4 + protein * 4 + fat * 9)
+        if (carbs === 0 && protein === 0 && fat === 0 && calories === 0) continue
+
+        const existing = dietLogs.find(l => l.meal_type === meal)
+        if (existing) {
+          const { error } = await supabase.from(TABLE).update({ carbs, protein, fat, calories }).eq('id', existing.id)
+          if (error) { errors.push(`${meal}: ${error.message}`); console.error(error); continue }
+        } else {
+          const { error } = await supabase.from(TABLE).insert({
+            [ID_FIELD]: user.id, log_date: selectedDate, meal_type: meal,
+            carbs, protein, fat, calories
+          })
+          if (error) { errors.push(`${meal}: ${error.message}`); console.error(error); continue }
+        }
+        count++
       }
-      count++
+
+      await loadDietLogs(selectedDate)
+      await loadAllDietLogs()
+      if (onDietUpdate) await onDietUpdate()
+
+      if (errors.length > 0) alert(`⚠️ 저장 실패\n\n${errors.join('\n')}`)
+      else if (count === 0) alert('ℹ️ 저장할 내용이 없습니다.')
+      else alert(`✅ ${count}개 식사 저장 완료!`)
+    } catch (err) {
+      console.error('[DietLog] saveAll exception:', err)
+      alert(`❌ 저장 중 오류: ${err.message || err}`)
+    } finally {
+      setSaving(false)
     }
-    await loadDietLogs(selectedDate)
-    await loadAllDietLogs()
-    if (onDietUpdate) await onDietUpdate()
-    alert(`✅ ${count}개 식사 저장 완료!`)
   }
 
   const getDayTotal = (field) => dietLogs.reduce((sum, l) => sum + (l[field] || 0), 0)
@@ -92,7 +180,17 @@ export default function DietLog({ user, onDietUpdate, tableOverride, trainerIdFi
     byDay[row.log_date].fat += row.fat || 0
     byDay[row.log_date].calories += row.calories || 0
   })
-  const monthDays = Object.keys(byDay).filter(d => d.startsWith(`${yearStr}-${monthStr}`)).sort()
+
+  // 🆕 해당 월의 1~31일 모두 생성 (기록 없는 날도 빈 카드로 표시)
+  const daysInMonth = new Date(viewYear, viewMonth, 0).getDate()
+  const allMonthDays = []
+  for (let d = 1; d <= daysInMonth; d++) {
+    const dStr = `${yearStr}-${monthStr}-${String(d).padStart(2, '0')}`
+    allMonthDays.push({
+      date: dStr,
+      data: byDay[dStr] || { carbs: 0, protein: 0, fat: 0, calories: 0 }
+    })
+  }
 
   const weeklyByWeek = Array.from({ length: 5 }, () => ({ carbs: 0, protein: 0, fat: 0, calories: 0 }))
   allDietLogs.filter(r => r.log_date?.startsWith(`${yearStr}-${monthStr}`)).forEach(row => {
@@ -127,12 +225,12 @@ export default function DietLog({ user, onDietUpdate, tableOverride, trainerIdFi
   const yearOptions = []
   for (let y = today.getFullYear(); y >= today.getFullYear() - 3; y--) yearOptions.push(y)
 
-  const YearMonthPicker = () => (
+  const YearMonthPicker = ({ showMonth = true }) => (
     <div style={{ display: 'flex', gap: '6px' }}>
       <select value={viewYear} onChange={e => setViewYear(parseInt(e.target.value))} style={{ padding: '4px 8px', borderRadius: '8px', border: `1px solid ${THEME.border}`, fontSize: '13px', background: '#FFF' }}>
         {yearOptions.map(y => <option key={y} value={y}>{y}년</option>)}
       </select>
-      {statsTab !== 'monthly' && (
+      {showMonth && (
         <select value={viewMonth} onChange={e => setViewMonth(parseInt(e.target.value))} style={{ padding: '4px 8px', borderRadius: '8px', border: `1px solid ${THEME.border}`, fontSize: '13px', background: '#FFF' }}>
           {Array.from({ length: 12 }, (_, i) => i + 1).map(m => <option key={m} value={m}>{m}월</option>)}
         </select>
@@ -211,7 +309,13 @@ export default function DietLog({ user, onDietUpdate, tableOverride, trainerIdFi
             <span style={{ fontSize: '12px', fontWeight: '600', color: '#FFF', textAlign: 'center' }}>{Math.round(todayCalories)}</span>
           </div>
 
-          <button style={{ ...S.btnPrimary, fontSize: '15px' }} onClick={saveAll}>💾 저장</button>
+          <button
+            style={{ ...S.btnPrimary, fontSize: '15px', opacity: saving ? 0.6 : 1, cursor: saving ? 'wait' : 'pointer' }}
+            onClick={saveAll}
+            disabled={saving}
+          >
+            {saving ? '⏳ 저장 중...' : '💾 저장'}
+          </button>
         </div>
       )}
 
@@ -238,27 +342,27 @@ export default function DietLog({ user, onDietUpdate, tableOverride, trainerIdFi
             ))}
           </div>
 
+          {/* 🆕 일간 — 31일 그리드 그래프 */}
           {statsTab === 'daily' && (
             <div style={S.card}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
                 <p style={{ ...S.cardTitle, margin: 0 }}>{viewYear}년 {viewMonth}월</p>
                 <YearMonthPicker />
               </div>
-              {monthDays.length === 0 ? <p style={{ color: THEME.textSub, fontSize: '13px', textAlign: 'center', padding: '16px 0' }}>식단 기록이 없습니다</p> : (
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '8px' }}>
-                  {monthDays.map(date => {
-                    const d = byDay[date]
-                    const isToday = date === todayStr
-                    return (
-                      <div key={date} style={{ background: isToday ? THEME.primary : THEME.cardAlt, borderRadius: '12px', padding: '10px', textAlign: 'center' }}>
-                        <p style={{ fontSize: '12px', fontWeight: '700', color: isToday ? '#FFF' : THEME.text, margin: '0 0 4px' }}>{date.split('-')[2]}일</p>
-                        <p style={{ fontSize: '12px', fontWeight: '700', color: isToday ? '#FCD34D' : THEME.danger, margin: '0 0 4px' }}>{Math.round(d.calories)}kcal</p>
-                        <p style={{ fontSize: '10px', color: isToday ? 'rgba(255,255,255,0.7)' : THEME.textSub, margin: 0 }}>탄{Math.round(d.carbs)} 단{Math.round(d.protein)} 지{Math.round(d.fat)}</p>
-                      </div>
-                    )
-                  })}
-                </div>
-              )}
+
+              {/* 범례 */}
+              <div style={{ display: 'flex', gap: '10px', marginBottom: '10px', padding: '0 2px', alignItems: 'center' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '3px' }}><div style={{ width: '8px', height: '8px', background: '#378ADD', borderRadius: '2px' }} /><span style={{ fontSize: '9px', color: THEME.textSub }}>탄</span></div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '3px' }}><div style={{ width: '8px', height: '8px', background: '#E24B4A', borderRadius: '2px' }} /><span style={{ fontSize: '9px', color: THEME.textSub }}>단</span></div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '3px' }}><div style={{ width: '8px', height: '8px', background: '#EF9F27', borderRadius: '2px' }} /><span style={{ fontSize: '9px', color: THEME.textSub }}>지</span></div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '3px', marginLeft: 'auto' }}><div style={{ width: '12px', borderTop: '1px dashed #888780' }} /><span style={{ fontSize: '9px', color: THEME.textSub }}>목표</span></div>
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '7px' }}>
+                {allMonthDays.map(({ date, data }) => (
+                  <DayGridCard key={date} date={date} data={data} target={macroTarget} isToday={date === todayStr} />
+                ))}
+              </div>
             </div>
           )}
 
@@ -277,7 +381,7 @@ export default function DietLog({ user, onDietUpdate, tableOverride, trainerIdFi
             <div style={S.card}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
                 <p style={{ ...S.cardTitle, margin: 0 }}>{viewYear}년 월별</p>
-                <YearMonthPicker />
+                <YearMonthPicker showMonth={false} />
               </div>
               {Object.entries(monthlyByMonth).filter(([, d]) => d.calories > 0).length === 0
                 ? <p style={{ color: THEME.textSub, fontSize: '13px', textAlign: 'center', padding: '16px 0' }}>식단 기록이 없습니다</p>

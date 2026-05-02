@@ -52,6 +52,10 @@ export default function MemberDashboard({ user, onLogout }) {
   const [showCalcModal, setShowCalcModal] = useState(false)
   const [todayDietLogs, setTodayDietLogs] = useState([])
 
+  // 🆕 트레이너 macro + 트레이너 오늘 식단 (트레이너 식단 화면에서 사용)
+  const [trainerMacro, setTrainerMacro] = useState(null)
+  const [trainerTodayDiet, setTrainerTodayDiet] = useState([])
+
   const [goal, setGoal] = useState(() => localStorage.getItem(`macro_goal_${user.id}`) || '다이어트')
   const [gender, setGender] = useState(() => localStorage.getItem(`macro_gender_${user.id}`) || '여성')
   const [weight, setWeight] = useState(() => localStorage.getItem(`macro_weight_${user.id}`) || '')
@@ -64,25 +68,67 @@ export default function MemberDashboard({ user, onLogout }) {
     return saved ? JSON.parse(saved) : null
   })
 
-  useEffect(() => { loadAllLogs(); loadTrainerLogs(); loadTodayDiet() }, [])
+  useEffect(() => { loadAllLogs(); loadTrainerLogs(); loadTodayDiet(); loadTrainerMacroAndDiet() }, [])
 
   const loadAllLogs = async () => {
-    const { data } = await supabase.from('workout_logs').select('*').eq('member_id', user.id).order('log_date')
+    const { data, error } = await supabase.from('workout_logs').select('*').eq('member_id', user.id).order('log_date')
+    if (error) { console.error('[MemberDashboard] loadAllLogs error:', error); return null }
     if (data) setAllLogs(data)
     return data
   }
 
   const loadTrainerLogs = async () => {
-    const { data: wData } = await supabase.from('trainer_workout_logs').select('*').order('log_date')
+    const { data: wData, error: wErr } = await supabase.from('trainer_workout_logs').select('*').order('log_date')
+    if (wErr) console.error('[MemberDashboard] loadTrainerLogs(workout) error:', wErr)
     if (wData) setTrainerLogs(wData)
-    const { data: dData } = await supabase.from('trainer_diet_logs').select('*').order('log_date')
+    const { data: dData, error: dErr } = await supabase.from('trainer_diet_logs').select('*').order('log_date')
+    if (dErr) console.error('[MemberDashboard] loadTrainerLogs(diet) error:', dErr)
     if (dData) setTrainerDietLogs(dData)
   }
 
   const loadTodayDiet = async () => {
     const today = new Date().toISOString().split('T')[0]
-    const { data } = await supabase.from('diet_logs').select('*').eq('member_id', user.id).eq('log_date', today)
+    const { data, error } = await supabase.from('diet_logs').select('*').eq('member_id', user.id).eq('log_date', today)
+    if (error) { console.error('[MemberDashboard] loadTodayDiet error:', error); return }
     setTodayDietLogs(data || [])
+  }
+
+  // 🆕 트레이너 macro + 오늘 식단 (트레이너 식단 화면에서 사용)
+  const loadTrainerMacroAndDiet = async () => {
+    // 회원에게 연결된 트레이너 ID 가져오기
+    const { data: memberData, error: memErr } = await supabase
+      .from('members').select('trainer_id').eq('id', user.id).single()
+    if (memErr || !memberData?.trainer_id) {
+      console.error('[MemberDashboard] trainer_id 조회 실패:', memErr)
+      return
+    }
+    const trainerId = memberData.trainer_id
+
+    // 트레이너 목표수치
+    const { data: tData, error: tErr } = await supabase
+      .from('trainers')
+      .select('target_calories, target_carbs, target_protein, target_fat')
+      .eq('id', trainerId)
+      .single()
+    if (tErr) { console.error('[MemberDashboard] loadTrainerMacro error:', tErr); return }
+    if (tData && (tData.target_calories || tData.target_carbs || tData.target_protein || tData.target_fat)) {
+      setTrainerMacro({
+        target: tData.target_calories || 0,
+        carbs: tData.target_carbs || 0,
+        protein: tData.target_protein || 0,
+        fat: tData.target_fat || 0
+      })
+    }
+
+    // 트레이너의 오늘 식단
+    const today = new Date().toISOString().split('T')[0]
+    const { data: dData, error: dErr } = await supabase
+      .from('trainer_diet_logs')
+      .select('*')
+      .eq('trainer_id', trainerId)
+      .eq('log_date', today)
+    if (dErr) { console.error('[MemberDashboard] loadTrainerTodayDiet error:', dErr); return }
+    setTrainerTodayDiet(dData || [])
   }
 
   const calculate = () => {
@@ -158,12 +204,65 @@ export default function MemberDashboard({ user, onLogout }) {
     )
   }
 
+  // 🆕 트레이너 목표수치 카드 (회원이 보는 화면 - 읽기 전용)
+  const TrainerMacroCardReadonly = () => {
+    if (!trainerMacro) return (
+      <div style={{ background: THEME.cardAlt, borderRadius: '12px', padding: '10px 14px', marginBottom: '12px', textAlign: 'center', border: `1px dashed ${THEME.border}` }}>
+        <p style={{ fontSize: '13px', color: THEME.textSub, margin: 0 }}>트레이너가 목표를 설정하지 않았습니다</p>
+      </div>
+    )
+    const tCalories = trainerTodayDiet.reduce((s, l) => s + (l.calories || 0), 0)
+    const tCarbs = trainerTodayDiet.reduce((s, l) => s + (l.carbs || 0), 0)
+    const tProtein = trainerTodayDiet.reduce((s, l) => s + (l.protein || 0), 0)
+    const tFat = trainerTodayDiet.reduce((s, l) => s + (l.fat || 0), 0)
+    const fields = [
+      { label: '칼로리', field: 'target', unit: 'kcal', current: tCalories, color: '#FCD34D' },
+      { label: '탄수화물', field: 'carbs', unit: 'g', current: tCarbs, color: '#93C5FD' },
+      { label: '단백질', field: 'protein', unit: 'g', current: tProtein, color: '#FCA5A5' },
+      { label: '지방', field: 'fat', unit: 'g', current: tFat, color: '#FDBA74' },
+    ]
+    return (
+      <div style={{ background: THEME.primary, borderRadius: '14px', padding: '12px 14px', marginBottom: '12px' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
+          <span style={{ fontSize: '13px', fontWeight: '600', color: '#FFF' }}>🎯 트레이너 목표 수치</span>
+          <span style={{ fontSize: '10px', color: 'rgba(255,255,255,0.6)' }}>오늘 달성률</span>
+        </div>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: '6px' }}>
+          {fields.map(({ label, field, unit, current, color }) => {
+            const target = trainerMacro[field]
+            const pct = target > 0 ? Math.min(Math.round(current / target * 100), 100) : 0
+            const over = target > 0 && current > target
+            return (
+              <div key={field} style={{ background: 'rgba(255,255,255,0.12)', borderRadius: '8px', padding: '8px', textAlign: 'center' }}>
+                <p style={{ fontSize: '9px', color: 'rgba(255,255,255,0.7)', margin: '0 0 4px' }}>{label}</p>
+                <p style={{ fontSize: '14px', fontWeight: '700', color, margin: '0 0 2px' }}>{target}</p>
+                <p style={{ fontSize: '9px', color: 'rgba(255,255,255,0.5)', margin: '0 0 5px' }}>{unit}</p>
+                <div style={{ background: 'rgba(255,255,255,0.2)', borderRadius: '4px', height: '4px', marginBottom: '3px' }}>
+                  <div style={{ width: `${pct}%`, background: over ? '#FF6B6B' : color, height: '4px', borderRadius: '4px' }} />
+                </div>
+                <p style={{ fontSize: '9px', color: over ? '#FF6B6B' : color, margin: 0, fontWeight: '600' }}>
+                  {Math.round(current)}{unit} ({pct}%)
+                </p>
+              </div>
+            )
+          })}
+        </div>
+      </div>
+    )
+  }
+
   const mainTabs = [
     { key: 'workout', label: '운동', icon: IconWorkout },
     { key: 'stats', label: '통계', icon: IconStats },
     { key: 'diet', label: '식단', icon: IconDiet },
     { key: 'trainer', label: '트레이너', icon: IconTrainer },
   ]
+
+  const handleTabSelect = (key) => {
+    setMemberView(key)
+    if (key === 'diet') loadTodayDiet()
+    if (key === 'trainer') loadTrainerMacroAndDiet()
+  }
 
   return (
     <div style={S.container}>
@@ -222,7 +321,7 @@ export default function MemberDashboard({ user, onLogout }) {
           </div>
         )}
 
-        <TabBar tabs={mainTabs} active={memberView} onSelect={(key) => { setMemberView(key); if (key === 'diet') loadTodayDiet() }} />
+        <TabBar tabs={mainTabs} active={memberView} onSelect={handleTabSelect} />
 
         {memberView === 'workout' && (
           <WorkoutLog
@@ -235,7 +334,7 @@ export default function MemberDashboard({ user, onLogout }) {
           />
         )}
         {memberView === 'stats' && <WorkoutStats allLogs={allLogs} />}
-        {memberView === 'diet' && <DietLog user={user} onDietUpdate={async () => { await loadTodayDiet() }} />}
+        {memberView === 'diet' && <DietLog user={user} onDietUpdate={loadTodayDiet} />}
 
         {memberView === 'trainer' && (
           <>
@@ -253,35 +352,40 @@ export default function MemberDashboard({ user, onLogout }) {
             />
             {trainerView === 'workout' && <WorkoutStats allLogs={trainerLogs} />}
             {trainerView === 'diet' && (
-              <div style={S.card}>
-                <p style={S.cardTitle}>트레이너 식단 기록</p>
-                {trainerDietLogs.length === 0 ? (
-                  <p style={{ color: THEME.textSub, fontSize: '13px', textAlign: 'center', padding: '16px 0' }}>트레이너 식단 기록이 없습니다</p>
-                ) : (() => {
-                  const byDay = {}
-                  trainerDietLogs.forEach(row => {
-                    if (!byDay[row.log_date]) byDay[row.log_date] = { carbs: 0, protein: 0, fat: 0, calories: 0 }
-                    byDay[row.log_date].carbs += row.carbs || 0
-                    byDay[row.log_date].protein += row.protein || 0
-                    byDay[row.log_date].fat += row.fat || 0
-                    byDay[row.log_date].calories += row.calories || 0
-                  })
-                  return (
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '8px' }}>
-                      {Object.keys(byDay).sort().reverse().map(date => {
-                        const d = byDay[date]
-                        return (
-                          <div key={date} style={{ background: THEME.cardAlt, borderRadius: '12px', padding: '10px', textAlign: 'center' }}>
-                            <p style={{ fontSize: '12px', fontWeight: '700', color: THEME.text, margin: '0 0 4px' }}>{date.split('-')[1]}/{date.split('-')[2]}</p>
-                            <p style={{ fontSize: '12px', fontWeight: '700', color: THEME.danger, margin: '0 0 4px' }}>{Math.round(d.calories)}kcal</p>
-                            <p style={{ fontSize: '10px', color: THEME.textSub, margin: 0 }}>탄{Math.round(d.carbs)} 단{Math.round(d.protein)} 지{Math.round(d.fat)}</p>
-                          </div>
-                        )
-                      })}
-                    </div>
-                  )
-                })()}
-              </div>
+              <>
+                {/* 🆕 트레이너 목표수치 카드 (읽기 전용) */}
+                <TrainerMacroCardReadonly />
+
+                <div style={S.card}>
+                  <p style={S.cardTitle}>트레이너 식단 기록</p>
+                  {trainerDietLogs.length === 0 ? (
+                    <p style={{ color: THEME.textSub, fontSize: '13px', textAlign: 'center', padding: '16px 0' }}>트레이너 식단 기록이 없습니다</p>
+                  ) : (() => {
+                    const byDay = {}
+                    trainerDietLogs.forEach(row => {
+                      if (!byDay[row.log_date]) byDay[row.log_date] = { carbs: 0, protein: 0, fat: 0, calories: 0 }
+                      byDay[row.log_date].carbs += row.carbs || 0
+                      byDay[row.log_date].protein += row.protein || 0
+                      byDay[row.log_date].fat += row.fat || 0
+                      byDay[row.log_date].calories += row.calories || 0
+                    })
+                    return (
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '8px' }}>
+                        {Object.keys(byDay).sort().reverse().map(date => {
+                          const d = byDay[date]
+                          return (
+                            <div key={date} style={{ background: THEME.cardAlt, borderRadius: '12px', padding: '10px', textAlign: 'center' }}>
+                              <p style={{ fontSize: '12px', fontWeight: '700', color: THEME.text, margin: '0 0 4px' }}>{date.split('-')[1]}/{date.split('-')[2]}</p>
+                              <p style={{ fontSize: '12px', fontWeight: '700', color: THEME.danger, margin: '0 0 4px' }}>{Math.round(d.calories)}kcal</p>
+                              <p style={{ fontSize: '10px', color: THEME.textSub, margin: 0 }}>탄{Math.round(d.carbs)} 단{Math.round(d.protein)} 지{Math.round(d.fat)}</p>
+                            </div>
+                          )
+                        })}
+                      </div>
+                    )
+                  })()}
+                </div>
+              </>
             )}
           </>
         )}
