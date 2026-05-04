@@ -4,6 +4,7 @@ import { S, THEME, calcMacro, CYCLE_PHASES } from './utils'
 import WorkoutLog from './WorkoutLog'
 import WorkoutStats from './WorkoutStats'
 import DietLog from './DietLog'
+import HelpModal from './HelpModal'
 
 const IconWorkout = ({ color = 'currentColor' }) => (
   <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="1.8" strokeLinecap="round">
@@ -52,9 +53,11 @@ export default function MemberDashboard({ user, onLogout }) {
   const [showCalcModal, setShowCalcModal] = useState(false)
   const [todayDietLogs, setTodayDietLogs] = useState([])
 
-  // 🆕 트레이너 macro + 트레이너 오늘 식단 (트레이너 식단 화면에서 사용)
   const [trainerMacro, setTrainerMacro] = useState(null)
   const [trainerTodayDiet, setTrainerTodayDiet] = useState([])
+
+  // 🆕 도움말 모달
+  const [showHelp, setShowHelp] = useState(false)
 
   const [goal, setGoal] = useState(() => localStorage.getItem(`macro_goal_${user.id}`) || '다이어트')
   const [gender, setGender] = useState(() => localStorage.getItem(`macro_gender_${user.id}`) || '여성')
@@ -93,9 +96,7 @@ export default function MemberDashboard({ user, onLogout }) {
     setTodayDietLogs(data || [])
   }
 
-  // 🆕 트레이너 macro + 오늘 식단 (트레이너 식단 화면에서 사용)
   const loadTrainerMacroAndDiet = async () => {
-    // 회원에게 연결된 트레이너 ID 가져오기
     const { data: memberData, error: memErr } = await supabase
       .from('members').select('trainer_id').eq('id', user.id).single()
     if (memErr || !memberData?.trainer_id) {
@@ -104,7 +105,6 @@ export default function MemberDashboard({ user, onLogout }) {
     }
     const trainerId = memberData.trainer_id
 
-    // 트레이너 목표수치
     const { data: tData, error: tErr } = await supabase
       .from('trainers')
       .select('target_calories, target_carbs, target_protein, target_fat')
@@ -120,7 +120,6 @@ export default function MemberDashboard({ user, onLogout }) {
       })
     }
 
-    // 트레이너의 오늘 식단
     const today = new Date().toISOString().split('T')[0]
     const { data: dData, error: dErr } = await supabase
       .from('trainer_diet_logs')
@@ -204,7 +203,6 @@ export default function MemberDashboard({ user, onLogout }) {
     )
   }
 
-  // 🆕 트레이너 목표수치 카드 (회원이 보는 화면 - 읽기 전용)
   const TrainerMacroCardReadonly = () => {
     if (!trainerMacro) return (
       <div style={{ background: THEME.cardAlt, borderRadius: '12px', padding: '10px 14px', marginBottom: '12px', textAlign: 'center', border: `1px dashed ${THEME.border}` }}>
@@ -269,13 +267,22 @@ export default function MemberDashboard({ user, onLogout }) {
       <div style={S.wrap}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
           <h1 style={{ ...S.headerTitle, fontSize: '18px', margin: 0 }}>🏋️ {user.name}님</h1>
-          <div style={{ display: 'flex', gap: '6px' }}>
+          <div style={{ display: 'flex', gap: '6px', alignItems: 'center', flexWrap: 'wrap' }}>
+            {/* 🆕 도움말 ? 버튼 */}
+            <button
+              onClick={() => setShowHelp(true)}
+              style={{ background: '#FFF', border: `1px solid ${THEME.primary}`, color: THEME.primary, width: '30px', height: '30px', borderRadius: '50%', cursor: 'pointer', fontSize: '14px', fontWeight: '700', padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+              title="도움말"
+            >?</button>
             <button onClick={() => setShowCalcModal(true)} style={{ background: THEME.primaryLight, border: `1px solid ${THEME.primary}`, color: THEME.primary, padding: '6px 10px', borderRadius: '8px', cursor: 'pointer', fontSize: '12px', fontWeight: '600' }}>
               🧮 칼로리 설정
             </button>
             <button style={S.logoutBtn} onClick={onLogout}>로그아웃</button>
           </div>
         </div>
+
+        {/* 🆕 도움말 모달 */}
+        {showHelp && <HelpModal type="member" onClose={() => setShowHelp(false)} />}
 
         <MacroCard />
 
@@ -353,7 +360,6 @@ export default function MemberDashboard({ user, onLogout }) {
             {trainerView === 'workout' && <WorkoutStats allLogs={trainerLogs} />}
             {trainerView === 'diet' && (
               <>
-                {/* 🆕 트레이너 목표수치 카드 (읽기 전용) */}
                 <TrainerMacroCardReadonly />
 
                 <div style={S.card}>
