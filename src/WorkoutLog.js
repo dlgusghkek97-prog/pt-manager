@@ -1,7 +1,7 @@
 import React from 'react'
 import { supabase } from './supabase'
 import { PARTS, PART_COLORS, S, THEME } from './utils'
-import DatePicker from './DatePicker'
+// import DatePicker from './DatePicker'
 
 const CameraIcon = () => (
   <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
@@ -205,7 +205,7 @@ export default function WorkoutLog({ user, selectedDate, setSelectedDate, exerci
       <div style={S.card}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px' }}>
           <p style={{ ...S.cardTitle, margin: 0 }}>운동 기록</p>
-          <DatePicker value={selectedDate} onChange={(d) => { setSelectedDate(d); loadExercises(user.id, d) }} />
+        <input type="date" value={selectedDate} onChange={e => { setSelectedDate(e.target.value); loadExercises(user.id, e.target.value) }} style={S.dateInput} />
         </div>
 
         {exercises.map((ex, exIdx) => (
