@@ -1,6 +1,7 @@
 import React from 'react'
 import { supabase } from './supabase'
 import { PARTS, PART_COLORS, S, THEME } from './utils'
+import DatePicker from './DatePicker'
 
 const CameraIcon = () => (
   <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
@@ -204,11 +205,11 @@ export default function WorkoutLog({ user, selectedDate, setSelectedDate, exerci
       <div style={S.card}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px' }}>
           <p style={{ ...S.cardTitle, margin: 0 }}>운동 기록</p>
-          <input type="date" value={selectedDate} onChange={e => { setSelectedDate(e.target.value); loadExercises(user.id, e.target.value) }} style={S.dateInput} />
+          <DatePicker value={selectedDate} onChange={(d) => { setSelectedDate(d); loadExercises(user.id, d) }} />
         </div>
 
         {exercises.map((ex, exIdx) => (
-          <div key={exIdx} style={{ background: '#FAFAF7', border: `0.5px solid ${THEME.border}`, borderRadius: '12px', padding: '12px', marginBottom: '10px' }}>
+                  <div key={exIdx} style={{ background: '#FAFAF7', border: `0.5px solid ${THEME.border}`, borderRadius: '12px', padding: '12px', marginBottom: '10px' }}>
             {/* 1줄: 부위 / 운동명 / X */}
             <div style={{ display: 'grid', gridTemplateColumns: '70px 1fr 32px', gap: '6px', marginBottom: '7px' }}>
               <select style={inputBase} value={ex.body_part} onChange={e => updateExField(exIdx, 'body_part', e.target.value)}>
