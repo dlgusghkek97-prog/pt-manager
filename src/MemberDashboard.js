@@ -266,18 +266,23 @@ export default function MemberDashboard({ user, onLogout }) {
     <div style={S.container}>
       <div style={S.wrap}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
-          <h1 style={{ ...S.headerTitle, fontSize: '18px', margin: 0 }}>🏋️ {user.name}님</h1>
-          <div style={{ display: 'flex', gap: '6px', alignItems: 'center', flexWrap: 'wrap' }}>
-            {/* 🆕 도움말 ? 버튼 */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0, flex: 1 }}>
+            <div style={{ width: '40px', height: '40px', background: THEME.primary, borderRadius: '9px', display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', flexShrink: 0 }}>
+              <span style={{ color: '#FFF', fontSize: '15px', fontWeight: '700', lineHeight: 1, letterSpacing: '-0.5px' }}>PT</span>
+              <div style={{ width: '18px', height: '1px', background: '#FFF', margin: '2px 0 1px', borderRadius: '1px' }} />
+              <span style={{ color: '#FFF', fontSize: '4.5px', letterSpacing: '0.6px', opacity: 0.9 }}>MANAGER</span>
+            </div>
+            <p style={{ fontSize: '15px', fontWeight: '700', color: THEME.primary, margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{user.name}님</p>
+          </div>
+          <div style={{ display: 'flex', gap: '5px', alignItems: 'center', flexShrink: 0 }}>
             <button
               onClick={() => setShowHelp(true)}
-              style={{ background: '#FFF', border: `1px solid ${THEME.primary}`, color: THEME.primary, width: '30px', height: '30px', borderRadius: '50%', cursor: 'pointer', fontSize: '14px', fontWeight: '700', padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+              style={{ background: '#FFF', border: `1px solid ${THEME.primary}`, color: THEME.primary, width: '30px', height: '30px', borderRadius: '50%', cursor: 'pointer', fontSize: '14px', fontWeight: '700', padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}
               title="도움말"
             >?</button>
-            <button onClick={() => setShowCalcModal(true)} style={{ background: THEME.primaryLight, border: `1px solid ${THEME.primary}`, color: THEME.primary, padding: '6px 10px', borderRadius: '8px', cursor: 'pointer', fontSize: '12px', fontWeight: '600' }}>
-              🧮 칼로리 설정
+            <button onClick={() => setShowCalcModal(true)} style={{ background: THEME.primaryLight, border: `1px solid ${THEME.primary}`, color: THEME.primary, padding: '0 10px', borderRadius: '15px', cursor: 'pointer', fontSize: '11px', fontWeight: '500', height: '30px', display: 'flex', alignItems: 'center', gap: '4px', flexShrink: 0 }}>
+              🧮 식단 설정
             </button>
-            <button style={S.logoutBtn} onClick={onLogout}>로그아웃</button>
           </div>
         </div>
 

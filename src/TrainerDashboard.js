@@ -449,23 +449,26 @@ export default function TrainerDashboard({ user, onLogout }) {
     <div style={S.container}>
       <div style={S.wrap}>
         <div style={S.header}>
-          <h1 style={S.headerTitle}>PT Manager</h1>
-          <div style={{ display: 'flex', gap: '6px', alignItems: 'center', flexWrap: 'wrap' }}>
-            {/* 🆕 도움말 ? 버튼 */}
+          <div style={{ width: '40px', height: '40px', background: THEME.primary, borderRadius: '9px', display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', flexShrink: 0 }}>
+            <span style={{ color: '#FFF', fontSize: '15px', fontWeight: '700', lineHeight: 1, letterSpacing: '-0.5px' }}>PT</span>
+            <div style={{ width: '18px', height: '1px', background: '#FFF', margin: '2px 0 1px', borderRadius: '1px' }} />
+            <span style={{ color: '#FFF', fontSize: '4.5px', letterSpacing: '0.6px', opacity: 0.9 }}>MANAGER</span>
+          </div>
+          <div style={{ display: 'flex', gap: '5px', alignItems: 'center' }}>
             <button
               onClick={() => setShowHelp(true)}
-              style={{ background: '#FFF', border: `1px solid ${THEME.primary}`, color: THEME.primary, width: '30px', height: '30px', borderRadius: '50%', cursor: 'pointer', fontSize: '14px', fontWeight: '700', padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+              style={{ background: '#FFF', border: `1px solid ${THEME.primary}`, color: THEME.primary, width: '30px', height: '30px', borderRadius: '50%', cursor: 'pointer', fontSize: '14px', fontWeight: '700', padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}
               title="도움말"
             >?</button>
             {view === 'members' && topTab === 'myRecord' && (
-              <button onClick={() => setShowCalcModal(true)} style={{ background: THEME.primaryLight, border: `1px solid ${THEME.primary}`, color: THEME.primary, padding: '6px 10px', borderRadius: '8px', cursor: 'pointer', fontSize: '12px', fontWeight: '600' }}>
-                🧮 칼로리 설정
+              <button onClick={() => setShowCalcModal(true)} style={{ background: THEME.primaryLight, border: `1px solid ${THEME.primary}`, color: THEME.primary, padding: '0 10px', borderRadius: '15px', cursor: 'pointer', fontSize: '11px', fontWeight: '500', height: '30px', display: 'flex', alignItems: 'center', gap: '4px', flexShrink: 0 }}>
+                🧮 식단 설정
               </button>
             )}
             {view !== 'members' && (
-              <button style={S.logoutBtn} onClick={() => { setView('members'); setSelectedMember(null) }}>← 목록</button>
+              <button style={{ background: '#FFF', border: `1px solid ${THEME.primary}`, color: THEME.primary, padding: '0 10px', borderRadius: '15px', cursor: 'pointer', fontSize: '11px', height: '30px', display: 'flex', alignItems: 'center', flexShrink: 0 }} onClick={() => { setView('members'); setSelectedMember(null) }}>← 목록</button>
             )}
-            <button style={S.logoutBtn} onClick={onLogout}>로그아웃</button>
+            <button style={{ background: '#FFF', border: `1px solid ${THEME.primary}`, color: THEME.primary, padding: '0 10px', borderRadius: '15px', cursor: 'pointer', fontSize: '11px', height: '30px', display: 'flex', alignItems: 'center', flexShrink: 0 }} onClick={onLogout}>로그아웃</button>
           </div>
         </div>
 
