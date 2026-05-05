@@ -7,133 +7,64 @@ import DietLog from './DietLog'
 import HelpModal from './HelpModal'
 
 const IconWorkout = ({ color = 'currentColor' }) => (
-  <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="1.8" strokeLinecap="round">
+  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="1.8" strokeLinecap="round">
     <path d="M6.5 6.5h11M6.5 17.5h11M3 12h18M7 9.5V6.5M17 9.5V6.5M7 17.5v-3M17 17.5v-3"/>
   </svg>
 )
 const IconStats = ({ color = 'currentColor' }) => (
-  <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
     <rect x="3" y="12" width="4" height="9" rx="1"/><rect x="10" y="7" width="4" height="14" rx="1"/><rect x="17" y="3" width="4" height="18" rx="1"/>
   </svg>
 )
 const IconDiet = ({ color = 'currentColor' }) => (
-  <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="1.8" strokeLinecap="round">
+  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="1.8" strokeLinecap="round">
     <path d="M12 2a5 5 0 0 1 5 5c0 3-5 7-5 7S7 10 7 7a5 5 0 0 1 5-5z"/>
     <path d="M5 21h14M8 17l1-3h6l1 3"/>
   </svg>
 )
-const IconTrainer = ({ color = 'currentColor' }) => (
-  <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="1.8" strokeLinecap="round">
-    <circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/>
-  </svg>
-)
-
-const TabBar = ({ tabs, active, onSelect }) => (
-  <div style={{ display: 'grid', gridTemplateColumns: `repeat(${tabs.length}, 1fr)`, gap: '6px', marginBottom: '12px' }}>
-    {tabs.map(({ key, label, icon: Icon }) => {
-      const isActive = active === key
-      return (
-        <button key={key} onClick={() => onSelect(key)} style={{ background: isActive ? THEME.primary : '#FFF', border: isActive ? 'none' : `0.5px solid ${THEME.border}`, borderRadius: '10px', padding: '10px 6px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '5px', cursor: 'pointer' }}>
-          <Icon color={isActive ? '#FFF' : THEME.textSub} />
-          <span style={{ fontSize: '11px', color: isActive ? '#FFF' : THEME.textSub, fontWeight: isActive ? '600' : '400' }}>{label}</span>
-        </button>
-      )
-    })}
-  </div>
-)
 
 export default function MemberDashboard({ user, onLogout }) {
-  const [memberView, setMemberView] = useState('workout')
-  const [exercises, setExercises] = useState([])
-  const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0])
+  const [view, setView] = useState('workout')
+  const [exercises, setExercises] = useState([{ slot: 1, exercise_type: 'weight', body_part: '', exercise_name: '', memo: '', description: '', sets: [{ id: null, weight: '', reps: '', media_url: '' }] }])
   const [allLogs, setAllLogs] = useState([])
-  const [trainerLogs, setTrainerLogs] = useState([])
-  const [trainerDietLogs, setTrainerDietLogs] = useState([])
-  const [trainerView, setTrainerView] = useState('workout')
+  const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0])
   const [showCalcModal, setShowCalcModal] = useState(false)
-  const [todayDietLogs, setTodayDietLogs] = useState([])
-
-  const [trainerMacro, setTrainerMacro] = useState(null)
-  const [trainerTodayDiet, setTrainerTodayDiet] = useState([])
-
-  // 🆕 도움말 모달
+  const [todayDiet, setTodayDiet] = useState([])
   const [showHelp, setShowHelp] = useState(false)
 
-  const [goal, setGoal] = useState(() => localStorage.getItem(`macro_goal_${user.id}`) || '다이어트')
-  const [gender, setGender] = useState(() => localStorage.getItem(`macro_gender_${user.id}`) || '여성')
+  const [goal, setGoal] = useState(() => localStorage.getItem(`macro_goal_${user.id}`) || user.goal || '다이어트')
+  const [gender, setGender] = useState(() => localStorage.getItem(`macro_gender_${user.id}`) || user.gender || '여성')
   const [weight, setWeight] = useState(() => localStorage.getItem(`macro_weight_${user.id}`) || '')
   const [muscle, setMuscle] = useState(() => localStorage.getItem(`macro_muscle_${user.id}`) || '')
   const [activity, setActivity] = useState(() => localStorage.getItem(`macro_activity_${user.id}`) || '보통 운동 (주 4~5회)')
   const [intensity, setIntensity] = useState(() => localStorage.getItem(`macro_intensity_${user.id}`) || '일반')
   const [cyclePhase, setCyclePhase] = useState(() => localStorage.getItem(`macro_cycle_${user.id}`) || '')
-  const [macro, setMacro] = useState(() => {
-    const saved = localStorage.getItem(`macro_result_${user.id}`)
-    return saved ? JSON.parse(saved) : null
+  const [macroResult, setMacroResult] = useState(() => {
+    try {
+      const saved = localStorage.getItem(`macro_result_${user.id}`)
+      return saved ? JSON.parse(saved) : null
+    } catch { return null }
   })
 
-  useEffect(() => { loadAllLogs(); loadTrainerLogs(); loadTodayDiet(); loadTrainerMacroAndDiet() }, [])
+  useEffect(() => { loadAllLogs(); loadTodayDiet() }, [])
 
   const loadAllLogs = async () => {
-    const { data, error } = await supabase.from('workout_logs').select('*').eq('member_id', user.id).order('log_date')
-    if (error) { console.error('[MemberDashboard] loadAllLogs error:', error); return null }
+    const { data } = await supabase.from('workout_logs').select('*').eq('member_id', user.id).order('log_date')
     if (data) setAllLogs(data)
-    return data
-  }
-
-  const loadTrainerLogs = async () => {
-    const { data: wData, error: wErr } = await supabase.from('trainer_workout_logs').select('*').order('log_date')
-    if (wErr) console.error('[MemberDashboard] loadTrainerLogs(workout) error:', wErr)
-    if (wData) setTrainerLogs(wData)
-    const { data: dData, error: dErr } = await supabase.from('trainer_diet_logs').select('*').order('log_date')
-    if (dErr) console.error('[MemberDashboard] loadTrainerLogs(diet) error:', dErr)
-    if (dData) setTrainerDietLogs(dData)
   }
 
   const loadTodayDiet = async () => {
     const today = new Date().toISOString().split('T')[0]
     const { data, error } = await supabase.from('diet_logs').select('*').eq('member_id', user.id).eq('log_date', today)
     if (error) { console.error('[MemberDashboard] loadTodayDiet error:', error); return }
-    setTodayDietLogs(data || [])
+    setTodayDiet(data || [])
   }
 
-  const loadTrainerMacroAndDiet = async () => {
-    const { data: memberData, error: memErr } = await supabase
-      .from('members').select('trainer_id').eq('id', user.id).single()
-    if (memErr || !memberData?.trainer_id) {
-      console.error('[MemberDashboard] trainer_id 조회 실패:', memErr)
-      return
-    }
-    const trainerId = memberData.trainer_id
-
-    const { data: tData, error: tErr } = await supabase
-      .from('trainers')
-      .select('target_calories, target_carbs, target_protein, target_fat')
-      .eq('id', trainerId)
-      .single()
-    if (tErr) { console.error('[MemberDashboard] loadTrainerMacro error:', tErr); return }
-    if (tData && (tData.target_calories || tData.target_carbs || tData.target_protein || tData.target_fat)) {
-      setTrainerMacro({
-        target: tData.target_calories || 0,
-        carbs: tData.target_carbs || 0,
-        protein: tData.target_protein || 0,
-        fat: tData.target_fat || 0
-      })
-    }
-
-    const today = new Date().toISOString().split('T')[0]
-    const { data: dData, error: dErr } = await supabase
-      .from('trainer_diet_logs')
-      .select('*')
-      .eq('trainer_id', trainerId)
-      .eq('log_date', today)
-    if (dErr) { console.error('[MemberDashboard] loadTrainerTodayDiet error:', dErr); return }
-    setTrainerTodayDiet(dData || [])
-  }
-
-  const calculate = () => {
-    if (!weight || !muscle) return
+  const calculateMacro = () => {
+    if (!weight || !muscle) { alert('체중과 골격근량을 입력해주세요.'); return }
     const result = calcMacro({ goal, gender, weight: parseFloat(weight), muscle: parseFloat(muscle), activity, intensity, cyclePhase })
-    setMacro(result)
+    setMacroResult(result)
+    localStorage.setItem(`macro_result_${user.id}`, JSON.stringify(result))
     localStorage.setItem(`macro_goal_${user.id}`, goal)
     localStorage.setItem(`macro_gender_${user.id}`, gender)
     localStorage.setItem(`macro_weight_${user.id}`, weight)
@@ -141,161 +72,49 @@ export default function MemberDashboard({ user, onLogout }) {
     localStorage.setItem(`macro_activity_${user.id}`, activity)
     localStorage.setItem(`macro_intensity_${user.id}`, intensity)
     localStorage.setItem(`macro_cycle_${user.id}`, cyclePhase)
-    localStorage.setItem(`macro_result_${user.id}`, JSON.stringify(result))
     setShowCalcModal(false)
   }
 
   const updateMacroField = (field, value) => {
-    const updated = { ...macro, [field]: parseInt(value) || 0 }
-    setMacro(updated)
+    const updated = { ...macroResult, [field]: parseInt(value) || 0 }
+    setMacroResult(updated)
     localStorage.setItem(`macro_result_${user.id}`, JSON.stringify(updated))
   }
 
-  const todayCarbs = todayDietLogs.reduce((s, l) => s + (l.carbs || 0), 0)
-  const todayProtein = todayDietLogs.reduce((s, l) => s + (l.protein || 0), 0)
-  const todayFat = todayDietLogs.reduce((s, l) => s + (l.fat || 0), 0)
-  const todayCalories = todayDietLogs.reduce((s, l) => s + (l.calories || 0), 0)
-
-  const MacroCard = () => {
-    if (!macro) return (
-      <div style={{ background: THEME.cardAlt, borderRadius: '12px', padding: '10px 14px', marginBottom: '12px', textAlign: 'center', border: `1px dashed ${THEME.border}` }}>
-        <p style={{ fontSize: '13px', color: THEME.textSub, margin: 0 }}>칼로리 설정을 눌러 목표를 설정해주세요</p>
-      </div>
-    )
-    const fields = [
-      { label: '칼로리', field: 'target', unit: 'kcal', current: todayCalories, color: '#FCD34D' },
-      { label: '탄수화물', field: 'carbs', unit: 'g', current: todayCarbs, color: '#93C5FD' },
-      { label: '단백질', field: 'protein', unit: 'g', current: todayProtein, color: '#FCA5A5' },
-      { label: '지방', field: 'fat', unit: 'g', current: todayFat, color: '#FDBA74' },
-    ]
-    return (
-      <div style={{ background: THEME.primary, borderRadius: '14px', padding: '12px 14px', marginBottom: '12px' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
-          <span style={{ fontSize: '13px', fontWeight: '600', color: '#FFF' }}>🎯 목표 수치</span>
-          <span style={{ fontSize: '10px', color: 'rgba(255,255,255,0.6)' }}>탭해서 수정</span>
-        </div>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: '6px' }}>
-          {fields.map(({ label, field, unit, current, color }) => {
-            const target = macro[field]
-            const pct = target > 0 ? Math.min(Math.round(current / target * 100), 100) : 0
-            const over = target > 0 && current > target
-            return (
-              <div key={field} style={{ background: 'rgba(255,255,255,0.12)', borderRadius: '8px', padding: '8px', textAlign: 'center' }}>
-                <p style={{ fontSize: '9px', color: 'rgba(255,255,255,0.7)', margin: '0 0 4px' }}>{label}</p>
-                <input
-                  type="number"
-                  value={macro[field]}
-                  onChange={e => updateMacroField(field, e.target.value)}
-                  style={{ width: '100%', background: 'transparent', border: 'none', borderBottom: `1px solid ${color}`, color, fontSize: '14px', fontWeight: '700', textAlign: 'center', padding: '2px 0', boxSizing: 'border-box', outline: 'none' }}
-                />
-                <p style={{ fontSize: '9px', color: 'rgba(255,255,255,0.5)', margin: '2px 0 5px' }}>{unit}</p>
-                <div style={{ background: 'rgba(255,255,255,0.2)', borderRadius: '4px', height: '4px', marginBottom: '3px' }}>
-                  <div style={{ width: `${pct}%`, background: over ? '#FF6B6B' : color, height: '4px', borderRadius: '4px' }} />
-                </div>
-                <p style={{ fontSize: '9px', color: over ? '#FF6B6B' : color, margin: 0, fontWeight: '600' }}>
-                  {Math.round(current)}{unit} ({pct}%)
-                </p>
-              </div>
-            )
-          })}
-        </div>
-      </div>
-    )
-  }
-
-  const TrainerMacroCardReadonly = () => {
-    if (!trainerMacro) return (
-      <div style={{ background: THEME.cardAlt, borderRadius: '12px', padding: '10px 14px', marginBottom: '12px', textAlign: 'center', border: `1px dashed ${THEME.border}` }}>
-        <p style={{ fontSize: '13px', color: THEME.textSub, margin: 0 }}>트레이너가 목표를 설정하지 않았습니다</p>
-      </div>
-    )
-    const tCalories = trainerTodayDiet.reduce((s, l) => s + (l.calories || 0), 0)
-    const tCarbs = trainerTodayDiet.reduce((s, l) => s + (l.carbs || 0), 0)
-    const tProtein = trainerTodayDiet.reduce((s, l) => s + (l.protein || 0), 0)
-    const tFat = trainerTodayDiet.reduce((s, l) => s + (l.fat || 0), 0)
-    const fields = [
-      { label: '칼로리', field: 'target', unit: 'kcal', current: tCalories, color: '#FCD34D' },
-      { label: '탄수화물', field: 'carbs', unit: 'g', current: tCarbs, color: '#93C5FD' },
-      { label: '단백질', field: 'protein', unit: 'g', current: tProtein, color: '#FCA5A5' },
-      { label: '지방', field: 'fat', unit: 'g', current: tFat, color: '#FDBA74' },
-    ]
-    return (
-      <div style={{ background: THEME.primary, borderRadius: '14px', padding: '12px 14px', marginBottom: '12px' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
-          <span style={{ fontSize: '13px', fontWeight: '600', color: '#FFF' }}>🎯 트레이너 목표 수치</span>
-          <span style={{ fontSize: '10px', color: 'rgba(255,255,255,0.6)' }}>오늘 달성률</span>
-        </div>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: '6px' }}>
-          {fields.map(({ label, field, unit, current, color }) => {
-            const target = trainerMacro[field]
-            const pct = target > 0 ? Math.min(Math.round(current / target * 100), 100) : 0
-            const over = target > 0 && current > target
-            return (
-              <div key={field} style={{ background: 'rgba(255,255,255,0.12)', borderRadius: '8px', padding: '8px', textAlign: 'center' }}>
-                <p style={{ fontSize: '9px', color: 'rgba(255,255,255,0.7)', margin: '0 0 4px' }}>{label}</p>
-                <p style={{ fontSize: '14px', fontWeight: '700', color, margin: '0 0 2px' }}>{target}</p>
-                <p style={{ fontSize: '9px', color: 'rgba(255,255,255,0.5)', margin: '0 0 5px' }}>{unit}</p>
-                <div style={{ background: 'rgba(255,255,255,0.2)', borderRadius: '4px', height: '4px', marginBottom: '3px' }}>
-                  <div style={{ width: `${pct}%`, background: over ? '#FF6B6B' : color, height: '4px', borderRadius: '4px' }} />
-                </div>
-                <p style={{ fontSize: '9px', color: over ? '#FF6B6B' : color, margin: 0, fontWeight: '600' }}>
-                  {Math.round(current)}{unit} ({pct}%)
-                </p>
-              </div>
-            )
-          })}
-        </div>
-      </div>
-    )
-  }
-
-  const mainTabs = [
-    { key: 'workout', label: '운동', icon: IconWorkout },
-    { key: 'stats', label: '통계', icon: IconStats },
-    { key: 'diet', label: '식단', icon: IconDiet },
-    { key: 'trainer', label: '트레이너', icon: IconTrainer },
-  ]
-
-  const handleTabSelect = (key) => {
-    setMemberView(key)
-    if (key === 'diet') loadTodayDiet()
-    if (key === 'trainer') loadTrainerMacroAndDiet()
-  }
+  const todayCalories = todayDiet.reduce((s, l) => s + (l.calories || 0), 0)
+  const todayCarbs = todayDiet.reduce((s, l) => s + (l.carbs || 0), 0)
+  const todayProtein = todayDiet.reduce((s, l) => s + (l.protein || 0), 0)
+  const todayFat = todayDiet.reduce((s, l) => s + (l.fat || 0), 0)
 
   return (
     <div style={S.container}>
       <div style={S.wrap}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0, flex: 1 }}>
-            <div style={{ width: '40px', height: '40px', background: THEME.primary, borderRadius: '9px', display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', flexShrink: 0 }}>
-              <span style={{ color: '#FFF', fontSize: '15px', fontWeight: '700', lineHeight: 1, letterSpacing: '-0.5px' }}>PT</span>
-              <div style={{ width: '18px', height: '1px', background: '#FFF', margin: '2px 0 1px', borderRadius: '1px' }} />
-              <span style={{ color: '#FFF', fontSize: '4.5px', letterSpacing: '0.6px', opacity: 0.9 }}>MANAGER</span>
-            </div>
-            <p style={{ fontSize: '15px', fontWeight: '700', color: THEME.primary, margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{user.name}님</p>
+        <div style={S.header}>
+          <div style={{ width: '40px', height: '40px', background: THEME.primary, borderRadius: '9px', display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', flexShrink: 0 }}>
+            <span style={{ color: '#FFF', fontSize: '15px', fontWeight: '700', lineHeight: 1, letterSpacing: '-0.5px' }}>PT</span>
+            <div style={{ width: '18px', height: '1px', background: '#FFF', margin: '2px 0 1px', borderRadius: '1px' }} />
+            <span style={{ color: '#FFF', fontSize: '4.5px', letterSpacing: '0.6px', opacity: 0.9 }}>MANAGER</span>
           </div>
-          <div style={{ display: 'flex', gap: '5px', alignItems: 'center', flexShrink: 0 }}>
+          <p style={{ fontSize: '15px', fontWeight: '600', color: THEME.text, margin: 0, flex: 1, textAlign: 'center' }}>{user.name}님</p>
+          <div style={{ display: 'flex', gap: '5px', alignItems: 'center' }}>
             <button
               onClick={() => setShowHelp(true)}
               style={{ background: '#FFF', border: `1px solid ${THEME.primary}`, color: THEME.primary, width: '30px', height: '30px', borderRadius: '50%', cursor: 'pointer', fontSize: '14px', fontWeight: '700', padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}
               title="도움말"
             >?</button>
-            <button onClick={() => setShowCalcModal(true)} style={{ background: THEME.primaryLight, border: `1px solid ${THEME.primary}`, color: THEME.primary, padding: '0 10px', borderRadius: '15px', cursor: 'pointer', fontSize: '11px', fontWeight: '500', height: '30px', display: 'flex', alignItems: 'center', gap: '4px', flexShrink: 0 }}>
+            <button onClick={() => setShowCalcModal(true)} style={{ background: THEME.primaryLight, border: `1px solid ${THEME.primary}`, color: THEME.primary, padding: '0 10px', borderRadius: '15px', cursor: 'pointer', fontSize: '11px', fontWeight: '500', height: '30px', display: 'flex', alignItems: 'center', flexShrink: 0 }}>
               🧮 식단 설정
             </button>
           </div>
         </div>
 
-        {/* 🆕 도움말 모달 */}
         {showHelp && <HelpModal type="member" onClose={() => setShowHelp(false)} />}
-
-        <MacroCard />
 
         {showCalcModal && (
           <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.5)', zIndex: 1000, display: 'flex', alignItems: 'flex-end', justifyContent: 'center' }}>
             <div style={{ background: '#FFF', borderRadius: '20px 20px 0 0', padding: '20px', width: '100%', maxWidth: '480px', maxHeight: '85vh', overflowY: 'auto' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-                <p style={{ fontSize: '16px', fontWeight: '700', color: THEME.text, margin: 0 }}>🧮 칼로리 계산기</p>
+                <p style={{ fontSize: '16px', fontWeight: '700', color: THEME.text, margin: 0 }}>🧮 식단 설정</p>
                 <button onClick={() => setShowCalcModal(false)} style={{ background: 'none', border: 'none', fontSize: '20px', cursor: 'pointer', color: THEME.textSub }}>✕</button>
               </div>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', marginBottom: '8px' }}>
@@ -328,78 +147,68 @@ export default function MemberDashboard({ user, onLogout }) {
                   ))}
                 </select>
               )}
-              <button style={S.btnPrimary} onClick={calculate}>🧮 계산 및 저장</button>
+              <button style={S.btnPrimary} onClick={calculateMacro}>🧮 계산 및 저장</button>
             </div>
           </div>
         )}
 
-        <TabBar tabs={mainTabs} active={memberView} onSelect={handleTabSelect} />
-
-        {memberView === 'workout' && (
-          <WorkoutLog
-            user={user}
-            selectedDate={selectedDate}
-            setSelectedDate={setSelectedDate}
-            exercises={exercises}
-            setExercises={setExercises}
-            onUpdate={async () => { await loadAllLogs() }}
-          />
-        )}
-        {memberView === 'stats' && <WorkoutStats allLogs={allLogs} />}
-        {memberView === 'diet' && <DietLog user={user} onDietUpdate={loadTodayDiet} />}
-
-        {memberView === 'trainer' && (
-          <>
-            <div style={{ background: THEME.primaryLight, border: `1px solid ${THEME.primary}`, borderRadius: '12px', padding: '12px 16px', marginBottom: '12px' }}>
-              <p style={{ fontSize: '14px', fontWeight: '700', color: THEME.primary, margin: '0 0 2px' }}>👨‍💼 트레이너 기록</p>
-              <p style={{ fontSize: '12px', color: THEME.textSub, margin: 0 }}>트레이너의 운동 및 식단 기록을 확인하세요</p>
+        {macroResult && (
+          <div style={{ background: THEME.primary, borderRadius: '14px', padding: '12px 14px', marginBottom: '12px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
+              <span style={{ fontSize: '13px', fontWeight: '600', color: '#FFF' }}>🎯 목표 수치</span>
+              <span style={{ fontSize: '10px', color: 'rgba(255,255,255,0.6)' }}>탭해서 수정</span>
             </div>
-            <TabBar
-              tabs={[
-                { key: 'workout', label: '운동 통계', icon: IconStats },
-                { key: 'diet', label: '식단', icon: IconDiet },
-              ]}
-              active={trainerView}
-              onSelect={setTrainerView}
-            />
-            {trainerView === 'workout' && <WorkoutStats allLogs={trainerLogs} />}
-            {trainerView === 'diet' && (
-              <>
-                <TrainerMacroCardReadonly />
-
-                <div style={S.card}>
-                  <p style={S.cardTitle}>트레이너 식단 기록</p>
-                  {trainerDietLogs.length === 0 ? (
-                    <p style={{ color: THEME.textSub, fontSize: '13px', textAlign: 'center', padding: '16px 0' }}>트레이너 식단 기록이 없습니다</p>
-                  ) : (() => {
-                    const byDay = {}
-                    trainerDietLogs.forEach(row => {
-                      if (!byDay[row.log_date]) byDay[row.log_date] = { carbs: 0, protein: 0, fat: 0, calories: 0 }
-                      byDay[row.log_date].carbs += row.carbs || 0
-                      byDay[row.log_date].protein += row.protein || 0
-                      byDay[row.log_date].fat += row.fat || 0
-                      byDay[row.log_date].calories += row.calories || 0
-                    })
-                    return (
-                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '8px' }}>
-                        {Object.keys(byDay).sort().reverse().map(date => {
-                          const d = byDay[date]
-                          return (
-                            <div key={date} style={{ background: THEME.cardAlt, borderRadius: '12px', padding: '10px', textAlign: 'center' }}>
-                              <p style={{ fontSize: '12px', fontWeight: '700', color: THEME.text, margin: '0 0 4px' }}>{date.split('-')[1]}/{date.split('-')[2]}</p>
-                              <p style={{ fontSize: '12px', fontWeight: '700', color: THEME.danger, margin: '0 0 4px' }}>{Math.round(d.calories)}kcal</p>
-                              <p style={{ fontSize: '10px', color: THEME.textSub, margin: 0 }}>탄{Math.round(d.carbs)} 단{Math.round(d.protein)} 지{Math.round(d.fat)}</p>
-                            </div>
-                          )
-                        })}
-                      </div>
-                    )
-                  })()}
-                </div>
-              </>
-            )}
-          </>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: '6px' }}>
+              {[
+                { label: '칼로리', field: 'target', unit: 'kcal', current: todayCalories, color: '#FCD34D' },
+                { label: '탄수화물', field: 'carbs', unit: 'g', current: todayCarbs, color: '#93C5FD' },
+                { label: '단백질', field: 'protein', unit: 'g', current: todayProtein, color: '#FCA5A5' },
+                { label: '지방', field: 'fat', unit: 'g', current: todayFat, color: '#FDBA74' },
+              ].map(({ label, field, unit, current, color }) => {
+                const target = macroResult[field]
+                const pct = target > 0 ? Math.min(Math.round(current / target * 100), 100) : 0
+                const over = target > 0 && current > target
+                return (
+                  <div key={field} style={{ background: 'rgba(255,255,255,0.12)', borderRadius: '8px', padding: '8px', textAlign: 'center' }}>
+                    <p style={{ fontSize: '9px', color: 'rgba(255,255,255,0.7)', margin: '0 0 4px' }}>{label}</p>
+                    <input
+                      type="number"
+                      value={macroResult[field]}
+                      onChange={e => updateMacroField(field, e.target.value)}
+                      style={{ width: '100%', background: 'transparent', border: 'none', borderBottom: `1px solid ${color}`, color, fontSize: '14px', fontWeight: '700', textAlign: 'center', padding: '2px 0', boxSizing: 'border-box', outline: 'none' }}
+                    />
+                    <p style={{ fontSize: '9px', color: 'rgba(255,255,255,0.5)', margin: '2px 0 5px' }}>{unit}</p>
+                    <div style={{ background: 'rgba(255,255,255,0.2)', borderRadius: '4px', height: '4px', marginBottom: '3px' }}>
+                      <div style={{ width: `${pct}%`, background: over ? '#FF6B6B' : color, height: '4px', borderRadius: '4px' }} />
+                    </div>
+                    <p style={{ fontSize: '9px', color: over ? '#FF6B6B' : color, margin: 0, fontWeight: '600' }}>
+                      {Math.round(current)}{unit} ({pct}%)
+                    </p>
+                  </div>
+                )
+              })}
+            </div>
+          </div>
         )}
+
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '6px', marginBottom: '12px' }}>
+          {[
+            { key: 'workout', label: '운동 기록', Icon: IconWorkout },
+            { key: 'stats', label: '운동 통계', Icon: IconStats },
+            { key: 'diet', label: '식단', Icon: IconDiet },
+          ].map(({ key, label, Icon }) => (
+            <button key={key} onClick={() => setView(key)} style={{ background: view === key ? THEME.primary : '#FFF', border: view === key ? 'none' : `0.5px solid ${THEME.border}`, borderRadius: '10px', padding: '10px 6px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '5px', cursor: 'pointer' }}>
+              <Icon color={view === key ? '#FFF' : THEME.textSub} />
+              <span style={{ fontSize: '11px', color: view === key ? '#FFF' : THEME.textSub, fontWeight: view === key ? '500' : '400' }}>{label}</span>
+            </button>
+          ))}
+        </div>
+
+        {view === 'workout' && <WorkoutLog user={user} selectedDate={selectedDate} setSelectedDate={setSelectedDate} exercises={exercises} setExercises={setExercises} onUpdate={loadAllLogs} weight={weight} muscle={muscle} />}
+        {view === 'stats' && <WorkoutStats allLogs={allLogs} />}
+        {view === 'diet' && <DietLog user={user} onDietUpdate={loadTodayDiet} weight={weight} muscle={muscle} />}
+
+        <button style={{ background: '#FFF', color: THEME.textSub, border: `1px solid ${THEME.border}`, padding: '12px', borderRadius: '12px', cursor: 'pointer', fontSize: '13px', width: '100%', marginTop: '12px' }} onClick={onLogout}>로그아웃</button>
       </div>
     </div>
   )

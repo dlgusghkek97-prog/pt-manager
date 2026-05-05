@@ -1,7 +1,8 @@
-export const PARTS = ['하체', '가슴', '등', '어깨', '팔', '복근']
+export const PARTS = ['하체', '가슴', '등', '어깨', '팔', '복근', '코어']
 export const PART_COLORS = {
   '하체': '#4472C4', '가슴': '#E84747', '등': '#2E9E3B',
-  '어깨': '#E8A020', '팔': '#9B59B6', '복근': '#1ABC9C'
+  '어깨': '#E8A020', '팔': '#9B59B6', '복근': '#1ABC9C',
+  '코어': '#7B61FF'
 }
 
 export const generateCode = () => {
@@ -45,6 +46,21 @@ export const calcMacro = ({ goal, gender, weight, muscle, activity, intensity, c
   const fat = Math.round(target * 0.25 / 9)
   const carbs = Math.max(0, Math.round((target - protein * 4 - fat * 9) / 4))
   return { bmr, tdee, target, protein, fat, carbs }
+}
+
+// 웨이트 운동 순수 소비 칼로리 (BMR 제외, 옵션 C 절충안)
+// 공식: 4.0 × 체중 × (세트 × 2분 / 60) + 볼륨 × 0.025
+// 예: 70kg, 20세트, 볼륨 20,000kg
+//   = 4.0 × 70 × 0.67 + 20000 × 0.025 = 187 + 500 = 687 kcal
+export function calcWeightCalories({ volume = 0, totalSets = 0, weight, muscle }) {
+  const w = parseFloat(weight) || 70  // 기본값 70kg
+  // 운동 시간(시): 세트당 2분 (휴식 포함, PT 빡세게 기준)
+  const hours = (totalSets * 2.0) / 60
+  // (MET 5.0 - 1) = 4.0 (BMR 제외한 순수 운동 추가분)
+  const metKcal = 4.0 * w * hours
+  // 볼륨 보정 (무게 들수록 추가 소비)
+  const volumeKcal = volume * 0.025
+  return Math.round(metKcal + volumeKcal)
 }
 
 export const THEME = {
