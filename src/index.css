@@ -1,9 +1,7 @@
 html {
-  /* 시스템 폰트 크기 설정 무시 (안드로이드 글자 크기 큼/매우 큼 영향 차단) */
   -webkit-text-size-adjust: 100%;
   -ms-text-size-adjust: 100%;
   text-size-adjust: 100%;
-  /* 기본 폰트 크기 고정 */
   font-size: 16px;
 }
 
@@ -14,21 +12,30 @@ body {
     sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  /* 폰트 크기 고정 */
   font-size: 14px;
-  /* 더블탭 줌 방지 */
   touch-action: manipulation;
+  /* 안드로이드 시스템 폰트 크기 무시 강화 */
+  -webkit-text-size-adjust: none !important;
+  text-size-adjust: none !important;
 }
 
-/* 모든 요소가 시스템 폰트 크기 영향 안 받게 */
-* {
-  -webkit-text-size-adjust: 100%;
-  text-size-adjust: 100%;
+/* 모든 요소가 시스템 폰트 크기 영향 안 받게 강제 */
+*, *::before, *::after {
+  -webkit-text-size-adjust: 100% !important;
+  text-size-adjust: 100% !important;
+  /* rem 단위가 시스템 설정 따라가는 거 차단 */
+  font-size: inherit;
+}
+
+/* 텍스트가 들어가는 모든 요소에서 시스템 글자 크기 강제 무시 */
+p, span, div, button, input, select, textarea, label, a, h1, h2, h3, h4, h5, h6 {
+  -webkit-text-size-adjust: 100% !important;
+  text-size-adjust: 100% !important;
 }
 
 /* iOS Safari에서 input 자동 줌 방지 */
 input, select, textarea {
-  font-size: 14px !important;
+  font-size: 14px;
 }
 
 code {
