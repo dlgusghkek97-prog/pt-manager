@@ -31,17 +31,20 @@ export const CYCLE_PHASES = {
 }
 
 export const calcMacro = ({ goal, gender, weight, muscle, activity, intensity, cyclePhase }) => {
+  // 제지방량(LBM) = 골격근량 * 1.4 (체중 대비 골격근 비율 기반 추정)
   const leanMass = muscle * 1.4
-  const bmr = gender === '여성'
-    ? Math.round((370 + 21.6 * leanMass) * 0.9)
-    : Math.round(370 + 21.6 * leanMass)
+  // Katch-McArdle 공식 (성별 무관, 골격근량 입력으로 이미 성별 차이 반영됨)
+  const bmr = Math.round(370 + 21.6 * leanMass)
   const actMap = { '가벼운 운동 (주 2~3회)': 1.375, '보통 운동 (주 4~5회)': 1.55, '고강도 운동 (주 6회+)': 1.725 }
   const tdee = Math.round(bmr * (actMap[activity] || 1.55))
   const adjMap = goal === '벌크업'
     ? { '완만': 300, '일반': 400, '공격적': 500 }
     : { '완만': -300, '일반': -500, '공격적': -700 }
   const cycleAdj = (gender === '여성' && cyclePhase) ? (CYCLE_PHASES[cyclePhase] || 0) : 0
-  const target = tdee + (adjMap[intensity] || (goal === '벌크업' ? 400 : -500)) + 100 + cycleAdj
+  const rawTarget = tdee + (adjMap[intensity] || (goal === '벌크업' ? 400 : -500)) + 100 + cycleAdj
+  // 안전 하한선: 여성 1200kcal, 남성 1500kcal (의학적 최소 권장 칼로리)
+  const minTarget = gender === '여성' ? 1200 : 1500
+  const target = Math.max(rawTarget, minTarget)
   const protein = Math.round(weight * (gender === '여성' ? 2.0 : 2.2))
   const fat = Math.round(target * 0.25 / 9)
   const carbs = Math.max(0, Math.round((target - protein * 4 - fat * 9) / 4))
