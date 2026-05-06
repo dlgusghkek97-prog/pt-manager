@@ -32,7 +32,65 @@ export default function MemberDashboard({ user, onLogout }) {
     } catch { return null }
   })
 
-  useEffect(() => { loadAllLogs(); loadTodayDiet() }, [])
+  useEffect(() => { loadAllLogs(); loadTodayDiet(); loadMacroFromDB() }, [])
+
+  const loadMacroFromDB = async () => {
+    const { data, error } = await supabase
+      .from('members')
+      .select('goal, gender, target_calories, target_carbs, target_protein, target_fat, macro_weight, macro_muscle, macro_activity, macro_intensity, macro_cycle')
+      .eq('id', user.id)
+      .single()
+
+    if (error) {
+      console.error('[MemberDashboard] loadMacroFromDB error:', error)
+      return
+    }
+
+    const hasResult = data.target_calories || data.target_carbs || data.target_protein || data.target_fat
+    if (hasResult) {
+      const dbMacro = {
+        target: data.target_calories || 0,
+        carbs: data.target_carbs || 0,
+        protein: data.target_protein || 0,
+        fat: data.target_fat || 0,
+      }
+      setMacroResult(dbMacro)
+      localStorage.setItem(`macro_result_${user.id}`, JSON.stringify(dbMacro))
+    }
+
+    if (data.goal) setGoal(data.goal)
+    if (data.gender) setGender(data.gender)
+    if (data.macro_weight) setWeight(String(data.macro_weight))
+    if (data.macro_muscle) setMuscle(String(data.macro_muscle))
+    if (data.macro_activity) setActivity(data.macro_activity)
+    if (data.macro_intensity) setIntensity(data.macro_intensity)
+    if (data.macro_cycle) setCyclePhase(data.macro_cycle)
+  }
+
+  const saveMacroToDB = async (macro, inputs = null) => {
+    const payload = {
+      target_calories: macro.target || 0,
+      target_carbs: macro.carbs || 0,
+      target_protein: macro.protein || 0,
+      target_fat: macro.fat || 0,
+    }
+    if (inputs) {
+      payload.goal = inputs.goal
+      payload.gender = inputs.gender
+      payload.macro_weight = parseFloat(inputs.weight) || null
+      payload.macro_muscle = parseFloat(inputs.muscle) || null
+      payload.macro_activity = inputs.activity
+      payload.macro_intensity = inputs.intensity
+      payload.macro_cycle = inputs.cyclePhase || null
+    }
+    const { error } = await supabase.from('members').update(payload).eq('id', user.id)
+    if (error) {
+      console.error('[MemberDashboard] saveMacroToDB error:', error)
+      alert('서버 저장 실패: ' + error.message)
+      return false
+    }
+    return true
+  }
 
   const loadAllLogs = async () => {
     const { data } = await supabase.from('workout_logs').select('*').eq('member_id', user.id).order('log_date')
@@ -46,9 +104,11 @@ export default function MemberDashboard({ user, onLogout }) {
     setTodayDiet(data || [])
   }
 
-  const calculateMacro = () => {
+  const calculateMacro = async () => {
     if (!weight || !muscle) { alert('체중과 골격근량을 입력해주세요.'); return }
     const result = calcMacro({ goal, gender, weight: parseFloat(weight), muscle: parseFloat(muscle), activity, intensity, cyclePhase })
+    const ok = await saveMacroToDB(result, { goal, gender, weight, muscle, activity, intensity, cyclePhase })
+    if (!ok) return
     setMacroResult(result)
     localStorage.setItem(`macro_result_${user.id}`, JSON.stringify(result))
     localStorage.setItem(`macro_goal_${user.id}`, goal)
@@ -61,10 +121,11 @@ export default function MemberDashboard({ user, onLogout }) {
     setShowCalcModal(false)
   }
 
-  const updateMacroField = (field, value) => {
+  const updateMacroField = async (field, value) => {
     const updated = { ...macroResult, [field]: parseInt(value) || 0 }
     setMacroResult(updated)
     localStorage.setItem(`macro_result_${user.id}`, JSON.stringify(updated))
+    await saveMacroToDB(updated)
   }
 
   const todayCalories = todayDiet.reduce((s, l) => s + (l.calories || 0), 0)
