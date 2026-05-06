@@ -1,8 +1,8 @@
 export const PARTS = ['하체', '가슴', '등', '어깨', '팔', '복근', '코어']
 export const PART_COLORS = {
-  '하체': '#4472C4', '가슴': '#E84747', '등': '#2E9E3B',
-  '어깨': '#E8A020', '팔': '#9B59B6', '복근': '#1ABC9C',
-  '코어': '#7B61FF'
+  '하체': '#6BA8C5', '가슴': '#C57878', '등': '#8AB55C',
+  '어깨': '#D4A848', '팔': '#A878B5', '복근': '#5DBDA8',
+  '코어': '#8B7BD8'
 }
 
 export const generateCode = () => {
@@ -54,27 +54,50 @@ export const calcMacro = ({ goal, gender, weight, muscle, activity, intensity, c
 //   = 4.0 × 70 × 0.67 + 20000 × 0.025 = 187 + 500 = 687 kcal
 export function calcWeightCalories({ volume = 0, totalSets = 0, weight, muscle }) {
   const w = parseFloat(weight) || 70  // 기본값 70kg
-  // 운동 시간(시): 세트당 2분 (휴식 포함, PT 빡세게 기준)
   const hours = (totalSets * 2.0) / 60
-  // (MET 5.0 - 1) = 4.0 (BMR 제외한 순수 운동 추가분)
   const metKcal = 4.0 * w * hours
-  // 볼륨 보정 (무게 들수록 추가 소비)
   const volumeKcal = volume * 0.025
   return Math.round(metKcal + volumeKcal)
 }
 
 export const THEME = {
-  bg: '#F5F3EF',
+  bg: '#F0F7F4',
   card: '#FFFFFF',
-  cardAlt: '#F0EDE8',
-  primary: '#2E7D52',
-  primaryLight: '#E8F5EE',
-  primaryDark: '#1B5E38',
-  text: '#1C1C1C',
-  textSub: '#6B7280',
-  border: '#E5E1DA',
-  danger: '#E84747',
-  yellow: '#F59E0B',
+  cardAlt: '#F5FBF7',
+  primary: '#5A8E72',
+  primaryLight: '#E8F2EE',
+  primaryDark: '#2F5C45',
+  primaryAccent: '#B8DCC8',
+  text: '#2D4A3E',
+  textSub: '#7AA890',
+  textHint: '#A8C8B5',
+  border: '#DCEAE2',
+  borderLight: '#E8F2EE',
+  danger: '#C5705C',
+  dangerLight: '#FCE4E0',
+  dangerDark: '#8E3D2E',
+  warning: '#D4A848',
+  // 영양소 색상 (소프트 톤)
+  nutCalories: '#E0B84A',
+  nutCaloriesBg: '#FFF7E6',
+  nutCaloriesText: '#A8893C',
+  nutCaloriesDark: '#7A6322',
+  nutCarbs: '#5A9CAB',
+  nutCarbsBg: '#E6F2F4',
+  nutCarbsText: '#5A9CAB',
+  nutCarbsDark: '#2F6B7A',
+  nutProtein: '#C5708F',
+  nutProteinBg: '#FBE8EE',
+  nutProteinText: '#C5708F',
+  nutProteinDark: '#8E3D5C',
+  nutFat: '#C28A52',
+  nutFatBg: '#FBEDDB',
+  nutFatText: '#C28A52',
+  nutFatDark: '#8B5E2E',
+  // 잉여/적자
+  surplus: '#5A9CAB',
+  deficit: '#C5705C',
+  todayHighlight: '#5A8E72',
 }
 
 // SVG 아이콘 모음
@@ -84,10 +107,10 @@ export const ICONS = {
   diet: `<svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M12 2a5 5 0 0 1 5 5c0 3-5 7-5 7S7 10 7 7a5 5 0 0 1 5-5z"/><path d="M5 21h14M8 17l1-3h6l1 3"/></svg>`,
   trainer: `<svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/></svg>`,
   camera: `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>`,
-  morning: `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#E8A020" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/></svg>`,
-  lunch: `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#F59E0B" stroke-width="2"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="3"/></svg>`,
-  dinner: `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#6B7280" stroke-width="2"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9z"/></svg>`,
-  snack: `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#E84747" stroke-width="2"><path d="M12 2a7 7 0 0 0-7 7c0 5 7 13 7 13s7-8 7-13a7 7 0 0 0-7-7z"/><circle cx="12" cy="9" r="2.5"/></svg>`,
+  morning: `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#D4A848" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/></svg>`,
+  lunch: `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#E0B84A" stroke-width="2"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="3"/></svg>`,
+  dinner: `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#7AA890" stroke-width="2"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9z"/></svg>`,
+  snack: `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#C5705C" stroke-width="2"><path d="M12 2a7 7 0 0 0-7 7c0 5 7 13 7 13s7-8 7-13a7 7 0 0 0-7-7z"/><circle cx="12" cy="9" r="2.5"/></svg>`,
 }
 
 export const S = {
@@ -96,12 +119,12 @@ export const S = {
   header: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px' },
   headerTitle: { color: THEME.primary, fontSize: '20px', fontWeight: '700', margin: 0 },
   logoutBtn: { background: 'transparent', border: `1px solid ${THEME.primary}`, color: THEME.primary, padding: '6px 14px', borderRadius: '8px', cursor: 'pointer', fontSize: '13px' },
-  card: { background: THEME.card, borderRadius: '16px', padding: '16px', marginBottom: '12px', boxShadow: '0 1px 4px rgba(0,0,0,0.07)' },
-  cardTitle: { fontSize: '15px', fontWeight: '700', color: THEME.text, margin: '0 0 12px' },
-  addBtn: { background: THEME.primary, color: '#FFF', border: 'none', padding: '8px 14px', borderRadius: '8px', cursor: 'pointer', fontSize: '13px', fontWeight: '700' },
+  card: { background: THEME.card, borderRadius: '16px', padding: '16px', marginBottom: '12px' },
+  cardTitle: { fontSize: '14px', fontWeight: '500', color: THEME.text, margin: '0 0 12px' },
+  addBtn: { background: THEME.primary, color: '#FFF', border: 'none', padding: '8px 14px', borderRadius: '8px', cursor: 'pointer', fontSize: '13px', fontWeight: '500' },
   barRow: { display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' },
   barLabel: { fontSize: '12px', color: THEME.text, width: '32px', flexShrink: 0 },
-  barBg: { flex: 1, background: '#F0F0F0', borderRadius: '4px', height: '10px' },
+  barBg: { flex: 1, background: THEME.borderLight, borderRadius: '4px', height: '10px' },
   barFill: { height: '10px', borderRadius: '4px' },
   barVal: { fontSize: '11px', color: THEME.textSub, width: '58px', textAlign: 'right', flexShrink: 0 },
   dateInput: { padding: '6px 10px', borderRadius: '8px', border: `1px solid ${THEME.border}`, fontSize: '13px', background: '#FFF' },
@@ -109,15 +132,30 @@ export const S = {
   exHeader: { display: 'flex', gap: '6px', alignItems: 'center', marginBottom: '10px' },
   partSel: { flex: 1, padding: '7px', borderRadius: '6px', border: `1px solid ${THEME.border}`, fontSize: '12px', background: '#FFF', minWidth: 0 },
   exNameInput: { flex: 2, padding: '7px', borderRadius: '6px', border: `1px solid ${THEME.border}`, fontSize: '12px', minWidth: 0 },
-  delExBtn: { background: '#FFE0E0', color: THEME.danger, border: 'none', borderRadius: '6px', padding: '6px 8px', cursor: 'pointer', fontSize: '12px', flexShrink: 0 },
+  delExBtn: { background: '#FBE8E8', color: '#C57878', border: 'none', borderRadius: '6px', padding: '6px 8px', cursor: 'pointer', fontSize: '12px', flexShrink: 0 },
   setHeaderRow: { display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '4px' },
   setRow: { display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '6px' },
   numInput: { flex: 1, padding: '7px 4px', borderRadius: '6px', border: `1px solid ${THEME.border}`, fontSize: '13px', textAlign: 'center', minWidth: 0 },
-  delSetBtn: { flex: 0.4, background: '#F0F0F0', color: '#888', border: 'none', borderRadius: '6px', padding: '7px 6px', cursor: 'pointer', fontSize: '14px' },
+  delSetBtn: { flex: 0.4, background: '#EAEAE5', color: '#888', border: 'none', borderRadius: '6px', padding: '7px 6px', cursor: 'pointer', fontSize: '14px' },
   addSetBtn: { width: '100%', padding: '7px', borderRadius: '6px', border: `1px dashed ${THEME.border}`, background: 'transparent', color: THEME.textSub, fontSize: '13px', cursor: 'pointer', marginTop: '4px' },
-  addExBtn: { width: '100%', padding: '12px', borderRadius: '10px', border: `2px dashed ${THEME.primary}`, background: 'transparent', color: THEME.primary, fontSize: '14px', fontWeight: '700', cursor: 'pointer' },
-  loginCard: { background: THEME.card, borderRadius: '16px', padding: '40px 32px', width: '100%', maxWidth: '360px', display: 'flex', flexDirection: 'column', gap: '12px', boxShadow: '0 4px 20px rgba(0,0,0,0.08)' },
+  addExBtn: { width: '100%', padding: '12px', borderRadius: '10px', border: `1.5px dashed ${THEME.primaryAccent}`, background: 'transparent', color: THEME.primary, fontSize: '13px', fontWeight: '500', cursor: 'pointer' },
+  loginCard: { background: THEME.card, borderRadius: '16px', padding: '40px 32px', width: '100%', maxWidth: '360px', display: 'flex', flexDirection: 'column', gap: '12px' },
   input: { width: '100%', padding: '12px 14px', borderRadius: '8px', border: `1px solid ${THEME.border}`, fontSize: '15px', outline: 'none', boxSizing: 'border-box', background: '#FAFAFA' },
-  btnPrimary: { width: '100%', padding: '14px', borderRadius: '8px', border: 'none', background: THEME.primary, color: '#FFF', fontSize: '16px', fontWeight: '700', cursor: 'pointer' },
-  btnSecondary: { width: '100%', padding: '14px', borderRadius: '8px', border: `1px solid ${THEME.border}`, background: '#FFF', color: THEME.textSub, fontSize: '15px', cursor: 'pointer' },
+  btnPrimary: { width: '100%', padding: '14px', borderRadius: '10px', border: 'none', background: THEME.primary, color: '#FFF', fontSize: '14px', fontWeight: '500', cursor: 'pointer' },
+  btnSecondary: { width: '100%', padding: '14px', borderRadius: '10px', border: `1px solid ${THEME.border}`, background: '#FFF', color: THEME.textSub, fontSize: '14px', cursor: 'pointer' },
+}
+export const calcTDEE = (macroResult, goal, intensity) => {
+  if (!macroResult || !macroResult.target) return null
+  const target = parseInt(macroResult.target) || 0
+  if (target <= 0) return null
+
+  const ADJ = {
+    '다이어트': { '완만': -300, '일반': -500, '공격적': -700 },
+    '벌크업':   { '완만': +300, '일반': +400, '공격적': +500 },
+  }
+
+  const adj = ADJ[goal]?.[intensity] ?? -500
+  // calcMacro와 정확히 역산: target = TDEE + adj + 100
+  // (여성의 cyclePhase 보정은 ±50~150 kcal 범위라 무시 — 잉여/적자 본질적 정확도 내)
+  return target - adj - 100
 }

@@ -6,25 +6,11 @@ import WorkoutStats from './WorkoutStats'
 import DietLog from './DietLog'
 import HelpModal from './HelpModal'
 
-const IconWorkout = ({ color = 'currentColor' }) => (
-  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="1.8" strokeLinecap="round">
-    <path d="M6.5 6.5h11M6.5 17.5h11M3 12h18M7 9.5V6.5M17 9.5V6.5M7 17.5v-3M17 17.5v-3"/>
-  </svg>
-)
-const IconStats = ({ color = 'currentColor' }) => (
-  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-    <rect x="3" y="12" width="4" height="9" rx="1"/><rect x="10" y="7" width="4" height="14" rx="1"/><rect x="17" y="3" width="4" height="18" rx="1"/>
-  </svg>
-)
-const IconDiet = ({ color = 'currentColor' }) => (
-  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="1.8" strokeLinecap="round">
-    <path d="M12 2a5 5 0 0 1 5 5c0 3-5 7-5 7S7 10 7 7a5 5 0 0 1 5-5z"/>
-    <path d="M5 21h14M8 17l1-3h6l1 3"/>
-  </svg>
-)
-
 export default function MemberDashboard({ user, onLogout }) {
-  const [view, setView] = useState('workout')
+  const [mainTab, setMainTab] = useState('workout')
+  const [workoutSubTab, setWorkoutSubTab] = useState('log')
+  const [dietSubTab, setDietSubTab] = useState('log')
+
   const [exercises, setExercises] = useState([{ slot: 1, exercise_type: 'weight', body_part: '', exercise_name: '', memo: '', description: '', sets: [{ id: null, weight: '', reps: '', media_url: '' }] }])
   const [allLogs, setAllLogs] = useState([])
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0])
@@ -86,24 +72,79 @@ export default function MemberDashboard({ user, onLogout }) {
   const todayProtein = todayDiet.reduce((s, l) => s + (l.protein || 0), 0)
   const todayFat = todayDiet.reduce((s, l) => s + (l.fat || 0), 0)
 
+  const PTLogo = () => (
+    <div style={{
+      width: '32px', height: '32px', background: THEME.primaryAccent, borderRadius: '10px',
+      display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', flexShrink: 0
+    }}>
+      <span style={{ color: THEME.primaryDark, fontSize: '11px', fontWeight: '500', lineHeight: 1, letterSpacing: '-0.3px' }}>PT</span>
+      <div style={{ width: '14px', height: '0.5px', background: THEME.primaryDark, margin: '1px 0' }} />
+      <span style={{ color: THEME.primaryDark, fontSize: '4px', letterSpacing: '0.5px' }}>MANAGER</span>
+    </div>
+  )
+
+  const MainTabBtn = ({ tabKey, label }) => {
+    const active = mainTab === tabKey
+    return (
+      <button
+        onClick={() => setMainTab(tabKey)}
+        style={{
+          background: active ? THEME.primaryAccent : '#FFF',
+          color: active ? THEME.primaryDark : THEME.textSub,
+          border: 'none',
+          borderRadius: '14px',
+          padding: '12px',
+          fontSize: '13px',
+          fontWeight: active ? '500' : '400',
+          cursor: 'pointer',
+        }}
+      >{label}</button>
+    )
+  }
+
+  const SubTabs = ({ value, onChange }) => (
+    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px', marginBottom: '12px', background: THEME.borderLight, padding: '4px', borderRadius: '12px' }}>
+      {[
+        { key: 'log', label: '기록' },
+        { key: 'stats', label: '통계' },
+      ].map(({ key, label }) => {
+        const active = value === key
+        return (
+          <button
+            key={key}
+            onClick={() => onChange(key)}
+            style={{
+              background: active ? '#FFF' : 'transparent',
+              color: active ? THEME.text : THEME.textSub,
+              border: 'none',
+              borderRadius: '9px',
+              padding: '8px',
+              fontSize: '12px',
+              fontWeight: active ? '500' : '400',
+              cursor: 'pointer',
+            }}
+          >{label}</button>
+        )
+      })}
+    </div>
+  )
+
   return (
     <div style={S.container}>
       <div style={S.wrap}>
         <div style={S.header}>
-          <div style={{ width: '40px', height: '40px', background: THEME.primary, borderRadius: '9px', display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', flexShrink: 0 }}>
-            <span style={{ color: '#FFF', fontSize: '15px', fontWeight: '700', lineHeight: 1, letterSpacing: '-0.5px' }}>PT</span>
-            <div style={{ width: '18px', height: '1px', background: '#FFF', margin: '2px 0 1px', borderRadius: '1px' }} />
-            <span style={{ color: '#FFF', fontSize: '4.5px', letterSpacing: '0.6px', opacity: 0.9 }}>MANAGER</span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <PTLogo />
+            <span style={{ fontSize: '14px', color: THEME.text, fontWeight: '500' }}>{user.name}님</span>
           </div>
-          <p style={{ fontSize: '15px', fontWeight: '600', color: THEME.text, margin: 0, flex: 1, textAlign: 'center' }}>{user.name}님</p>
           <div style={{ display: 'flex', gap: '5px', alignItems: 'center' }}>
             <button
               onClick={() => setShowHelp(true)}
-              style={{ background: '#FFF', border: `1px solid ${THEME.primary}`, color: THEME.primary, width: '30px', height: '30px', borderRadius: '50%', cursor: 'pointer', fontSize: '14px', fontWeight: '700', padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}
+              style={{ background: '#FFF', border: `0.5px solid ${THEME.border}`, color: THEME.textSub, width: '30px', height: '30px', borderRadius: '50%', cursor: 'pointer', fontSize: '13px', fontWeight: '500', padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}
               title="도움말"
             >?</button>
-            <button onClick={() => setShowCalcModal(true)} style={{ background: THEME.primaryLight, border: `1px solid ${THEME.primary}`, color: THEME.primary, padding: '0 10px', borderRadius: '15px', cursor: 'pointer', fontSize: '11px', fontWeight: '500', height: '30px', display: 'flex', alignItems: 'center', flexShrink: 0 }}>
-              🧮 식단 설정
+            <button onClick={() => setShowCalcModal(true)} style={{ background: '#FFF', border: `0.5px solid ${THEME.border}`, color: THEME.primary, padding: '0 12px', borderRadius: '15px', cursor: 'pointer', fontSize: '11px', fontWeight: '500', height: '30px', display: 'flex', alignItems: 'center', flexShrink: 0 }}>
+              식단 설정
             </button>
           </div>
         </div>
@@ -114,76 +155,80 @@ export default function MemberDashboard({ user, onLogout }) {
           <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.5)', zIndex: 1000, display: 'flex', alignItems: 'flex-end', justifyContent: 'center' }}>
             <div style={{ background: '#FFF', borderRadius: '20px 20px 0 0', padding: '20px', width: '100%', maxWidth: '480px', maxHeight: '85vh', overflowY: 'auto' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-                <p style={{ fontSize: '16px', fontWeight: '700', color: THEME.text, margin: 0 }}>🧮 식단 설정</p>
+                <p style={{ fontSize: '15px', fontWeight: '500', color: THEME.text, margin: 0 }}>식단 설정</p>
                 <button onClick={() => setShowCalcModal(false)} style={{ background: 'none', border: 'none', fontSize: '20px', cursor: 'pointer', color: THEME.textSub }}>✕</button>
               </div>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', marginBottom: '8px' }}>
-                <select style={{ ...S.input, padding: '10px' }} value={goal} onChange={e => setGoal(e.target.value)}>
-                  <option value="다이어트">🥗 다이어트</option>
-                  <option value="벌크업">💪 벌크업</option>
+                <select style={{ ...S.input, padding: '10px', fontSize: '13px' }} value={goal} onChange={e => setGoal(e.target.value)}>
+                  <option value="다이어트">다이어트</option>
+                  <option value="벌크업">벌크업</option>
                 </select>
-                <select style={{ ...S.input, padding: '10px' }} value={gender} onChange={e => setGender(e.target.value)}>
-                  <option value="여성">👩 여성</option>
-                  <option value="남성">👨 남성</option>
+                <select style={{ ...S.input, padding: '10px', fontSize: '13px' }} value={gender} onChange={e => setGender(e.target.value)}>
+                  <option value="여성">여성</option>
+                  <option value="남성">남성</option>
                 </select>
-                <input style={{ ...S.input, padding: '10px' }} type="number" placeholder="체중 (kg)" value={weight} onChange={e => setWeight(e.target.value)} />
-                <input style={{ ...S.input, padding: '10px' }} type="number" placeholder="골격근량 (kg)" value={muscle} onChange={e => setMuscle(e.target.value)} />
+                <input style={{ ...S.input, padding: '10px', fontSize: '13px' }} type="number" placeholder="체중 (kg)" value={weight} onChange={e => setWeight(e.target.value)} />
+                <input style={{ ...S.input, padding: '10px', fontSize: '13px' }} type="number" placeholder="골격근량 (kg)" value={muscle} onChange={e => setMuscle(e.target.value)} />
               </div>
-              <select style={{ ...S.input, padding: '10px', marginBottom: '8px' }} value={activity} onChange={e => setActivity(e.target.value)}>
-                <option value="가벼운 운동 (주 2~3회)">🚶 가벼운 운동 (주 2~3회)</option>
-                <option value="보통 운동 (주 4~5회)">🏃 보통 운동 (주 4~5회)</option>
-                <option value="고강도 운동 (주 6회+)">🔥 고강도 운동 (주 6회+)</option>
+              <select style={{ ...S.input, padding: '10px', marginBottom: '8px', fontSize: '13px' }} value={activity} onChange={e => setActivity(e.target.value)}>
+                <option value="가벼운 운동 (주 2~3회)">가벼운 운동 (주 2~3회)</option>
+                <option value="보통 운동 (주 4~5회)">보통 운동 (주 4~5회)</option>
+                <option value="고강도 운동 (주 6회+)">고강도 운동 (주 6회+)</option>
               </select>
-              <select style={{ ...S.input, padding: '10px', marginBottom: '8px' }} value={intensity} onChange={e => setIntensity(e.target.value)}>
-                <option value="완만">🐢 완만 {goal === '벌크업' ? '(+300kcal)' : '(-300kcal)'}</option>
-                <option value="일반">⚡ 일반 {goal === '벌크업' ? '(+400kcal)' : '(-500kcal)'}</option>
-                <option value="공격적">🚀 공격적 {goal === '벌크업' ? '(+500kcal)' : '(-700kcal)'}</option>
+              <select style={{ ...S.input, padding: '10px', marginBottom: '8px', fontSize: '13px' }} value={intensity} onChange={e => setIntensity(e.target.value)}>
+                <option value="완만">완만 {goal === '벌크업' ? '(+300kcal)' : '(-300kcal)'}</option>
+                <option value="일반">일반 {goal === '벌크업' ? '(+400kcal)' : '(-500kcal)'}</option>
+                <option value="공격적">공격적 {goal === '벌크업' ? '(+500kcal)' : '(-700kcal)'}</option>
               </select>
               {gender === '여성' && (
-                <select style={{ ...S.input, padding: '10px', marginBottom: '12px' }} value={cyclePhase} onChange={e => setCyclePhase(e.target.value)}>
-                  <option value="">🌸 생리 주기 (선택사항)</option>
+                <select style={{ ...S.input, padding: '10px', marginBottom: '12px', fontSize: '13px' }} value={cyclePhase} onChange={e => setCyclePhase(e.target.value)}>
+                  <option value="">생리 주기 (선택사항)</option>
                   {Object.entries(CYCLE_PHASES).map(([phase, adj]) => (
                     <option key={phase} value={phase}>{phase} ({adj > 0 ? '+' : ''}{adj}kcal)</option>
                   ))}
                 </select>
               )}
-              <button style={S.btnPrimary} onClick={calculateMacro}>🧮 계산 및 저장</button>
+              <button style={S.btnPrimary} onClick={calculateMacro}>계산 및 저장</button>
             </div>
           </div>
         )}
 
         {macroResult && (
-          <div style={{ background: THEME.primary, borderRadius: '14px', padding: '12px 14px', marginBottom: '12px' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
-              <span style={{ fontSize: '13px', fontWeight: '600', color: '#FFF' }}>🎯 목표 수치</span>
-              <span style={{ fontSize: '10px', color: 'rgba(255,255,255,0.6)' }}>탭해서 수정</span>
+          <div style={{ background: '#FFF', borderRadius: '14px', padding: '14px', marginBottom: '12px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: '12px' }}>
+              <span style={{ fontSize: '12px', fontWeight: '500', color: THEME.text }}>오늘의 목표</span>
+              <span style={{ fontSize: '10px', color: THEME.textHint }}>탭하여 수정</span>
             </div>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: '6px' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: '8px' }}>
               {[
-                { label: '칼로리', field: 'target', unit: 'kcal', current: todayCalories, color: '#FCD34D' },
-                { label: '탄수화물', field: 'carbs', unit: 'g', current: todayCarbs, color: '#93C5FD' },
-                { label: '단백질', field: 'protein', unit: 'g', current: todayProtein, color: '#FCA5A5' },
-                { label: '지방', field: 'fat', unit: 'g', current: todayFat, color: '#FDBA74' },
-              ].map(({ label, field, unit, current, color }) => {
+                { label: '칼로리', field: 'target', unit: 'kcal', current: todayCalories, bg: THEME.nutCaloriesBg, mid: THEME.nutCaloriesText, dark: THEME.nutCaloriesDark, accent: THEME.nutCalories },
+                { label: '탄수', field: 'carbs', unit: 'g', current: todayCarbs, bg: THEME.nutCarbsBg, mid: THEME.nutCarbsText, dark: THEME.nutCarbsDark, accent: THEME.nutCarbs },
+                { label: '단백질', field: 'protein', unit: 'g', current: todayProtein, bg: THEME.nutProteinBg, mid: THEME.nutProteinText, dark: THEME.nutProteinDark, accent: THEME.nutProtein },
+                { label: '지방', field: 'fat', unit: 'g', current: todayFat, bg: THEME.nutFatBg, mid: THEME.nutFatText, dark: THEME.nutFatDark, accent: THEME.nutFat },
+              ].map(({ label, field, unit, current, bg, mid, dark, accent }) => {
                 const target = macroResult[field]
                 const pct = target > 0 ? Math.min(Math.round(current / target * 100), 100) : 0
                 const over = target > 0 && current > target
                 return (
-                  <div key={field} style={{ background: 'rgba(255,255,255,0.12)', borderRadius: '8px', padding: '8px', textAlign: 'center' }}>
-                    <p style={{ fontSize: '9px', color: 'rgba(255,255,255,0.7)', margin: '0 0 4px' }}>{label}</p>
-                    <input
-                      type="number"
-                      value={macroResult[field]}
-                      onChange={e => updateMacroField(field, e.target.value)}
-                      style={{ width: '100%', background: 'transparent', border: 'none', borderBottom: `1px solid ${color}`, color, fontSize: '14px', fontWeight: '700', textAlign: 'center', padding: '2px 0', boxSizing: 'border-box', outline: 'none' }}
-                    />
-                    <p style={{ fontSize: '9px', color: 'rgba(255,255,255,0.5)', margin: '2px 0 5px' }}>{unit}</p>
-                    <div style={{ background: 'rgba(255,255,255,0.2)', borderRadius: '4px', height: '4px', marginBottom: '3px' }}>
-                      <div style={{ width: `${pct}%`, background: over ? '#FF6B6B' : color, height: '4px', borderRadius: '4px' }} />
+                  <div key={field} style={{ background: bg, borderRadius: '12px', padding: '10px 6px', display: 'flex', flexDirection: 'column', alignItems: 'center', minHeight: '105px' }}>
+                    <div style={{ fontSize: '10px', color: mid, lineHeight: 1, height: '12px' }}>{label}</div>
+                    <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', width: '100%' }}>
+                      <div style={{ display: 'flex', alignItems: 'baseline', gap: '2px', justifyContent: 'center' }}>
+                        <input
+                          type="number"
+                          value={macroResult[field]}
+                          onChange={e => updateMacroField(field, e.target.value)}
+                          style={{ background: 'transparent', border: 'none', color: dark, fontSize: '16px', fontWeight: '500', textAlign: 'right', padding: 0, boxSizing: 'border-box', outline: 'none', width: '52px', letterSpacing: '-0.3px', fontFamily: 'inherit' }}
+                        />
+                        <span style={{ fontSize: '8px', color: mid, opacity: 0.85 }}>{unit}</span>
+                      </div>
                     </div>
-                    <p style={{ fontSize: '9px', color: over ? '#FF6B6B' : color, margin: 0, fontWeight: '600' }}>
+                    <div style={{ height: '3px', background: '#FFF', borderRadius: '2px', width: '100%', marginBottom: '4px', overflow: 'hidden' }}>
+                      <div style={{ width: `${pct}%`, background: over ? THEME.danger : accent, height: '3px', borderRadius: '2px' }} />
+                    </div>
+                    <div style={{ fontSize: '9px', color: over ? THEME.danger : mid, fontWeight: '500', lineHeight: 1, height: '11px' }}>
                       {Math.round(current)}{unit} ({pct}%)
-                    </p>
+                    </div>
                   </div>
                 )
               })}
@@ -191,24 +236,27 @@ export default function MemberDashboard({ user, onLogout }) {
           </div>
         )}
 
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '6px', marginBottom: '12px' }}>
-          {[
-            { key: 'workout', label: '운동 기록', Icon: IconWorkout },
-            { key: 'stats', label: '운동 통계', Icon: IconStats },
-            { key: 'diet', label: '식단', Icon: IconDiet },
-          ].map(({ key, label, Icon }) => (
-            <button key={key} onClick={() => setView(key)} style={{ background: view === key ? THEME.primary : '#FFF', border: view === key ? 'none' : `0.5px solid ${THEME.border}`, borderRadius: '10px', padding: '10px 6px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '5px', cursor: 'pointer' }}>
-              <Icon color={view === key ? '#FFF' : THEME.textSub} />
-              <span style={{ fontSize: '11px', color: view === key ? '#FFF' : THEME.textSub, fontWeight: view === key ? '500' : '400' }}>{label}</span>
-            </button>
-          ))}
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px', marginBottom: '10px' }}>
+          <MainTabBtn tabKey="workout" label="운동" />
+          <MainTabBtn tabKey="diet" label="식단" />
         </div>
 
-        {view === 'workout' && <WorkoutLog user={user} selectedDate={selectedDate} setSelectedDate={setSelectedDate} exercises={exercises} setExercises={setExercises} onUpdate={loadAllLogs} weight={weight} muscle={muscle} />}
-        {view === 'stats' && <WorkoutStats allLogs={allLogs} />}
-        {view === 'diet' && <DietLog user={user} onDietUpdate={loadTodayDiet} weight={weight} muscle={muscle} />}
+        {mainTab === 'workout' && (
+          <>
+            <SubTabs value={workoutSubTab} onChange={setWorkoutSubTab} />
+            {workoutSubTab === 'log' && <WorkoutLog user={user} selectedDate={selectedDate} setSelectedDate={setSelectedDate} exercises={exercises} setExercises={setExercises} onUpdate={loadAllLogs} weight={weight} muscle={muscle} />}
+            {workoutSubTab === 'stats' && <WorkoutStats allLogs={allLogs} />}
+          </>
+        )}
 
-        <button style={{ background: '#FFF', color: THEME.textSub, border: `1px solid ${THEME.border}`, padding: '12px', borderRadius: '12px', cursor: 'pointer', fontSize: '13px', width: '100%', marginTop: '12px' }} onClick={onLogout}>로그아웃</button>
+        {mainTab === 'diet' && (
+          <>
+            <SubTabs value={dietSubTab} onChange={setDietSubTab} />
+            <DietLog user={user} onDietUpdate={loadTodayDiet} weight={weight} muscle={muscle} forcedTab={dietSubTab} macroResult={macroResult} goal={goal} intensity={intensity} />
+          </>
+        )}
+
+        <button style={{ background: '#FFF', color: THEME.textSub, border: `0.5px solid ${THEME.border}`, padding: '12px', borderRadius: '12px', cursor: 'pointer', fontSize: '12px', width: '100%', marginTop: '12px' }} onClick={onLogout}>로그아웃</button>
       </div>
     </div>
   )

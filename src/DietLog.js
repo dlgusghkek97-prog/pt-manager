@@ -1,34 +1,44 @@
 import React, { useState, useEffect } from 'react'
 import { supabase } from './supabase'
-import { S, THEME, calcWeightCalories } from './utils'
+import { S, THEME, calcWeightCalories, calcTDEE } from './utils'
 import DatePicker from './DatePicker'
 
 const MEALS = [
-  { key: 'breakfast', label: '아침', icon: '☀️' },
-  { key: 'lunch', label: '점심', icon: '◐' },
-  { key: 'dinner', label: '저녁', icon: '🌙' },
-  { key: 'snack', label: '간식', icon: '📍' },
+  { key: 'breakfast', label: '아침' },
+  { key: 'lunch', label: '점심' },
+  { key: 'dinner', label: '저녁' },
+  { key: 'snack', label: '간식' },
 ]
 
 const NUTRIENTS = [
-  { key: 'calories', label: '칼로리', unit: 'kcal', color: '#FCD34D' },
-  { key: 'carbs', label: '탄수화물', unit: 'g', color: '#4472C4' },
-  { key: 'protein', label: '단백질', unit: 'g', color: '#E84747' },
-  { key: 'fat', label: '지방', unit: 'g', color: '#E8A020' },
-  { key: 'net', label: '잉여/적자', unit: 'kcal', color: '#10B981' },
+  { key: 'calories', label: '칼로리', unit: 'kcal', color: THEME.nutCalories },
+  { key: 'carbs', label: '탄수화물', unit: 'g', color: THEME.nutCarbs },
+  { key: 'protein', label: '단백질', unit: 'g', color: THEME.nutProtein },
+  { key: 'fat', label: '지방', unit: 'g', color: THEME.nutFat },
+  { key: 'net', label: '잉여 / 적자', unit: 'kcal', color: THEME.primary },
 ]
 
-const COLOR_SURPLUS = '#4472C4'  // 파랑 = 초과 (살찜)
-const COLOR_DEFICIT = '#E24B4A'  // 빨강 = 적자 (빠짐)
-const COLOR_TODAY = '#2E7D52'    // 초록 = 오늘/이번달
+const COLOR_SURPLUS = THEME.surplus
+const COLOR_DEFICIT = THEME.deficit
 
-export default function DietLog({ user, onDietUpdate, tableOverride, trainerIdField, weight, muscle, workoutTable, workoutIdField }) {
+const CameraIcon = () => (
+  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
+    <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/>
+    <circle cx="12" cy="13" r="4"/>
+  </svg>
+)
+
+export default function DietLog({ user, onDietUpdate, tableOverride, trainerIdField, weight, muscle, workoutTable, workoutIdField, forcedTab, macroResult, goal, intensity }) {
   const TABLE = tableOverride || 'diet_logs'
   const ID_FIELD = trainerIdField || 'member_id'
   const W_TABLE = workoutTable || 'workout_logs'
   const W_ID_FIELD = workoutIdField || 'member_id'
+  const FB_TABLE = trainerIdField ? 'trainer_diet_feedback' : 'diet_feedback'
 
-  const [tab, setTab] = useState('log')
+  const [internalTab, setInternalTab] = useState('log')
+  const tab = forcedTab || internalTab
+  const setTab = forcedTab ? () => {} : setInternalTab
+
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0])
   const [statMode, setStatMode] = useState('week')
   const [statValue, setStatValue] = useState(() => {
@@ -40,7 +50,7 @@ export default function DietLog({ user, onDietUpdate, tableOverride, trainerIdFi
   })
   const [activeNutrient, setActiveNutrient] = useState('calories')
 
-  const emptyMeal = { carbs: '', protein: '', fat: '', calories: '' }
+  const emptyMeal = { carbs: '', protein: '', fat: '', calories: '', media_url: '' }
   const [meals, setMeals] = useState({
     breakfast: { ...emptyMeal },
     lunch: { ...emptyMeal },
@@ -51,7 +61,13 @@ export default function DietLog({ user, onDietUpdate, tableOverride, trainerIdFi
   const [statsLogs, setStatsLogs] = useState([])
   const [statsWorkouts, setStatsWorkouts] = useState([])
 
-  useEffect(() => { loadLogs(selectedDate) }, [selectedDate, user.id])
+  const [feedback, setFeedback] = useState('')
+  const [feedbackId, setFeedbackId] = useState(null)
+  const [savingFeedback, setSavingFeedback] = useState(false)
+
+  const [previewUrl, setPreviewUrl] = useState(null)
+
+  useEffect(() => { loadLogs(selectedDate); loadFeedback(selectedDate) }, [selectedDate, user.id])
   useEffect(() => { if (tab === 'stats') loadStatsLogs() }, [tab, statMode, statValue])
 
   const loadLogs = async (date) => {
@@ -71,6 +87,7 @@ export default function DietLog({ user, onDietUpdate, tableOverride, trainerIdFi
           protein: row.protein ?? '',
           fat: row.fat ?? '',
           calories: row.calories ?? '',
+          media_url: row.media_url ?? '',
         }
         ids[row.meal_type] = row.id
       }
@@ -79,11 +96,99 @@ export default function DietLog({ user, onDietUpdate, tableOverride, trainerIdFi
     setLogIds(ids)
   }
 
+  const loadFeedback = async (date) => {
+    const { data, error } = await supabase.from(FB_TABLE).select('*').eq(ID_FIELD, user.id).eq('log_date', date).maybeSingle()
+    if (error) { console.error('[DietLog] feedback load error:', error); setFeedback(''); setFeedbackId(null); return }
+    if (data) {
+      setFeedback(data.content || '')
+      setFeedbackId(data.id)
+    } else {
+      setFeedback('')
+      setFeedbackId(null)
+    }
+  }
+
+  const saveFeedback = async () => {
+    setSavingFeedback(true)
+    const payload = {
+      [ID_FIELD]: user.id,
+      log_date: selectedDate,
+      content: feedback,
+      updated_at: new Date().toISOString(),
+    }
+    if (feedbackId) {
+      const { error } = await supabase.from(FB_TABLE).update(payload).eq('id', feedbackId)
+      if (error) { alert('피드백 저장 실패: ' + error.message); setSavingFeedback(false); return }
+    } else {
+      const { data, error } = await supabase.from(FB_TABLE).insert(payload).select().single()
+      if (error) { alert('피드백 저장 실패: ' + error.message); setSavingFeedback(false); return }
+      if (data) setFeedbackId(data.id)
+    }
+    setSavingFeedback(false)
+    alert('피드백이 저장되었습니다.')
+  }
+
   const updateField = (mealKey, field, value) => {
     setMeals(prev => ({
       ...prev,
       [mealKey]: { ...prev[mealKey], [field]: value }
     }))
+  }
+
+  const ensureMealRow = async (mealKey) => {
+    const meal = meals[mealKey]
+    if (logIds[mealKey]) return logIds[mealKey]
+    const carbs = parseFloat(meal.carbs) || 0
+    const protein = parseFloat(meal.protein) || 0
+    const fat = parseFloat(meal.fat) || 0
+    let calories = parseFloat(meal.calories) || 0
+    if (!calories && (carbs || protein || fat)) {
+      calories = Math.round(carbs * 4 + protein * 4 + fat * 9)
+    }
+    const payload = {
+      [ID_FIELD]: user.id,
+      log_date: selectedDate,
+      meal_type: mealKey,
+      carbs, protein, fat, calories,
+    }
+    const { data, error } = await supabase.from(TABLE).insert(payload).select().single()
+    if (error) { alert('식사 생성 실패: ' + error.message); return null }
+    if (data) {
+      setLogIds(prev => ({ ...prev, [mealKey]: data.id }))
+      return data.id
+    }
+    return null
+  }
+
+  const uploadMealPhoto = async (mealKey, file) => {
+    try {
+      const ext = file.name.split('.').pop().toLowerCase()
+      const fileName = `diet/${user.id}/${selectedDate}_${mealKey}_${Date.now()}.${ext}`
+      const { error: uploadError } = await supabase.storage.from('workout-media').upload(fileName, file, { upsert: true })
+      if (uploadError) { alert('업로드 실패: ' + uploadError.message); return }
+      const { data: urlData } = supabase.storage.from('workout-media').getPublicUrl(fileName)
+      const url = urlData.publicUrl
+
+      const id = await ensureMealRow(mealKey)
+      if (!id) return
+
+      const { error: updErr } = await supabase.from(TABLE).update({ media_url: url }).eq('id', id)
+      if (updErr) { alert('사진 저장 실패: ' + updErr.message); return }
+
+      setMeals(prev => ({ ...prev, [mealKey]: { ...prev[mealKey], media_url: url } }))
+    } catch (e) {
+      alert('업로드 중 오류: ' + e.message)
+    }
+  }
+
+  const removeMealPhoto = async (mealKey) => {
+    if (!window.confirm(`${MEALS.find(m => m.key === mealKey)?.label} 사진을 삭제할까요?`)) return
+    const id = logIds[mealKey]
+    if (id) {
+      const { error } = await supabase.from(TABLE).update({ media_url: null }).eq('id', id)
+      if (error) { alert('삭제 실패: ' + error.message); return }
+    }
+    setMeals(prev => ({ ...prev, [mealKey]: { ...prev[mealKey], media_url: '' } }))
   }
 
   const saveAll = async () => {
@@ -98,7 +203,8 @@ export default function DietLog({ user, onDietUpdate, tableOverride, trainerIdFi
       if (!calories && (carbs || protein || fat)) {
         calories = Math.round(carbs * 4 + protein * 4 + fat * 9)
       }
-      if (!carbs && !protein && !fat && !calories) {
+      const hasPhoto = !!meal.media_url
+      if (!carbs && !protein && !fat && !calories && !hasPhoto) {
         if (logIds[m.key]) {
           const { error } = await supabase.from(TABLE).delete().eq('id', logIds[m.key])
           if (error) errors.push(`${m.label} 삭제 실패: ${error.message}`)
@@ -110,6 +216,7 @@ export default function DietLog({ user, onDietUpdate, tableOverride, trainerIdFi
         log_date: selectedDate,
         meal_type: m.key,
         carbs, protein, fat, calories,
+        media_url: meal.media_url || null,
       }
       if (logIds[m.key]) {
         const { error } = await supabase.from(TABLE).update(payload).eq('id', logIds[m.key])
@@ -125,9 +232,9 @@ export default function DietLog({ user, onDietUpdate, tableOverride, trainerIdFi
       }
     }
     if (errors.length > 0) {
-      alert(`⚠️ 일부 저장 실패\n\n${errors.join('\n')}`)
+      alert(`일부 저장 실패\n\n${errors.join('\n')}`)
     } else {
-      alert(`✅ ${savedCount}개 식사 저장 완료!`)
+      alert(`${savedCount}개 식사 저장 완료!`)
     }
     if (onDietUpdate) await onDietUpdate()
     await loadLogs(selectedDate)
@@ -179,14 +286,17 @@ export default function DietLog({ user, onDietUpdate, tableOverride, trainerIdFi
 
   const cellStyle = {
     width: '100%',
-    padding: '8px 4px',
+    padding: '6px 2px',
     border: `0.5px solid ${THEME.border}`,
-    borderRadius: '6px',
-    fontSize: '13px',
+    borderRadius: '5px',
+    fontSize: '12px',
     textAlign: 'center',
-    background: '#FFF',
+    background: THEME.cardAlt,
     boxSizing: 'border-box',
     fontFamily: 'inherit',
+    color: THEME.text,
+    fontWeight: '500',
+    outline: 'none',
   }
 
   const calcBurnedByDate = (dateStr) => {
@@ -199,6 +309,10 @@ export default function DietLog({ user, onDietUpdate, tableOverride, trainerIdFi
     return cardioCal + weightCal
   }
 
+  // TDEE: 한 번만 계산 (macroResult, goal, intensity로부터)
+  const dailyTDEE = calcTDEE(macroResult, goal, intensity)
+  const hasTDEE = dailyTDEE !== null && dailyTDEE > 0
+
   const weekDailyTotals = (() => {
     const map = {}
     if (statMode !== 'week') return map
@@ -209,7 +323,13 @@ export default function DietLog({ user, onDietUpdate, tableOverride, trainerIdFi
     const endDay = Math.min(startDay + 6, new Date(y, mo, 0).getDate())
     for (let d = startDay; d <= endDay; d++) {
       const dateStr = `${y}-${String(mo).padStart(2, '0')}-${String(d).padStart(2, '0')}`
-      map[dateStr] = { calories: 0, carbs: 0, protein: 0, fat: 0, burned: calcBurnedByDate(dateStr) }
+      const burned = calcBurnedByDate(dateStr)
+      map[dateStr] = {
+        calories: 0, carbs: 0, protein: 0, fat: 0,
+        burned,
+        // TDEE 있으면 TDEE 사용, 없으면 burned로 fallback
+        tdee: hasTDEE ? dailyTDEE : burned,
+      }
     }
     statsLogs.forEach(r => {
       if (map[r.log_date]) {
@@ -227,7 +347,7 @@ export default function DietLog({ user, onDietUpdate, tableOverride, trainerIdFi
     const map = {}
     if (statMode !== 'year') return map
     for (let m = 1; m <= 12; m++) {
-      map[m] = { calories: 0, carbs: 0, protein: 0, fat: 0, burned: 0, days: new Set() }
+      map[m] = { calories: 0, carbs: 0, protein: 0, fat: 0, burned: 0, tdee: 0, days: new Set(), tdeeDays: new Set() }
     }
     const dailyDiet = {}
     statsLogs.forEach(r => {
@@ -241,10 +361,17 @@ export default function DietLog({ user, onDietUpdate, tableOverride, trainerIdFi
       const month = parseInt(date.split('-')[1])
       if (map[month]) {
         map[month].calories += v.calories
-        map[month].carbs += v.carbs
         map[month].protein += v.protein
+        map[month].carbs += v.carbs
         map[month].fat += v.fat
-        if (v.calories > 0) map[month].days.add(date)
+        if (v.calories > 0) {
+          map[month].days.add(date)
+          // 식단 기록 있는 날에 TDEE 누적
+          if (hasTDEE) {
+            map[month].tdee += dailyTDEE
+            map[month].tdeeDays.add(date)
+          }
+        }
       }
     })
     const dailyBurn = {}
@@ -268,12 +395,17 @@ export default function DietLog({ user, onDietUpdate, tableOverride, trainerIdFi
     const result = {}
     for (let m = 1; m <= 12; m++) {
       const dayCount = map[m].days.size
+      const tdeeDayCount = map[m].tdeeDays.size
       result[m] = {
         calories: dayCount > 0 ? Math.round(map[m].calories / dayCount) : 0,
         carbs: dayCount > 0 ? Math.round(map[m].carbs / dayCount) : 0,
         protein: dayCount > 0 ? Math.round(map[m].protein / dayCount) : 0,
         fat: dayCount > 0 ? Math.round(map[m].fat / dayCount) : 0,
         burned: dayCount > 0 ? Math.round(map[m].burned / dayCount) : 0,
+        // TDEE 평균: 식단 있는 날 기준. 없으면 burned 평균으로 fallback
+        tdee: hasTDEE
+          ? (tdeeDayCount > 0 ? Math.round(map[m].tdee / tdeeDayCount) : 0)
+          : (dayCount > 0 ? Math.round(map[m].burned / dayCount) : 0),
         days: dayCount,
       }
     }
@@ -288,15 +420,18 @@ export default function DietLog({ user, onDietUpdate, tableOverride, trainerIdFi
 
   const weekCalIntakeTotal = weekDates.reduce((s, d) => s + weekDailyTotals[d].calories, 0)
   const weekBurnedTotal = weekDates.reduce((s, d) => s + weekDailyTotals[d].burned, 0)
+  const weekTDEETotal = weekDates.reduce((s, d) => s + weekDailyTotals[d].tdee, 0)
   const recordedDays = weekDates.filter(d => weekDailyTotals[d].calories > 0).length
   const weekAvgIntake = recordedDays > 0 ? Math.round(weekCalIntakeTotal / recordedDays) : 0
   const weekAvgBurned = recordedDays > 0 ? Math.round(weekBurnedTotal / recordedDays) : 0
-  const weekAvgNet = weekAvgIntake - weekAvgBurned
+  const weekAvgTDEE = recordedDays > 0 ? Math.round(weekTDEETotal / recordedDays) : 0
+  const weekAvgNet = weekAvgIntake - weekAvgTDEE
 
   const recordedMonths = Object.values(yearMonthlyAvg).filter(v => v.days > 0).length
   const yearAvgIntake = recordedMonths > 0 ? Math.round(Object.values(yearMonthlyAvg).reduce((s, v) => s + v.calories, 0) / recordedMonths) : 0
   const yearAvgBurned = recordedMonths > 0 ? Math.round(Object.values(yearMonthlyAvg).reduce((s, v) => s + v.burned, 0) / recordedMonths) : 0
-  const yearAvgNet = yearAvgIntake - yearAvgBurned
+  const yearAvgTDEE = recordedMonths > 0 ? Math.round(Object.values(yearMonthlyAvg).reduce((s, v) => s + v.tdee, 0) / recordedMonths) : 0
+  const yearAvgNet = yearAvgIntake - yearAvgTDEE
 
   const CHART_VIEWBOX = "0 0 320 170"
   const CHART_TOP = 30
@@ -304,12 +439,11 @@ export default function DietLog({ user, onDietUpdate, tableOverride, trainerIdFi
   const CHART_HEIGHT = CHART_BOTTOM - CHART_TOP
 
   const CalorieChart = ({ mode }) => {
-    let data, labels, burnedData, todayIdx
+    let data, labels, burnedData
     if (mode === 'week') {
       data = weekDates.map(d => weekDailyTotals[d].calories)
       labels = weekDates.map(d => `${parseInt(d.split('-')[2])}일`)
       burnedData = weekDates.map(d => weekDailyTotals[d].burned)
-      todayIdx = weekDates.indexOf(today)
     } else {
       data = []; labels = []; burnedData = []
       for (let m = 1; m <= 12; m++) {
@@ -317,7 +451,6 @@ export default function DietLog({ user, onDietUpdate, tableOverride, trainerIdFi
         burnedData.push(yearMonthlyAvg[m].burned)
         labels.push(`${m}월`)
       }
-      todayIdx = isThisYear ? thisMonth - 1 : -1
     }
 
     const maxVal = Math.max(...data, ...burnedData, 100)
@@ -329,13 +462,13 @@ export default function DietLog({ user, onDietUpdate, tableOverride, trainerIdFi
 
     return (
       <svg viewBox={CHART_VIEWBOX} style={{ width: '100%', height: 'auto' }}>
-        <line x1="20" y1={CHART_TOP} x2="310" y2={CHART_TOP} stroke="#eee" strokeWidth="0.5" />
-        <line x1="20" y1={CHART_TOP + CHART_HEIGHT * 0.33} x2="310" y2={CHART_TOP + CHART_HEIGHT * 0.33} stroke="#eee" strokeWidth="0.5" />
-        <line x1="20" y1={CHART_TOP + CHART_HEIGHT * 0.66} x2="310" y2={CHART_TOP + CHART_HEIGHT * 0.66} stroke="#eee" strokeWidth="0.5" />
-        <line x1="20" y1={CHART_BOTTOM} x2="310" y2={CHART_BOTTOM} stroke="#ddd" strokeWidth="1" />
-        <text x="14" y={CHART_TOP + 4} textAnchor="end" fontSize="9" fill="#aaa">{Math.ceil(maxVal)}</text>
-        <text x="14" y={CHART_TOP + CHART_HEIGHT * 0.33 + 4} textAnchor="end" fontSize="9" fill="#aaa">{Math.ceil(maxVal * 0.66)}</text>
-        <text x="14" y={CHART_TOP + CHART_HEIGHT * 0.66 + 4} textAnchor="end" fontSize="9" fill="#aaa">{Math.ceil(maxVal * 0.33)}</text>
+        <line x1="20" y1={CHART_TOP} x2="310" y2={CHART_TOP} stroke={THEME.borderLight} strokeWidth="0.5" />
+        <line x1="20" y1={CHART_TOP + CHART_HEIGHT * 0.33} x2="310" y2={CHART_TOP + CHART_HEIGHT * 0.33} stroke={THEME.borderLight} strokeWidth="0.5" />
+        <line x1="20" y1={CHART_TOP + CHART_HEIGHT * 0.66} x2="310" y2={CHART_TOP + CHART_HEIGHT * 0.66} stroke={THEME.borderLight} strokeWidth="0.5" />
+        <line x1="20" y1={CHART_BOTTOM} x2="310" y2={CHART_BOTTOM} stroke={THEME.border} strokeWidth="1" />
+        <text x="14" y={CHART_TOP + 4} textAnchor="end" fontSize="9" fill={THEME.textHint}>{Math.ceil(maxVal)}</text>
+        <text x="14" y={CHART_TOP + CHART_HEIGHT * 0.33 + 4} textAnchor="end" fontSize="9" fill={THEME.textHint}>{Math.ceil(maxVal * 0.66)}</text>
+        <text x="14" y={CHART_TOP + CHART_HEIGHT * 0.66 + 4} textAnchor="end" fontSize="9" fill={THEME.textHint}>{Math.ceil(maxVal * 0.33)}</text>
 
         {data.map((val, i) => {
           const xStart = 20 + gap + i * (groupW + gap)
@@ -343,16 +476,15 @@ export default function DietLog({ user, onDietUpdate, tableOverride, trainerIdFi
           const burnedH = burnedData[i] > 0 ? (burnedData[i] / maxVal) * CHART_HEIGHT : 0
           const intakeY = CHART_BOTTOM - intakeH
           const burnedY = CHART_BOTTOM - burnedH
-          const isToday = i === todayIdx
           return (
             <g key={i}>
               {val > 0 && (
-                <rect x={xStart} y={intakeY} width={barW} height={intakeH} rx="2" fill={isToday ? COLOR_TODAY : '#FCD34D'} />
+                <rect x={xStart} y={intakeY} width={barW} height={intakeH} rx="2" fill={THEME.nutCalories} />
               )}
               {burnedData[i] > 0 && (
-                <rect x={xStart + barW + 2} y={burnedY} width={barW} height={burnedH} rx="2" fill="#FF6B6B" />
+                <rect x={xStart + barW + 2} y={burnedY} width={barW} height={burnedH} rx="2" fill={THEME.danger} />
               )}
-              <text x={xStart + groupW / 2} y="152" textAnchor="middle" fontSize={mode === 'year' ? '8' : '10'} fill={isToday ? COLOR_TODAY : '#888'} fontWeight={isToday ? '700' : '400'}>
+              <text x={xStart + groupW / 2} y="152" textAnchor="middle" fontSize={mode === 'year' ? '8' : '10'} fill={THEME.textSub}>
                 {labels[i]}
               </text>
             </g>
@@ -363,18 +495,16 @@ export default function DietLog({ user, onDietUpdate, tableOverride, trainerIdFi
   }
 
   const NutrientChart = ({ nutrientKey, color }) => {
-    let data, labels, todayIdx
+    let data, labels
     if (statMode === 'week') {
       data = weekDates.map(d => weekDailyTotals[d][nutrientKey])
       labels = weekDates.map(d => `${parseInt(d.split('-')[2])}일`)
-      todayIdx = weekDates.indexOf(today)
     } else {
       data = []; labels = []
       for (let m = 1; m <= 12; m++) {
         data.push(yearMonthlyAvg[m][nutrientKey])
         labels.push(`${m}월`)
       }
-      todayIdx = isThisYear ? thisMonth - 1 : -1
     }
 
     const maxVal = Math.max(...data, 10)
@@ -384,30 +514,29 @@ export default function DietLog({ user, onDietUpdate, tableOverride, trainerIdFi
 
     return (
       <svg viewBox={CHART_VIEWBOX} style={{ width: '100%', height: 'auto' }}>
-        <line x1="20" y1={CHART_TOP} x2="310" y2={CHART_TOP} stroke="#eee" strokeWidth="0.5" />
-        <line x1="20" y1={CHART_TOP + CHART_HEIGHT * 0.33} x2="310" y2={CHART_TOP + CHART_HEIGHT * 0.33} stroke="#eee" strokeWidth="0.5" />
-        <line x1="20" y1={CHART_TOP + CHART_HEIGHT * 0.66} x2="310" y2={CHART_TOP + CHART_HEIGHT * 0.66} stroke="#eee" strokeWidth="0.5" />
-        <line x1="20" y1={CHART_BOTTOM} x2="310" y2={CHART_BOTTOM} stroke="#ddd" strokeWidth="1" />
-        <text x="14" y={CHART_TOP + 4} textAnchor="end" fontSize="9" fill="#aaa">{Math.ceil(maxVal)}</text>
-        <text x="14" y={CHART_TOP + CHART_HEIGHT * 0.33 + 4} textAnchor="end" fontSize="9" fill="#aaa">{Math.ceil(maxVal * 0.66)}</text>
-        <text x="14" y={CHART_TOP + CHART_HEIGHT * 0.66 + 4} textAnchor="end" fontSize="9" fill="#aaa">{Math.ceil(maxVal * 0.33)}</text>
+        <line x1="20" y1={CHART_TOP} x2="310" y2={CHART_TOP} stroke={THEME.borderLight} strokeWidth="0.5" />
+        <line x1="20" y1={CHART_TOP + CHART_HEIGHT * 0.33} x2="310" y2={CHART_TOP + CHART_HEIGHT * 0.33} stroke={THEME.borderLight} strokeWidth="0.5" />
+        <line x1="20" y1={CHART_TOP + CHART_HEIGHT * 0.66} x2="310" y2={CHART_TOP + CHART_HEIGHT * 0.66} stroke={THEME.borderLight} strokeWidth="0.5" />
+        <line x1="20" y1={CHART_BOTTOM} x2="310" y2={CHART_BOTTOM} stroke={THEME.border} strokeWidth="1" />
+        <text x="14" y={CHART_TOP + 4} textAnchor="end" fontSize="9" fill={THEME.textHint}>{Math.ceil(maxVal)}</text>
+        <text x="14" y={CHART_TOP + CHART_HEIGHT * 0.33 + 4} textAnchor="end" fontSize="9" fill={THEME.textHint}>{Math.ceil(maxVal * 0.66)}</text>
+        <text x="14" y={CHART_TOP + CHART_HEIGHT * 0.66 + 4} textAnchor="end" fontSize="9" fill={THEME.textHint}>{Math.ceil(maxVal * 0.33)}</text>
 
         {data.map((val, i) => {
           const x = 20 + gap + i * (barW + gap)
           const h = val > 0 ? (val / maxVal) * CHART_HEIGHT : 0
           const y = CHART_BOTTOM - h
-          const isToday = i === todayIdx
           return (
             <g key={i}>
               {val > 0 && (
                 <>
-                  <rect x={x} y={y} width={barW} height={h} rx="3" fill={isToday ? COLOR_TODAY : color} />
-                  <text x={x + barW / 2} y={y - 4} textAnchor="middle" fontSize={statMode === 'year' ? '7' : '9'} fill={isToday ? COLOR_TODAY : '#333'} fontWeight={isToday ? '700' : '600'}>
+                  <rect x={x} y={y} width={barW} height={h} rx="3" fill={color} />
+                  <text x={x + barW / 2} y={y - 4} textAnchor="middle" fontSize={statMode === 'year' ? '7' : '9'} fill={THEME.text} fontWeight="500">
                     {Math.round(val)}
                   </text>
                 </>
               )}
-              <text x={x + barW / 2} y="152" textAnchor="middle" fontSize={statMode === 'year' ? '8' : '10'} fill={isToday ? COLOR_TODAY : '#888'} fontWeight={isToday ? '700' : '400'}>
+              <text x={x + barW / 2} y="152" textAnchor="middle" fontSize={statMode === 'year' ? '8' : '10'} fill={THEME.textSub}>
                 {labels[i]}
               </text>
             </g>
@@ -418,18 +547,26 @@ export default function DietLog({ user, onDietUpdate, tableOverride, trainerIdFi
   }
 
   const NetChart = () => {
-    let rawData, labels, todayIdx
+    let rawData, labels
     if (statMode === 'week') {
-      rawData = weekDates.map(d => weekDailyTotals[d].calories - weekDailyTotals[d].burned)
+      rawData = weekDates.map(d => {
+        const v = weekDailyTotals[d]
+        // 식단 기록 없는 날은 0
+        if (v.calories === 0) return 0
+        return v.calories - v.tdee
+      })
       labels = weekDates.map(d => `${parseInt(d.split('-')[2])}일`)
-      todayIdx = weekDates.indexOf(today)
     } else {
       rawData = []; labels = []
       for (let m = 1; m <= 12; m++) {
-        rawData.push(yearMonthlyAvg[m].calories - yearMonthlyAvg[m].burned)
+        const v = yearMonthlyAvg[m]
+        if (v.calories === 0) {
+          rawData.push(0)
+        } else {
+          rawData.push(v.calories - v.tdee)
+        }
         labels.push(`${m}월`)
       }
-      todayIdx = isThisYear ? thisMonth - 1 : -1
     }
 
     const absData = rawData.map(v => Math.abs(v))
@@ -440,32 +577,30 @@ export default function DietLog({ user, onDietUpdate, tableOverride, trainerIdFi
 
     return (
       <svg viewBox={CHART_VIEWBOX} style={{ width: '100%', height: 'auto' }}>
-        <line x1="20" y1={CHART_TOP} x2="310" y2={CHART_TOP} stroke="#eee" strokeWidth="0.5" />
-        <line x1="20" y1={CHART_TOP + CHART_HEIGHT * 0.33} x2="310" y2={CHART_TOP + CHART_HEIGHT * 0.33} stroke="#eee" strokeWidth="0.5" />
-        <line x1="20" y1={CHART_TOP + CHART_HEIGHT * 0.66} x2="310" y2={CHART_TOP + CHART_HEIGHT * 0.66} stroke="#eee" strokeWidth="0.5" />
-        <line x1="20" y1={CHART_BOTTOM} x2="310" y2={CHART_BOTTOM} stroke="#ddd" strokeWidth="1" />
-        <text x="14" y={CHART_TOP + 4} textAnchor="end" fontSize="9" fill="#aaa">{Math.ceil(maxVal)}</text>
-        <text x="14" y={CHART_TOP + CHART_HEIGHT * 0.33 + 4} textAnchor="end" fontSize="9" fill="#aaa">{Math.ceil(maxVal * 0.66)}</text>
-        <text x="14" y={CHART_TOP + CHART_HEIGHT * 0.66 + 4} textAnchor="end" fontSize="9" fill="#aaa">{Math.ceil(maxVal * 0.33)}</text>
+        <line x1="20" y1={CHART_TOP} x2="310" y2={CHART_TOP} stroke={THEME.borderLight} strokeWidth="0.5" />
+        <line x1="20" y1={CHART_TOP + CHART_HEIGHT * 0.33} x2="310" y2={CHART_TOP + CHART_HEIGHT * 0.33} stroke={THEME.borderLight} strokeWidth="0.5" />
+        <line x1="20" y1={CHART_TOP + CHART_HEIGHT * 0.66} x2="310" y2={CHART_TOP + CHART_HEIGHT * 0.66} stroke={THEME.borderLight} strokeWidth="0.5" />
+        <line x1="20" y1={CHART_BOTTOM} x2="310" y2={CHART_BOTTOM} stroke={THEME.border} strokeWidth="1" />
+        <text x="14" y={CHART_TOP + 4} textAnchor="end" fontSize="9" fill={THEME.textHint}>{Math.ceil(maxVal)}</text>
+        <text x="14" y={CHART_TOP + CHART_HEIGHT * 0.33 + 4} textAnchor="end" fontSize="9" fill={THEME.textHint}>{Math.ceil(maxVal * 0.66)}</text>
+        <text x="14" y={CHART_TOP + CHART_HEIGHT * 0.66 + 4} textAnchor="end" fontSize="9" fill={THEME.textHint}>{Math.ceil(maxVal * 0.33)}</text>
 
         {rawData.map((val, i) => {
           const x = 20 + gap + i * (barW + gap)
           const h = Math.abs(val) > 0 ? (Math.abs(val) / maxVal) * CHART_HEIGHT : 0
           const y = CHART_BOTTOM - h
-          const isToday = i === todayIdx
-          const fillColor = isToday ? COLOR_TODAY : (val >= 0 ? COLOR_SURPLUS : COLOR_DEFICIT)
-          const labelColor = isToday ? COLOR_TODAY : (val >= 0 ? COLOR_SURPLUS : COLOR_DEFICIT)
+          const fillColor = val >= 0 ? COLOR_SURPLUS : COLOR_DEFICIT
           return (
             <g key={i}>
               {val !== 0 && (
                 <>
                   <rect x={x} y={y} width={barW} height={h} rx="3" fill={fillColor} />
-                  <text x={x + barW / 2} y={y - 4} textAnchor="middle" fontSize={statMode === 'year' ? '7' : '9'} fill={labelColor} fontWeight="700">
+                  <text x={x + barW / 2} y={y - 4} textAnchor="middle" fontSize={statMode === 'year' ? '7' : '9'} fill={fillColor} fontWeight="500">
                     {val > 0 ? `+${Math.round(val)}` : Math.round(val)}
                   </text>
                 </>
               )}
-              <text x={x + barW / 2} y="152" textAnchor="middle" fontSize={statMode === 'year' ? '8' : '10'} fill={isToday ? COLOR_TODAY : '#888'} fontWeight={isToday ? '700' : '400'}>
+              <text x={x + barW / 2} y="152" textAnchor="middle" fontSize={statMode === 'year' ? '8' : '10'} fill={THEME.textSub}>
                 {labels[i]}
               </text>
             </g>
@@ -477,38 +612,41 @@ export default function DietLog({ user, onDietUpdate, tableOverride, trainerIdFi
 
   return (
     <div>
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px', marginBottom: '12px' }}>
-        <button onClick={() => setTab('log')} style={{ background: tab === 'log' ? THEME.primary : '#FFF', color: tab === 'log' ? '#FFF' : THEME.textSub, border: tab === 'log' ? 'none' : `0.5px solid ${THEME.border}`, borderRadius: '10px', padding: '11px', fontSize: '13px', fontWeight: tab === 'log' ? '600' : '400', cursor: 'pointer' }}>
-          식단 기록
-        </button>
-        <button onClick={() => setTab('stats')} style={{ background: tab === 'stats' ? THEME.primary : '#FFF', color: tab === 'stats' ? '#FFF' : THEME.textSub, border: tab === 'stats' ? 'none' : `0.5px solid ${THEME.border}`, borderRadius: '10px', padding: '11px', fontSize: '13px', fontWeight: tab === 'stats' ? '600' : '400', cursor: 'pointer' }}>
-          통계
-        </button>
-      </div>
+      {previewUrl && (
+        <div onClick={() => setPreviewUrl(null)} style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.85)', zIndex: 1100, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px', cursor: 'pointer' }}>
+          <img src={previewUrl} alt="식단 사진" style={{ maxWidth: '100%', maxHeight: '90vh', borderRadius: '8px' }} />
+        </div>
+      )}
+
+      {!forcedTab && (
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px', marginBottom: '12px' }}>
+          <button onClick={() => setTab('log')} style={{ background: tab === 'log' ? THEME.primaryAccent : '#FFF', color: tab === 'log' ? THEME.primaryDark : THEME.textSub, border: 'none', borderRadius: '12px', padding: '10px', fontSize: '12px', fontWeight: tab === 'log' ? '500' : '400', cursor: 'pointer' }}>
+            식단 기록
+          </button>
+          <button onClick={() => setTab('stats')} style={{ background: tab === 'stats' ? THEME.primaryAccent : '#FFF', color: tab === 'stats' ? THEME.primaryDark : THEME.textSub, border: 'none', borderRadius: '12px', padding: '10px', fontSize: '12px', fontWeight: tab === 'stats' ? '500' : '400', cursor: 'pointer' }}>
+            통계
+          </button>
+        </div>
+      )}
 
       {tab === 'log' && (
         <div style={S.card}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px', gap: '12px' }}>
-            <p style={{ ...S.cardTitle, margin: 0, flexShrink: 0 }}>식단 기록</p>
-            <div style={{ flex: 1, maxWidth: '260px' }}>
-              <DatePicker value={selectedDate} onChange={setSelectedDate} />
-            </div>
+          <p style={{ ...S.cardTitle, margin: '0 0 10px' }}>식단 기록</p>
+          <div style={{ marginBottom: '14px' }}>
+            <DatePicker value={selectedDate} onChange={setSelectedDate} />
           </div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: '60px 1fr 1fr 1fr 1fr', gap: '6px', marginBottom: '6px', alignItems: 'center', padding: '0 4px' }}>
-            <span style={{ fontSize: '11px', color: THEME.textSub, fontWeight: '500' }}>식사</span>
-            <span style={{ fontSize: '10px', color: '#4472C4', textAlign: 'center', fontWeight: '600' }}>탄수화물</span>
-            <span style={{ fontSize: '10px', color: '#E84747', textAlign: 'center', fontWeight: '600' }}>단백질</span>
-            <span style={{ fontSize: '10px', color: '#E8A020', textAlign: 'center', fontWeight: '600' }}>지방</span>
-            <span style={{ fontSize: '11px', color: THEME.textSub, textAlign: 'center', fontWeight: '500' }}>kcal</span>
+          <div style={{ display: 'grid', gridTemplateColumns: '42px 1fr 1fr 1fr 1fr', gap: '4px', marginBottom: '4px', padding: '0 2px' }}>
+            <span style={{ fontSize: '10px', color: THEME.textSub }}>식사</span>
+            <span style={{ fontSize: '10px', color: THEME.nutCarbsText, textAlign: 'center', fontWeight: '500' }}>탄수</span>
+            <span style={{ fontSize: '10px', color: THEME.nutProteinText, textAlign: 'center', fontWeight: '500' }}>단백</span>
+            <span style={{ fontSize: '10px', color: THEME.nutFatText, textAlign: 'center', fontWeight: '500' }}>지방</span>
+            <span style={{ fontSize: '10px', color: THEME.textSub, textAlign: 'center' }}>kcal</span>
           </div>
 
           {MEALS.map(m => (
-            <div key={m.key} style={{ display: 'grid', gridTemplateColumns: '60px 1fr 1fr 1fr 1fr', gap: '6px', marginBottom: '6px', alignItems: 'center' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                <span style={{ fontSize: '14px' }}>{m.icon}</span>
-                <span style={{ fontSize: '12px', color: THEME.text, fontWeight: '500' }}>{m.label}</span>
-              </div>
+            <div key={m.key} style={{ display: 'grid', gridTemplateColumns: '42px 1fr 1fr 1fr 1fr', gap: '4px', marginBottom: '4px', alignItems: 'center' }}>
+              <span style={{ fontSize: '11px', color: THEME.text, fontWeight: '500' }}>{m.label}</span>
               <input style={cellStyle} type="number" inputMode="decimal" placeholder="0" value={meals[m.key].carbs} onChange={e => updateField(m.key, 'carbs', e.target.value)} />
               <input style={cellStyle} type="number" inputMode="decimal" placeholder="0" value={meals[m.key].protein} onChange={e => updateField(m.key, 'protein', e.target.value)} />
               <input style={cellStyle} type="number" inputMode="decimal" placeholder="0" value={meals[m.key].fat} onChange={e => updateField(m.key, 'fat', e.target.value)} />
@@ -516,17 +654,68 @@ export default function DietLog({ user, onDietUpdate, tableOverride, trainerIdFi
             </div>
           ))}
 
-          <div style={{ display: 'grid', gridTemplateColumns: '60px 1fr 1fr 1fr 1fr', gap: '6px', marginTop: '10px', alignItems: 'center', background: THEME.primary, padding: '10px 4px', borderRadius: '8px' }}>
-            <span style={{ fontSize: '12px', color: '#FFF', fontWeight: '600', paddingLeft: '6px' }}>합계</span>
-            <span style={{ fontSize: '13px', color: '#93C5FD', textAlign: 'center', fontWeight: '600' }}>{Math.round(totals.carbs)}g</span>
-            <span style={{ fontSize: '13px', color: '#FCA5A5', textAlign: 'center', fontWeight: '600' }}>{Math.round(totals.protein)}g</span>
-            <span style={{ fontSize: '13px', color: '#FDBA74', textAlign: 'center', fontWeight: '600' }}>{Math.round(totals.fat)}g</span>
-            <span style={{ fontSize: '13px', color: '#FCD34D', textAlign: 'center', fontWeight: '700' }}>{Math.round(totals.calories)}</span>
+          <div style={{ display: 'grid', gridTemplateColumns: '42px 1fr 1fr 1fr 1fr', gap: '4px', marginTop: '8px', alignItems: 'center', background: THEME.primary, padding: '8px 2px', borderRadius: '8px' }}>
+            <span style={{ fontSize: '11px', color: '#FFF', fontWeight: '500', paddingLeft: '4px' }}>합계</span>
+            <span style={{ fontSize: '12px', color: '#B8E0D2', textAlign: 'center', fontWeight: '500' }}>{Math.round(totals.carbs)}g</span>
+            <span style={{ fontSize: '12px', color: '#F4C8D5', textAlign: 'center', fontWeight: '500' }}>{Math.round(totals.protein)}g</span>
+            <span style={{ fontSize: '12px', color: '#F2D5B5', textAlign: 'center', fontWeight: '500' }}>{Math.round(totals.fat)}g</span>
+            <span style={{ fontSize: '12px', color: '#FFE8A8', textAlign: 'center', fontWeight: '500' }}>{Math.round(totals.calories)}</span>
           </div>
 
-          <button style={{ ...S.btnPrimary, marginTop: '12px', fontSize: '15px' }} onClick={saveAll}>💾 저장</button>
+          <p style={{ fontSize: '11px', color: THEME.textSub, fontWeight: '500', margin: '14px 0 8px' }}>식사 사진</p>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', marginBottom: '12px' }}>
+            {MEALS.map(m => {
+              const url = meals[m.key].media_url
+              return (
+                <div key={m.key}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '4px' }}>
+                    <span style={{ fontSize: '11px', color: THEME.text, fontWeight: '500' }}>{m.label}</span>
+                    {url && (
+                      <button
+                        onClick={() => removeMealPhoto(m.key)}
+                        style={{ background: 'none', border: 'none', color: THEME.danger, fontSize: '10px', cursor: 'pointer', padding: 0 }}
+                      >삭제</button>
+                    )}
+                  </div>
+                  {url ? (
+                    <div
+                      onClick={() => setPreviewUrl(url)}
+                      style={{ width: '100%', height: '90px', borderRadius: '8px', overflow: 'hidden', cursor: 'pointer', background: THEME.cardAlt }}
+                    >
+                      <img src={url} alt={m.label} style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
+                    </div>
+                  ) : (
+                    <label style={{ cursor: 'pointer', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '4px', background: THEME.cardAlt, border: `0.5px dashed ${THEME.primaryAccent}`, borderRadius: '8px', height: '90px', color: THEME.textSub }}>
+                      <CameraIcon />
+                      <span style={{ fontSize: '10px' }}>사진 추가</span>
+                      <input type="file" accept="image/*" style={{ display: 'none' }} onChange={e => e.target.files[0] && uploadMealPhoto(m.key, e.target.files[0])} />
+                    </label>
+                  )}
+                </div>
+              )
+            })}
+          </div>
 
-          <p style={{ fontSize: '10px', color: THEME.textSub, margin: '8px 0 0', textAlign: 'center' }}>
+          <div style={{ background: THEME.cardAlt, border: `0.5px solid ${THEME.border}`, borderRadius: '10px', padding: '11px', marginBottom: '12px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '7px' }}>
+              <span style={{ fontSize: '11px', color: THEME.primary, fontWeight: '500' }}>트레이너 피드백</span>
+              <button
+                onClick={saveFeedback}
+                disabled={savingFeedback}
+                style={{ background: THEME.primary, color: '#FFF', border: 'none', borderRadius: '6px', padding: '4px 10px', fontSize: '10px', fontWeight: '500', cursor: 'pointer' }}
+              >{savingFeedback ? '저장 중...' : '피드백 저장'}</button>
+            </div>
+            <textarea
+              value={feedback}
+              onChange={e => setFeedback(e.target.value)}
+              placeholder="오늘 식단에 대한 피드백을 입력해주세요..."
+              style={{ width: '100%', background: '#FFF', borderRadius: '6px', padding: '9px 10px', minHeight: '60px', fontSize: '12px', color: THEME.text, lineHeight: '1.6', border: `0.5px solid ${THEME.border}`, resize: 'vertical', boxSizing: 'border-box', fontFamily: 'inherit', outline: 'none' }}
+            />
+          </div>
+
+          <button style={{ ...S.btnPrimary, fontSize: '13px', padding: '12px' }} onClick={saveAll}>저장</button>
+
+          <p style={{ fontSize: '10px', color: THEME.textHint, margin: '8px 0 0', textAlign: 'center' }}>
             칼로리를 비워두면 자동 계산됩니다 (탄·단 × 4 + 지 × 9)
           </p>
         </div>
@@ -534,7 +723,7 @@ export default function DietLog({ user, onDietUpdate, tableOverride, trainerIdFi
 
       {tab === 'stats' && (
         <div style={S.card}>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px', marginBottom: '12px' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px', marginBottom: '10px' }}>
             {[
               { key: 'week', label: '주간' },
               { key: 'year', label: '월간' },
@@ -551,72 +740,102 @@ export default function DietLog({ user, onDietUpdate, tableOverride, trainerIdFi
                   setStatValue(String(new Date().getFullYear()))
                 }
               }} style={{
-                background: statMode === key ? THEME.primary : '#FFF',
-                color: statMode === key ? '#FFF' : THEME.textSub,
-                border: statMode === key ? 'none' : `0.5px solid ${THEME.border}`,
+                background: statMode === key ? THEME.primaryAccent : '#FFF',
+                color: statMode === key ? THEME.primaryDark : THEME.textSub,
+                border: 'none',
                 borderRadius: '8px',
                 padding: '8px',
                 fontSize: '12px',
-                fontWeight: statMode === key ? '600' : '400',
+                fontWeight: statMode === key ? '500' : '400',
                 cursor: 'pointer'
               }}>{label}</button>
             ))}
           </div>
 
-          <div style={{ marginBottom: '14px' }}>
+          <div style={{ marginBottom: '12px' }}>
             <DatePicker value={statValue} onChange={setStatValue} mode={statMode} />
           </div>
 
-          <div style={{ background: '#FAFAF7', borderRadius: '12px', padding: '14px 8px', border: `0.5px solid ${THEME.border}`, marginBottom: '12px' }}>
-            <div style={{ padding: '0 8px 8px' }}>
-              {statMode === 'week' ? (
-                <>
-                  <p style={{ fontSize: '11px', color: THEME.textSub, margin: 0 }}>평균</p>
-                  {activeNutrient === 'net' ? (
-                    <p style={{ fontSize: '22px', fontWeight: '700', color: weekAvgNet >= 0 ? COLOR_SURPLUS : COLOR_DEFICIT, margin: 0 }}>
-                      {weekAvgNet >= 0 ? '+' : ''}{weekAvgNet}
-                      <span style={{ fontSize: '13px', color: THEME.textSub, fontWeight: '400' }}> kcal/일</span>
+          <div style={{ background: THEME.cardAlt, borderRadius: '12px', padding: '12px 8px', marginBottom: '10px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', padding: '0 6px 8px', gap: '10px' }}>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                {statMode === 'week' ? (
+                  <>
+                    <p style={{ fontSize: '10px', color: THEME.textSub, margin: 0 }}>평균</p>
+                    {activeNutrient === 'net' ? (
+                      <p style={{ fontSize: '20px', fontWeight: '500', color: weekAvgNet >= 0 ? COLOR_SURPLUS : COLOR_DEFICIT, margin: 0, letterSpacing: '-0.3px' }}>
+                        {weekAvgNet >= 0 ? '+' : ''}{weekAvgNet}
+                        <span style={{ fontSize: '11px', color: THEME.textSub, fontWeight: '400' }}> kcal/일</span>
+                      </p>
+                    ) : activeNutrient === 'calories' ? (
+                      <p style={{ fontSize: '20px', fontWeight: '500', color: THEME.text, margin: 0, letterSpacing: '-0.3px' }}>
+                        {weekAvgIntake} / <span style={{ color: THEME.danger }}>{weekAvgBurned}</span>
+                        <span style={{ fontSize: '11px', color: THEME.textSub, fontWeight: '400' }}> kcal/일</span>
+                      </p>
+                    ) : (
+                      <p style={{ fontSize: '20px', fontWeight: '500', color: THEME.text, margin: 0, letterSpacing: '-0.3px' }}>
+                        {recordedDays > 0 ? Math.round(weekDates.reduce((s, d) => s + weekDailyTotals[d][activeNutrient], 0) / recordedDays) : 0}
+                        <span style={{ fontSize: '11px', color: THEME.textSub, fontWeight: '400' }}> {currentNutrient.unit}/일</span>
+                      </p>
+                    )}
+                    {weekDates.length > 0 && (
+                      <p style={{ fontSize: '9px', color: THEME.textHint, margin: '4px 0 0' }}>
+                        {weekDates[0].replace(/-/g, '.')} ~ {weekDates[weekDates.length - 1].replace(/-/g, '.')} · 기록 {recordedDays}일
+                        {activeNutrient === 'net' && hasTDEE && ` · TDEE ${dailyTDEE}`}
+                      </p>
+                    )}
+                  </>
+                ) : (
+                  <>
+                    <p style={{ fontSize: '10px', color: THEME.textSub, margin: 0 }}>월별 평균</p>
+                    {activeNutrient === 'net' ? (
+                      <p style={{ fontSize: '20px', fontWeight: '500', color: yearAvgNet >= 0 ? COLOR_SURPLUS : COLOR_DEFICIT, margin: 0, letterSpacing: '-0.3px' }}>
+                        {yearAvgNet >= 0 ? '+' : ''}{yearAvgNet}
+                        <span style={{ fontSize: '11px', color: THEME.textSub, fontWeight: '400' }}> kcal/일</span>
+                      </p>
+                    ) : activeNutrient === 'calories' ? (
+                      <p style={{ fontSize: '20px', fontWeight: '500', color: THEME.text, margin: 0, letterSpacing: '-0.3px' }}>
+                        {yearAvgIntake} / <span style={{ color: THEME.danger }}>{yearAvgBurned}</span>
+                        <span style={{ fontSize: '11px', color: THEME.textSub, fontWeight: '400' }}> kcal/일</span>
+                      </p>
+                    ) : (
+                      <p style={{ fontSize: '20px', fontWeight: '500', color: THEME.text, margin: 0, letterSpacing: '-0.3px' }}>
+                        {recordedMonths > 0 ? Math.round(Object.values(yearMonthlyAvg).reduce((s, v) => s + v[activeNutrient], 0) / recordedMonths) : 0}
+                        <span style={{ fontSize: '11px', color: THEME.textSub, fontWeight: '400' }}> {currentNutrient.unit}/일</span>
+                      </p>
+                    )}
+                    <p style={{ fontSize: '9px', color: THEME.textHint, margin: '4px 0 0' }}>
+                      {statValue}년 · 기록 {recordedMonths}개월
+                      {activeNutrient === 'net' && hasTDEE && ` · TDEE ${dailyTDEE}`}
                     </p>
-                  ) : activeNutrient === 'calories' ? (
-                    <p style={{ fontSize: '22px', fontWeight: '700', color: THEME.text, margin: 0 }}>
-                      {weekAvgIntake} / <span style={{ color: '#FF6B6B' }}>{weekAvgBurned}</span>
-                      <span style={{ fontSize: '13px', color: THEME.textSub, fontWeight: '400' }}> kcal/일</span>
-                    </p>
-                  ) : (
-                    <p style={{ fontSize: '22px', fontWeight: '700', color: THEME.text, margin: 0 }}>
-                      {recordedDays > 0 ? Math.round(weekDates.reduce((s, d) => s + weekDailyTotals[d][activeNutrient], 0) / recordedDays) : 0}
-                      <span style={{ fontSize: '13px', color: THEME.textSub, fontWeight: '400' }}> {currentNutrient.unit}/일</span>
-                    </p>
-                  )}
-                  {weekDates.length > 0 && (
-                    <p style={{ fontSize: '9px', color: THEME.textSub, margin: '4px 0 0' }}>
-                      {weekDates[0].replace(/-/g, '.')} ~ {weekDates[weekDates.length - 1].replace(/-/g, '.')} · 기록 {recordedDays}일
-                    </p>
-                  )}
-                </>
-              ) : (
-                <>
-                  <p style={{ fontSize: '11px', color: THEME.textSub, margin: 0 }}>월별 평균</p>
-                  {activeNutrient === 'net' ? (
-                    <p style={{ fontSize: '22px', fontWeight: '700', color: yearAvgNet >= 0 ? COLOR_SURPLUS : COLOR_DEFICIT, margin: 0 }}>
-                      {yearAvgNet >= 0 ? '+' : ''}{yearAvgNet}
-                      <span style={{ fontSize: '13px', color: THEME.textSub, fontWeight: '400' }}> kcal/일</span>
-                    </p>
-                  ) : activeNutrient === 'calories' ? (
-                    <p style={{ fontSize: '22px', fontWeight: '700', color: THEME.text, margin: 0 }}>
-                      {yearAvgIntake} / <span style={{ color: '#FF6B6B' }}>{yearAvgBurned}</span>
-                      <span style={{ fontSize: '13px', color: THEME.textSub, fontWeight: '400' }}> kcal/일</span>
-                    </p>
-                  ) : (
-                    <p style={{ fontSize: '22px', fontWeight: '700', color: THEME.text, margin: 0 }}>
-                      {recordedMonths > 0 ? Math.round(Object.values(yearMonthlyAvg).reduce((s, v) => s + v[activeNutrient], 0) / recordedMonths) : 0}
-                      <span style={{ fontSize: '13px', color: THEME.textSub, fontWeight: '400' }}> {currentNutrient.unit}/일</span>
-                    </p>
-                  )}
-                  <p style={{ fontSize: '9px', color: THEME.textSub, margin: '4px 0 0' }}>
-                    {statValue}년 · 기록 {recordedMonths}개월
-                  </p>
-                </>
+                  </>
+                )}
+              </div>
+
+              {activeNutrient === 'calories' && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', flexShrink: 0 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+                    <div style={{ width: '8px', height: '8px', background: THEME.nutCalories, borderRadius: '2px' }} />
+                    <span style={{ fontSize: '9px', color: THEME.textSub }}>섭취</span>
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+                    <div style={{ width: '8px', height: '8px', background: THEME.danger, borderRadius: '2px' }} />
+                    <span style={{ fontSize: '9px', color: THEME.textSub }}>소비</span>
+                  </div>
+                </div>
+              )}
+
+              {activeNutrient === 'net' && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', flexShrink: 0 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+                    <div style={{ width: '8px', height: '8px', background: COLOR_SURPLUS, borderRadius: '2px' }} />
+                    <span style={{ fontSize: '9px', color: THEME.textSub }}>잉여 (살찜)</span>
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+                    <div style={{ width: '8px', height: '8px', background: COLOR_DEFICIT, borderRadius: '2px' }} />
+                    <span style={{ fontSize: '9px', color: THEME.textSub }}>적자 (빠짐)</span>
+                  </div>
+                </div>
               )}
             </div>
 
@@ -628,53 +847,19 @@ export default function DietLog({ user, onDietUpdate, tableOverride, trainerIdFi
               <NutrientChart nutrientKey={activeNutrient} color={currentNutrient.color} />
             )}
 
-            {activeNutrient === 'calories' && (
-              <div style={{ display: 'flex', justifyContent: 'center', gap: '12px', padding: '6px 0', borderTop: `0.5px solid ${THEME.border}`, marginTop: '8px' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                  <div style={{ width: '10px', height: '10px', background: '#FCD34D', borderRadius: '2px' }} />
-                  <span style={{ fontSize: '10px', color: THEME.textSub }}>섭취</span>
-                </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                  <div style={{ width: '10px', height: '10px', background: '#FF6B6B', borderRadius: '2px' }} />
-                  <span style={{ fontSize: '10px', color: THEME.textSub }}>소비</span>
-                </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                  <div style={{ width: '10px', height: '10px', background: COLOR_TODAY, borderRadius: '2px' }} />
-                  <span style={{ fontSize: '10px', color: THEME.textSub }}>{statMode === 'week' ? '오늘' : '이번달'}</span>
-                </div>
-              </div>
-            )}
-
-            {activeNutrient === 'net' && (
-              <div style={{ display: 'flex', justifyContent: 'center', gap: '12px', padding: '6px 0', borderTop: `0.5px solid ${THEME.border}`, marginTop: '8px', flexWrap: 'wrap' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                  <div style={{ width: '10px', height: '10px', background: COLOR_SURPLUS, borderRadius: '2px' }} />
-                  <span style={{ fontSize: '10px', color: THEME.textSub }}>잉여 (살찜)</span>
-                </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                  <div style={{ width: '10px', height: '10px', background: COLOR_DEFICIT, borderRadius: '2px' }} />
-                  <span style={{ fontSize: '10px', color: THEME.textSub }}>적자 (빠짐)</span>
-                </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                  <div style={{ width: '10px', height: '10px', background: COLOR_TODAY, borderRadius: '2px' }} />
-                  <span style={{ fontSize: '10px', color: THEME.textSub }}>{statMode === 'week' ? '오늘' : '이번달'}</span>
-                </div>
-              </div>
-            )}
-
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: '4px', marginTop: '10px' }}>
               {NUTRIENTS.map(n => (
                 <button
                   key={n.key}
                   onClick={() => setActiveNutrient(n.key)}
                   style={{
-                    background: activeNutrient === n.key ? '#2A2A2A' : '#F5F3EF',
-                    color: activeNutrient === n.key ? '#FFF' : '#888',
+                    background: activeNutrient === n.key ? THEME.primaryDark : THEME.borderLight,
+                    color: activeNutrient === n.key ? '#FFF' : THEME.textSub,
                     border: 'none',
                     borderRadius: '14px',
-                    padding: '7px 2px',
+                    padding: '6px 2px',
                     fontSize: '10px',
-                    fontWeight: activeNutrient === n.key ? '600' : '400',
+                    fontWeight: activeNutrient === n.key ? '500' : '400',
                     cursor: 'pointer'
                   }}
                 >{n.label}</button>
@@ -684,26 +869,31 @@ export default function DietLog({ user, onDietUpdate, tableOverride, trainerIdFi
 
           {statMode === 'week' && (
             <>
-              <p style={{ fontSize: '11px', color: THEME.textSub, fontWeight: '600', margin: '0 0 8px' }}>일자별 영양소</p>
+              <p style={{ fontSize: '11px', color: THEME.textSub, fontWeight: '500', margin: '0 0 7px' }}>일자별 영양소</p>
               {weekDates.filter(d => weekDailyTotals[d].calories > 0 || weekDailyTotals[d].burned > 0).length === 0 ? (
-                <p style={{ color: THEME.textSub, fontSize: '13px', textAlign: 'center', padding: '12px 0' }}>기록이 없습니다</p>
+                <p style={{ color: THEME.textSub, fontSize: '12px', textAlign: 'center', padding: '12px 0' }}>기록이 없습니다</p>
               ) : (
                 weekDates.filter(d => weekDailyTotals[d].calories > 0 || weekDailyTotals[d].burned > 0).map(date => {
                   const d = weekDailyTotals[date]
                   const isTodayLine = date === today
-                  const net = d.calories - d.burned
+                  const hasMeal = d.calories > 0
+                  const net = hasMeal ? (d.calories - d.tdee) : 0
                   return (
-                    <div key={date} style={{ padding: '8px 10px', background: isTodayLine ? THEME.primaryLight : THEME.cardAlt, borderRadius: '8px', marginBottom: '6px', border: isTodayLine ? `0.5px solid ${THEME.primary}` : 'none' }}>
+                    <div key={date} style={{ padding: '8px 11px', background: isTodayLine ? THEME.primaryLight : THEME.cardAlt, borderRadius: '8px', marginBottom: '5px', border: isTodayLine ? `0.5px solid ${THEME.primaryAccent}` : 'none' }}>
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                        <span style={{ fontSize: '12px', color: isTodayLine ? THEME.primary : THEME.text, fontWeight: isTodayLine ? '700' : '500' }}>
+                        <span style={{ fontSize: '11px', color: isTodayLine ? THEME.primaryDark : THEME.text, fontWeight: '500' }}>
                           {date.replace(/-/g, '.')} {isTodayLine && '(오늘)'}
                         </span>
-                        <span style={{ fontSize: '12px', fontWeight: '700', color: net >= 0 ? COLOR_SURPLUS : COLOR_DEFICIT }}>
-                          {net >= 0 ? '+' : ''}{Math.round(net)}
-                        </span>
+                        {hasMeal ? (
+                          <span style={{ fontSize: '12px', fontWeight: '500', color: net >= 0 ? COLOR_SURPLUS : COLOR_DEFICIT }}>
+                            {net >= 0 ? '+' : ''}{Math.round(net)}
+                          </span>
+                        ) : (
+                          <span style={{ fontSize: '11px', color: THEME.textHint }}>식단 없음</span>
+                        )}
                       </div>
-                      <p style={{ fontSize: '10px', color: THEME.textSub, margin: '3px 0 0' }}>
-                        섭취 {Math.round(d.calories)} · 소비 {Math.round(d.burned)} · 탄수화물 {Math.round(d.carbs)}g · 단백질 {Math.round(d.protein)}g · 지방 {Math.round(d.fat)}g
+                      <p style={{ fontSize: '10px', color: THEME.textSub, margin: '2px 0 0' }}>
+                        섭취 {Math.round(d.calories)} · 소비 {Math.round(d.burned)} · 탄 {Math.round(d.carbs)}g · 단 {Math.round(d.protein)}g · 지 {Math.round(d.fat)}g
                       </p>
                     </div>
                   )
@@ -714,26 +904,31 @@ export default function DietLog({ user, onDietUpdate, tableOverride, trainerIdFi
 
           {statMode === 'year' && (
             <>
-              <p style={{ fontSize: '11px', color: THEME.textSub, fontWeight: '600', margin: '0 0 8px' }}>월별 평균</p>
+              <p style={{ fontSize: '11px', color: THEME.textSub, fontWeight: '500', margin: '0 0 7px' }}>월별 평균</p>
               {recordedMonths === 0 ? (
-                <p style={{ color: THEME.textSub, fontSize: '13px', textAlign: 'center', padding: '12px 0' }}>기록이 없습니다</p>
+                <p style={{ color: THEME.textSub, fontSize: '12px', textAlign: 'center', padding: '12px 0' }}>기록이 없습니다</p>
               ) : (
                 Object.entries(yearMonthlyAvg).filter(([, v]) => v.days > 0).map(([month, d]) => {
                   const m = parseInt(month)
                   const isThisMonthLine = isThisYear && m === thisMonth
-                  const net = d.calories - d.burned
+                  const hasMeal = d.calories > 0
+                  const net = hasMeal ? (d.calories - d.tdee) : 0
                   return (
-                    <div key={month} style={{ padding: '8px 10px', background: isThisMonthLine ? THEME.primaryLight : THEME.cardAlt, borderRadius: '8px', marginBottom: '6px', border: isThisMonthLine ? `0.5px solid ${THEME.primary}` : 'none' }}>
+                    <div key={month} style={{ padding: '8px 11px', background: isThisMonthLine ? THEME.primaryLight : THEME.cardAlt, borderRadius: '8px', marginBottom: '5px', border: isThisMonthLine ? `0.5px solid ${THEME.primaryAccent}` : 'none' }}>
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                        <span style={{ fontSize: '12px', color: isThisMonthLine ? THEME.primary : THEME.text, fontWeight: isThisMonthLine ? '700' : '500' }}>
+                        <span style={{ fontSize: '11px', color: isThisMonthLine ? THEME.primaryDark : THEME.text, fontWeight: '500' }}>
                           {statValue}년 {m}월 {isThisMonthLine && '(이번달)'} · {d.days}일 기록
                         </span>
-                        <span style={{ fontSize: '12px', fontWeight: '700', color: net >= 0 ? COLOR_SURPLUS : COLOR_DEFICIT }}>
-                          {net >= 0 ? '+' : ''}{Math.round(net)}
-                        </span>
+                        {hasMeal ? (
+                          <span style={{ fontSize: '12px', fontWeight: '500', color: net >= 0 ? COLOR_SURPLUS : COLOR_DEFICIT }}>
+                            {net >= 0 ? '+' : ''}{Math.round(net)}
+                          </span>
+                        ) : (
+                          <span style={{ fontSize: '11px', color: THEME.textHint }}>식단 없음</span>
+                        )}
                       </div>
-                      <p style={{ fontSize: '10px', color: THEME.textSub, margin: '3px 0 0' }}>
-                        섭취 {Math.round(d.calories)} · 소비 {Math.round(d.burned)} · 탄수화물 {Math.round(d.carbs)}g · 단백질 {Math.round(d.protein)}g · 지방 {Math.round(d.fat)}g
+                      <p style={{ fontSize: '10px', color: THEME.textSub, margin: '2px 0 0' }}>
+                        섭취 {Math.round(d.calories)} · 소비 {Math.round(d.burned)} · 탄 {Math.round(d.carbs)}g · 단 {Math.round(d.protein)}g · 지 {Math.round(d.fat)}g
                       </p>
                     </div>
                   )

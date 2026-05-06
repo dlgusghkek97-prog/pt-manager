@@ -60,7 +60,8 @@ export default function DatePicker({ value, onChange, mode = 'day', showTodayBut
     }
   }
 
-  const goToday = () => {
+  const goToday = (e) => {
+    e.stopPropagation()
     if (typeof onChange !== 'function') return
     if (mode === 'day') onChange(today)
     else if (mode === 'month') onChange(today.substring(0, 7))
@@ -92,11 +93,11 @@ export default function DatePicker({ value, onChange, mode = 'day', showTodayBut
   }
 
   const todayLabel = () => {
-    if (mode === 'day') return '오늘로'
+    if (mode === 'day') return '오늘'
     if (mode === 'month') return '이번달'
     if (mode === 'week') return '이번주'
     if (mode === 'year') return '올해'
-    return '오늘로'
+    return '오늘'
   }
 
   const openPicker = () => {
@@ -110,76 +111,81 @@ export default function DatePicker({ value, onChange, mode = 'day', showTodayBut
   const showToday = !isToday() && showTodayButton
 
   return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontFamily: 'inherit' }}>
-      <div style={{
-        flex: 1,
-        background: '#FFF',
-        borderRadius: '10px',
-        border: `0.5px solid ${THEME.border}`,
-        display: 'flex',
-        alignItems: 'center',
-        overflow: 'hidden',
-        height: '38px'
-      }}>
-        <button
-          onClick={() => moveDate(-1)}
-          style={{ background: 'transparent', border: 'none', color: THEME.primary, fontSize: '13px', width: '36px', height: '100%', cursor: 'pointer', fontWeight: '600', padding: 0, flexShrink: 0 }}
-        >◀</button>
+    <div style={{
+      position: 'relative',
+      background: '#FFF',
+      borderRadius: '9px',
+      border: `0.5px solid ${THEME.border}`,
+      display: 'flex',
+      alignItems: 'center',
+      overflow: 'hidden',
+      height: '36px',
+      width: '100%',
+      fontFamily: 'inherit'
+    }}>
+      <button
+        onClick={() => moveDate(-1)}
+        style={{ background: 'transparent', border: 'none', color: THEME.primary, fontSize: '11px', width: '32px', height: '100%', cursor: 'pointer', fontWeight: '500', padding: 0, flexShrink: 0 }}
+      >◀</button>
 
-        <div
-          onClick={openPicker}
-          style={{
-            flex: 1,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            height: '100%',
-            borderLeft: '0.5px solid #eee',
-            borderRight: '0.5px solid #eee',
-            cursor: mode === 'day' && typeof onChange === 'function' ? 'pointer' : 'default',
-            position: 'relative'
-          }}
-        >
-          <span style={{ fontSize: '14px', fontWeight: '600', color: THEME.text, letterSpacing: '0.3px' }}>
-            {formatLabel()}
-          </span>
-          {mode === 'day' && (
-            <input
-              ref={inputRef}
-              type="date"
-              value={value || today}
-              onChange={e => typeof onChange === 'function' && onChange(e.target.value)}
-              style={{
-                position: 'absolute',
-                opacity: 0,
-                pointerEvents: 'none',
-                width: 0,
-                height: 0
-              }}
-            />
-          )}
-        </div>
-
-        <button
-          onClick={() => moveDate(1)}
-          style={{ background: 'transparent', border: 'none', color: THEME.primary, fontSize: '13px', width: '36px', height: '100%', cursor: 'pointer', fontWeight: '600', padding: 0, flexShrink: 0 }}
-        >▶</button>
+      <div
+        onClick={openPicker}
+        style={{
+          flex: 1,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          height: '100%',
+          borderLeft: `0.5px solid ${THEME.borderLight}`,
+          borderRight: `0.5px solid ${THEME.borderLight}`,
+          cursor: mode === 'day' && typeof onChange === 'function' ? 'pointer' : 'default',
+          position: 'relative',
+          minWidth: 0
+        }}
+      >
+        <span style={{ fontSize: '13px', fontWeight: '500', color: THEME.text, letterSpacing: '0.2px' }}>
+          {formatLabel()}
+        </span>
+        {mode === 'day' && (
+          <input
+            ref={inputRef}
+            type="date"
+            value={value || today}
+            onChange={e => typeof onChange === 'function' && onChange(e.target.value)}
+            style={{
+              position: 'absolute',
+              opacity: 0,
+              pointerEvents: 'none',
+              width: 0,
+              height: 0
+            }}
+          />
+        )}
       </div>
+
+      <button
+        onClick={() => moveDate(1)}
+        style={{ background: 'transparent', border: 'none', color: THEME.primary, fontSize: '11px', width: '32px', height: '100%', cursor: 'pointer', fontWeight: '500', padding: 0, flexShrink: 0 }}
+      >▶</button>
 
       {showToday && (
         <button
           onClick={goToday}
           style={{
+            position: 'absolute',
+            right: '50px',
+            top: '50%',
+            transform: 'translateY(-50%)',
             background: THEME.primary,
             color: '#FFF',
             border: 'none',
-            padding: '0 12px',
-            height: '38px',
-            borderRadius: '10px',
-            fontSize: '11px',
+            padding: '2px 7px',
+            borderRadius: '5px',
+            fontSize: '9px',
             fontWeight: '500',
             cursor: 'pointer',
-            flexShrink: 0,
+            lineHeight: '1.4',
+            fontFamily: 'inherit',
             whiteSpace: 'nowrap'
           }}
         >{todayLabel()}</button>
