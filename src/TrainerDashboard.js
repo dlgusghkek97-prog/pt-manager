@@ -5,7 +5,19 @@ import WorkoutLog from './WorkoutLog'
 import WorkoutStats from './WorkoutStats'
 import DietLog from './DietLog'
 import HelpModal from './HelpModal'
+import MemberNotes from './MemberNotes'
 import DatePicker from './DatePicker'
+
+const NOTE_COLOR_POOL = [
+  { name: '코랄', bg: '#FCE4E0', text: '#8E3D2E' },
+  { name: '앰버', bg: '#FFF7E6', text: '#8B6F2A' },
+  { name: '그린', bg: '#E8F2EE', text: '#2F5C45' },
+  { name: '블루', bg: '#E6F2F4', text: '#2F6B7A' },
+  { name: '퍼플', bg: '#F0E8F2', text: '#5C3D6E' },
+  { name: '핑크', bg: '#FBE8EE', text: '#8E3D5C' },
+  { name: '브라운', bg: '#FBEDDB', text: '#8B5E2E' },
+  { name: '틸', bg: '#E0F2EE', text: '#2A6B5E' },
+]
 
 export default function TrainerDashboard({ user, onLogout }) {
   const [view, setView] = useState('members')
@@ -35,9 +47,7 @@ export default function TrainerDashboard({ user, onLogout }) {
   const [trainerTodayDiet, setTrainerTodayDiet] = useState([])
   const [showCalcModal, setShowCalcModal] = useState(false)
 
-  // 회원 식단 설정 모달
   const [showMemberCalcModal, setShowMemberCalcModal] = useState(false)
-  // 회원의 macro 입력값들 (모달에서 사용, DB에서 로드/저장)
   const [memberGoal, setMemberGoal] = useState('다이어트')
   const [memberGender, setMemberGender] = useState('여성')
   const [memberWeight, setMemberWeight] = useState('')
@@ -53,6 +63,10 @@ export default function TrainerDashboard({ user, onLogout }) {
 
   const [showHelp, setShowHelp] = useState(false)
   const [editStartDateMember, setEditStartDateMember] = useState(null)
+
+  const [showNotesMember, setShowNotesMember] = useState(null)
+  const [importantNotes, setImportantNotes] = useState([])
+  const [memberCategories, setMemberCategories] = useState([])
 
   const [goal, setGoal] = useState(() => localStorage.getItem(`tmacro_goal_${user.id}`) || '벌크업')
   const [gender, setGender] = useState(() => localStorage.getItem(`tmacro_gender_${user.id}`) || '남성')
@@ -137,7 +151,14 @@ export default function TrainerDashboard({ user, onLogout }) {
     await saveTrainerMacro(updated)
   }
 
-  // ============ 회원 macro 관련 함수 ============
+  const loadMemberNotes = async (memberId) => {
+    const [{ data: cats }, { data: nts }] = await Promise.all([
+      supabase.from('member_note_categories').select('*').eq('member_id', memberId).order('created_at'),
+      supabase.from('member_notes').select('*').eq('member_id', memberId).eq('is_important', true).order('created_at', { ascending: false })
+    ])
+    setMemberCategories(cats || [])
+    setImportantNotes(nts || [])
+  }
 
   const loadMemberMacroFromDB = async (memberId) => {
     const { data, error } = await supabase
@@ -240,8 +261,6 @@ export default function TrainerDashboard({ user, onLogout }) {
     await saveMemberMacroToDB(selectedMember.id, updated)
   }
 
-  // ============ 기존 함수들 ============
-
   const loadStatsByDate = async (memberList, date) => {
     const stats = {}
     for (const m of memberList) {
@@ -255,7 +274,6 @@ export default function TrainerDashboard({ user, onLogout }) {
       const carbs = (dLogs || []).reduce((s, r) => s + (r.carbs || 0), 0)
       const protein = (dLogs || []).reduce((s, r) => s + (r.protein || 0), 0)
       const fat = (dLogs || []).reduce((s, r) => s + (r.fat || 0), 0)
-      // DB의 target 컬럼에서 직접 macro 가져오기
       const hasTarget = m.target_calories || m.target_carbs || m.target_protein || m.target_fat
       const macro = hasTarget ? {
         target: m.target_calories || 0,
@@ -369,8 +387,8 @@ export default function TrainerDashboard({ user, onLogout }) {
     loadMemberLogs(member.id)
     loadMemberExercises(member.id, new Date().toISOString().split('T')[0])
     loadMemberTodayDiet(member.id)
+    loadMemberNotes(member.id)
 
-    // DB에서 회원 macro 정보 전체 로드
     const memData = await loadMemberMacroFromDB(member.id)
     if (memData) {
       setMemberMacro(memData.macro)
@@ -460,7 +478,6 @@ export default function TrainerDashboard({ user, onLogout }) {
     </div>
   )
 
-  // 회원 목표 카드 - 트레이너가 직접 수정 가능 (input)
   const MemberMacroCard = ({ macro, todayDiet }) => {
     if (!macro) {
       return (
@@ -693,6 +710,14 @@ export default function TrainerDashboard({ user, onLogout }) {
 
         {showHelp && <HelpModal type="trainer" onClose={() => setShowHelp(false)} />}
 
+        {showNotesMember && (
+          <MemberNotes
+            member={showNotesMember}
+            onClose={() => setShowNotesMember(null)}
+            onUpdate={() => loadMemberNotes(showNotesMember.id)}
+          />
+        )}
+
         {showCalcModal && (
           <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.5)', zIndex: 1000, display: 'flex', alignItems: 'flex-end', justifyContent: 'center' }}>
             <div style={{ background: '#FFF', borderRadius: '20px 20px 0 0', padding: '20px', width: '100%', maxWidth: '480px', maxHeight: '85vh', overflowY: 'auto' }}>
@@ -906,8 +931,43 @@ export default function TrainerDashboard({ user, onLogout }) {
         {view === 'memberDetail' && selectedMember && (
           <>
             <div style={{ background: THEME.primaryLight, border: `0.5px solid ${THEME.primaryAccent}`, borderRadius: '12px', padding: '12px 16px', marginBottom: '12px' }}>
-              <p style={{ fontSize: '15px', fontWeight: '500', color: THEME.primaryDark, margin: '0 0 2px' }}>{selectedMember.name}</p>
-              <p style={{ fontSize: '12px', color: THEME.textSub, margin: 0 }}>{selectedMember.goal} · {selectedMember.gender} · {selectedMember.code}</p>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '8px' }}>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <p style={{ fontSize: '15px', fontWeight: '500', color: THEME.primaryDark, margin: '0 0 2px' }}>{selectedMember.name}</p>
+                  <p style={{ fontSize: '12px', color: THEME.textSub, margin: 0 }}>{selectedMember.goal} · {selectedMember.gender} · {selectedMember.code}</p>
+                </div>
+                <button
+                  onClick={() => setShowNotesMember(selectedMember)}
+                  style={{ background: '#FFF', border: `0.5px solid ${THEME.primaryAccent}`, color: THEME.primary, padding: '5px 11px', borderRadius: '14px', fontSize: '11px', fontWeight: '500', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px', flexShrink: 0 }}
+                >
+                  <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke={THEME.primary} strokeWidth="2" strokeLinecap="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+                  메모
+                </button>
+              </div>
+
+              {importantNotes.length > 0 && (
+                <div style={{ marginTop: '10px', paddingTop: '10px', borderTop: `0.5px dashed ${THEME.primaryAccent}` }}>
+                  {importantNotes.map(note => {
+                    const cat = memberCategories.find(c => c.id === note.category_id)
+                    const color = cat ? (NOTE_COLOR_POOL.find(c => c.name === cat.color) || NOTE_COLOR_POOL[0]) : null
+                    return (
+                      <div key={note.id} style={{ display: 'flex', alignItems: 'flex-start', gap: '6px', marginBottom: '5px' }}>
+                        {cat && color && (
+                          <span style={{ fontSize: '9px', background: color.bg, color: color.text, padding: '2px 6px', borderRadius: '4px', fontWeight: '500', flexShrink: 0, marginTop: '1px' }}>
+                            {cat.name}
+                          </span>
+                        )}
+                        {!cat && (
+                          <span style={{ fontSize: '9px', background: THEME.borderLight, color: THEME.textSub, padding: '2px 6px', borderRadius: '4px', fontWeight: '500', flexShrink: 0, marginTop: '1px' }}>
+                            미분류
+                          </span>
+                        )}
+                        <span style={{ fontSize: '11px', color: THEME.text, lineHeight: '1.5', whiteSpace: 'pre-wrap' }}>{note.content}</span>
+                      </div>
+                    )
+                  })}
+                </div>
+              )}
             </div>
 
             <MemberMacroCard macro={memberMacro} todayDiet={memberTodayDiet} />
