@@ -324,9 +324,12 @@ export const getLatestRecord = (allLogs, bodyPart, exerciseName) => {
   }
 }
 
-// ─── 인바디 관련 함수들 (NEW) ───
+// ─── 인바디 관련 함수들 (NEW v2 - 케이스 C: trainer_inbody에 trainer_id + member_id) ───
 
-// 인바디 측정 기록 로드 (날짜 오름차순)
+// 인바디 측정 기록 로드 (단일 테이블, 날짜 오름차순)
+// 사용 예:
+//   회원: loadInbody(memberId)
+//   트레이너 본인: loadInbody(trainerId, 'trainer_inbody', 'trainer_id')
 export const loadInbody = async (userId, table = 'member_inbody', idField = 'member_id') => {
   const { data, error } = await supabase
     .from(table)
@@ -337,11 +340,62 @@ export const loadInbody = async (userId, table = 'member_inbody', idField = 'mem
     console.error('[loadInbody] error:', error)
     return []
   }
-  return data || []
+  // 메타정보 부착 (수정/삭제 시 어느 테이블 행인지 알기 위함)
+  return (data || []).map(r => ({
+    ...r,
+    _source: table === 'trainer_inbody' ? 'trainer' : 'member',
+    _table: table,
+  }))
+}
+
+// 특정 회원의 모든 인바디 기록을 합쳐서 로드 (member_inbody + trainer_inbody)
+// 추이 모달에서 사용. 회원 화면이든 트레이너 화면이든 동일하게 호출.
+// memberId: 대상 회원의 UUID
+export const loadInbodyMerged = async (memberId) => {
+  if (!memberId) return []
+
+  const [memberRes, trainerRes] = await Promise.all([
+    supabase
+      .from('member_inbody')
+      .select('*')
+      .eq('member_id', memberId)
+      .order('measured_date', { ascending: true }),
+    supabase
+      .from('trainer_inbody')
+      .select('*')
+      .eq('member_id', memberId)
+      .order('measured_date', { ascending: true }),
+  ])
+
+  if (memberRes.error) console.error('[loadInbodyMerged] member error:', memberRes.error)
+  if (trainerRes.error) console.error('[loadInbodyMerged] trainer error:', trainerRes.error)
+
+  const memberData = (memberRes.data || []).map(r => ({
+    ...r,
+    _source: 'member',
+    _table: 'member_inbody',
+  }))
+  const trainerData = (trainerRes.data || []).map(r => ({
+    ...r,
+    _source: 'trainer',
+    _table: 'trainer_inbody',
+  }))
+
+  // 날짜 오름차순으로 합쳐서 정렬 (같은 날짜면 created_at 순)
+  const merged = [...memberData, ...trainerData].sort((a, b) => {
+    if (a.measured_date !== b.measured_date) {
+      return a.measured_date.localeCompare(b.measured_date)
+    }
+    return (a.created_at || '').localeCompare(b.created_at || '')
+  })
+
+  return merged
 }
 
 // 인바디 측정 기록 추가
-export const addInbody = async (userId, record, table = 'member_inbody', idField = 'member_id') => {
+// 회원이 입력: addInbody(memberId, record)  -> member_inbody
+// 트레이너가 회원의 인바디 입력: addInbody(trainerId, record, 'trainer_inbody', 'trainer_id', { member_id: memberId })
+export const addInbody = async (userId, record, table = 'member_inbody', idField = 'member_id', extra = {}) => {
   const { measured_date, weight, muscle_mass, body_fat_percent } = record
   if (!measured_date || !weight || !muscle_mass || !body_fat_percent) {
     return { success: false, error: '모든 항목을 입력해주세요' }
@@ -352,6 +406,7 @@ export const addInbody = async (userId, record, table = 'member_inbody', idField
     weight: parseFloat(weight),
     muscle_mass: parseFloat(muscle_mass),
     body_fat_percent: parseFloat(body_fat_percent),
+    ...extra, // trainer_inbody에 member_id 추가용
   }
   const { data, error } = await supabase
     .from(table)
@@ -366,6 +421,7 @@ export const addInbody = async (userId, record, table = 'member_inbody', idField
 }
 
 // 인바디 측정 기록 수정
+// table: 'member_inbody' | 'trainer_inbody' (어느 테이블의 행인지 명시 필요)
 export const updateInbody = async (recordId, record, table = 'member_inbody') => {
   const { measured_date, weight, muscle_mass, body_fat_percent } = record
   const payload = {
@@ -384,6 +440,7 @@ export const updateInbody = async (recordId, record, table = 'member_inbody') =>
 }
 
 // 인바디 측정 기록 삭제
+// table: 'member_inbody' | 'trainer_inbody'
 export const deleteInbody = async (recordId, table = 'member_inbody') => {
   const { error } = await supabase.from(table).delete().eq('id', recordId)
   if (error) {
