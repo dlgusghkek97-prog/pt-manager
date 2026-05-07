@@ -1,5 +1,5 @@
 import React, { useState } from 'react'
-import { PARTS, PART_COLORS, S, THEME, getWeekNum, weekLabels } from './utils'
+import { PARTS, PART_COLORS, S, THEME, getWeekNum, weekLabels, calcPRs } from './utils'
 
 export default function WorkoutStats({ allLogs }) {
   const [statsTab, setStatsTab] = useState('daily')
@@ -13,7 +13,6 @@ export default function WorkoutStats({ allLogs }) {
   const monthStr = String(viewMonth).padStart(2, '0')
   const monthLogs = allLogs.filter(r => r.log_date && r.log_date.startsWith(`${yearStr}-${monthStr}`))
 
-  // 일간
   const byDay = {}
   monthLogs.forEach(row => {
     if (!byDay[row.log_date]) byDay[row.log_date] = { total: 0, parts: {} }
@@ -21,7 +20,6 @@ export default function WorkoutStats({ allLogs }) {
     if (row.body_part) byDay[row.log_date].parts[row.body_part] = (byDay[row.log_date].parts[row.body_part] || 0) + (row.volume || 0)
   })
 
-  // 주간
   const weeklyByPart = Array.from({ length: 5 }, () => { const o = {}; PARTS.forEach(p => o[p] = 0); return o })
   const weeklyTotals = [0, 0, 0, 0, 0]
   monthLogs.forEach(row => {
@@ -30,7 +28,6 @@ export default function WorkoutStats({ allLogs }) {
     weeklyTotals[wk] += row.volume || 0
   })
 
-  // 월간
   const monthlyByMonth = {}
   for (let m = 1; m <= 12; m++) {
     const mStr = String(m).padStart(2, '0')
@@ -56,15 +53,11 @@ export default function WorkoutStats({ allLogs }) {
 
   const formatVol = (v) => v >= 1000 ? (v / 1000).toFixed(1) + 't' : v + 'kg'
 
-  // 캘린더용: 해당 월의 1일 요일과 마지막 날짜 계산
-  const firstDayOfWeek = new Date(viewYear, viewMonth - 1, 1).getDay() // 0=일, 1=월...
+  const firstDayOfWeek = new Date(viewYear, viewMonth - 1, 1).getDay()
   const lastDate = new Date(viewYear, viewMonth, 0).getDate()
 
-  // 7x6 캘린더 셀 배열 만들기
   const calendarCells = []
-  // 앞쪽 빈 셀
   for (let i = 0; i < firstDayOfWeek; i++) calendarCells.push(null)
-  // 날짜 셀
   for (let d = 1; d <= lastDate; d++) {
     const dateStr = `${yearStr}-${monthStr}-${String(d).padStart(2, '0')}`
     calendarCells.push({
@@ -73,7 +66,6 @@ export default function WorkoutStats({ allLogs }) {
       data: byDay[dateStr] || null,
     })
   }
-  // 뒤쪽 빈 셀 (7의 배수까지)
   while (calendarCells.length % 7 !== 0) calendarCells.push(null)
 
   const selectedData = byDay[selectedDate]
@@ -81,15 +73,16 @@ export default function WorkoutStats({ allLogs }) {
   const selectedDayWeekday = selectedDate ? new Date(selectedDate).getDay() : null
   const weekdayKor = ['일', '월', '화', '수', '목', '금', '토']
   const isSelectedToday = selectedDate === todayStr
-  // 선택한 날이 현재 보고 있는 월에 속하는지
   const selectedInView = selectedDate && selectedDate.startsWith(`${yearStr}-${monthStr}`)
+
+  const prs = calcPRs(allLogs)
 
   const YearMonthPicker = () => (
     <div style={{ display: 'flex', gap: '6px' }}>
       <select value={viewYear} onChange={e => setViewYear(parseInt(e.target.value))} style={{ padding: '5px 9px', borderRadius: '6px', border: 'none', background: THEME.borderLight, fontSize: '11px', color: THEME.text, fontFamily: 'inherit', outline: 'none' }}>
         {yearOptions.map(y => <option key={y} value={y}>{y}년</option>)}
       </select>
-      {statsTab !== 'monthly' && (
+      {statsTab !== 'monthly' && statsTab !== 'pr' && (
         <select value={viewMonth} onChange={e => setViewMonth(parseInt(e.target.value))} style={{ padding: '5px 9px', borderRadius: '6px', border: 'none', background: THEME.borderLight, fontSize: '11px', color: THEME.text, fontFamily: 'inherit', outline: 'none' }}>
           {Array.from({ length: 12 }, (_, i) => i + 1).map(m => <option key={m} value={m}>{m}월</option>)}
         </select>
@@ -99,7 +92,6 @@ export default function WorkoutStats({ allLogs }) {
 
   return (
     <div>
-      {/* 요약 카드 */}
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '8px', marginBottom: '10px' }}>
         {[
           { label: '오늘', val: todayTotal, color: THEME.nutCarbsDark },
@@ -115,13 +107,12 @@ export default function WorkoutStats({ allLogs }) {
         ))}
       </div>
 
-      {/* 탭 */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '6px', marginBottom: '10px' }}>
-        {['daily', 'weekly', 'monthly'].map((t, i) => {
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: '6px', marginBottom: '10px' }}>
+        {['daily', 'weekly', 'monthly', 'pr'].map((t, i) => {
           const active = statsTab === t
           return (
             <button key={t} style={{
-              padding: '8px',
+              padding: '8px 4px',
               borderRadius: '8px',
               border: 'none',
               background: active ? THEME.primaryAccent : '#FFF',
@@ -130,13 +121,12 @@ export default function WorkoutStats({ allLogs }) {
               fontWeight: active ? '500' : '400',
               cursor: 'pointer'
             }} onClick={() => setStatsTab(t)}>
-              {['일간', '주간', '월간'][i]}
+              {['일간', '주간', '월간', 'PR'][i]}
             </button>
           )
         })}
       </div>
 
-      {/* 일간 - 캘린더 뷰 */}
       {statsTab === 'daily' && (
         <div style={S.card}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
@@ -144,7 +134,6 @@ export default function WorkoutStats({ allLogs }) {
             <YearMonthPicker />
           </div>
 
-          {/* 요일 헤더 */}
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: '4px', marginBottom: '4px' }}>
             {weekdayKor.map((w, i) => (
               <span key={w} style={{
@@ -156,7 +145,6 @@ export default function WorkoutStats({ allLogs }) {
             ))}
           </div>
 
-          {/* 캘린더 그리드 */}
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: '4px' }}>
             {calendarCells.map((cell, idx) => {
               if (!cell) return <div key={`empty-${idx}`} />
@@ -168,7 +156,6 @@ export default function WorkoutStats({ allLogs }) {
               const weekday = new Date(dateStr).getDay()
               const activeParts = data ? Object.entries(data.parts).filter(([, v]) => v > 0).sort((a, b) => b[1] - a[1]) : []
 
-              // 색상 결정
               let bg, numColor, volColor
               if (isSelected) {
                 bg = THEME.primary
@@ -239,7 +226,6 @@ export default function WorkoutStats({ allLogs }) {
             })}
           </div>
 
-          {/* 범례 */}
           <div style={{
             display: 'flex',
             flexWrap: 'wrap',
@@ -257,7 +243,6 @@ export default function WorkoutStats({ allLogs }) {
             ))}
           </div>
 
-          {/* 선택한 날 상세 */}
           {selectedInView && (
             <div style={{
               marginTop: '12px',
@@ -339,7 +324,6 @@ export default function WorkoutStats({ allLogs }) {
         </div>
       )}
 
-      {/* 주간 */}
       {statsTab === 'weekly' && (
         <div style={S.card}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
@@ -371,7 +355,6 @@ export default function WorkoutStats({ allLogs }) {
         </div>
       )}
 
-      {/* 월간 */}
       {statsTab === 'monthly' && (
         <div style={S.card}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
@@ -397,6 +380,63 @@ export default function WorkoutStats({ allLogs }) {
               ))}
             </div>
           ))}
+        </div>
+      )}
+
+      {statsTab === 'pr' && (
+        <div style={S.card}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+            <p style={{ ...S.cardTitle, margin: 0 }}>개인 최고 기록 (PR)</p>
+            <span style={{ fontSize: '10px', color: THEME.textHint }}>{prs.length}개 운동</span>
+          </div>
+
+          {prs.length === 0 ? (
+            <p style={{ color: THEME.textSub, fontSize: '12px', textAlign: 'center', padding: '20px 0' }}>
+              아직 운동 기록이 없습니다
+            </p>
+          ) : (
+            <>
+              {PARTS.map(part => {
+                const partPRs = prs.filter(p => p.body_part === part)
+                if (partPRs.length === 0) return null
+                return (
+                  <div key={part} style={{ marginBottom: '14px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '7px' }}>
+                      <span style={{
+                        fontSize: '10px',
+                        color: '#FFF',
+                        background: PART_COLORS[part],
+                        padding: '2px 8px',
+                        borderRadius: '4px',
+                        fontWeight: '500',
+                      }}>{part}</span>
+                      <span style={{ fontSize: '10px', color: THEME.textSub }}>{partPRs.length}개 운동</span>
+                    </div>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px' }}>
+                      {partPRs.map((pr, i) => (
+                        <div key={i} style={{
+                          background: THEME.cardAlt,
+                          border: `0.5px solid ${THEME.border}`,
+                          borderRadius: '8px',
+                          padding: '8px 10px',
+                        }}>
+                          <p style={{ fontSize: '10px', color: THEME.textSub, margin: '0 0 3px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            {pr.exercise_name}
+                          </p>
+                          <p style={{ fontSize: '15px', color: THEME.primary, fontWeight: '500', margin: '0 0 2px', letterSpacing: '-0.3px' }}>
+                            {pr.maxWeight}<span style={{ fontSize: '9px', color: THEME.textSub, fontWeight: '400' }}>kg × {pr.maxWeightReps}회</span>
+                          </p>
+                          <p style={{ fontSize: '9px', color: THEME.textHint, margin: 0 }}>
+                            {pr.maxWeightDate.replace(/-/g, '.')} · {pr.totalSessions}회 운동
+                          </p>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )
+              })}
+            </>
+          )}
         </div>
       )}
     </div>

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react'
 import { supabase } from './supabase'
-import { S, THEME, PART_COLORS, generateCode, calcMacro, CYCLE_PHASES } from './utils'
+import { S, THEME, PART_COLORS, generateCode, calcMacro, CYCLE_PHASES, loadFavorites } from './utils'
 import WorkoutLog from './WorkoutLog'
 import WorkoutStats from './WorkoutStats'
 import DietLog from './DietLog'
@@ -34,6 +34,8 @@ export default function TrainerDashboard({ user, onLogout }) {
   const [exercises, setExercises] = useState([])
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0])
   const [allLogs, setAllLogs] = useState([])
+  const [memberFavorites, setMemberFavorites] = useState([])
+  const [trainerFavorites, setTrainerFavorites] = useState([])
   const [topTab, setTopTab] = useState('members')
   const [memberMacro, setMemberMacro] = useState(null)
   const [memberTodayDiet, setMemberTodayDiet] = useState([])
@@ -76,11 +78,21 @@ export default function TrainerDashboard({ user, onLogout }) {
   const [intensity, setIntensity] = useState(() => localStorage.getItem(`tmacro_intensity_${user.id}`) || '일반')
   const [cyclePhase, setCyclePhase] = useState(() => localStorage.getItem(`tmacro_cycle_${user.id}`) || '')
 
-  useEffect(() => { loadMembers(); loadTrainerMacro(); loadTrainerTodayDiet() }, [])
+  useEffect(() => { loadMembers(); loadTrainerMacro(); loadTrainerTodayDiet(); loadTrainerFavorites() }, [])
 
   useEffect(() => {
     if (members.length > 0) loadStatsByDate(members, memberListDate)
   }, [memberListDate])
+
+  const loadTrainerFavorites = async () => {
+    const data = await loadFavorites(user.id, 'trainer_favorite_exercises', 'trainer_id')
+    setTrainerFavorites(data)
+  }
+
+  const loadMemberFavorites = async (memberId) => {
+    const data = await loadFavorites(memberId, 'member_favorite_exercises', 'member_id')
+    setMemberFavorites(data)
+  }
 
   const loadMembers = async () => {
     const { data } = await supabase.from('members').select('*').eq('trainer_id', user.id).order('created_at', { ascending: false })
@@ -388,6 +400,7 @@ export default function TrainerDashboard({ user, onLogout }) {
     loadMemberExercises(member.id, new Date().toISOString().split('T')[0])
     loadMemberTodayDiet(member.id)
     loadMemberNotes(member.id)
+    loadMemberFavorites(member.id)
 
     const memData = await loadMemberMacroFromDB(member.id)
     if (memData) {
@@ -914,7 +927,7 @@ export default function TrainerDashboard({ user, onLogout }) {
             {trainerMainTab === 'workout' && (
               <>
                 <SubTabs value={trainerSubTab} onChange={setTrainerSubTab} />
-                {trainerSubTab === 'log' && <WorkoutLog user={trainerAsUser} selectedDate={selectedDate} setSelectedDate={setSelectedDate} exercises={exercises} setExercises={setExercises} onUpdate={loadTrainerLogs} tableOverride="trainer_workout_logs" trainerIdField="trainer_id" weight={weight} muscle={muscle} />}
+                {trainerSubTab === 'log' && <WorkoutLog user={trainerAsUser} selectedDate={selectedDate} setSelectedDate={setSelectedDate} exercises={exercises} setExercises={setExercises} onUpdate={loadTrainerLogs} tableOverride="trainer_workout_logs" trainerIdField="trainer_id" weight={weight} muscle={muscle} allLogs={allLogs} favorites={trainerFavorites} onFavoritesUpdate={loadTrainerFavorites} />}
                 {trainerSubTab === 'stats' && <WorkoutStats allLogs={allLogs} />}
               </>
             )}
@@ -980,7 +993,7 @@ export default function TrainerDashboard({ user, onLogout }) {
             {memberMainTab === 'workout' && (
               <>
                 <SubTabs value={memberSubTab} onChange={setMemberSubTab} />
-                {memberSubTab === 'log' && <WorkoutLog user={selectedMember} selectedDate={selectedDate} setSelectedDate={setSelectedDate} exercises={exercises} setExercises={setExercises} onUpdate={async () => { await loadMemberLogs(selectedMember.id) }} weight={memberWeight} muscle={memberMuscle} />}
+                {memberSubTab === 'log' && <WorkoutLog user={selectedMember} selectedDate={selectedDate} setSelectedDate={setSelectedDate} exercises={exercises} setExercises={setExercises} onUpdate={async () => { await loadMemberLogs(selectedMember.id) }} weight={memberWeight} muscle={memberMuscle} allLogs={allLogs} favorites={memberFavorites} onFavoritesUpdate={() => loadMemberFavorites(selectedMember.id)} />}
                 {memberSubTab === 'stats' && <WorkoutStats allLogs={allLogs} />}
               </>
             )}

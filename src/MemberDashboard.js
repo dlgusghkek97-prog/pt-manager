@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react'
 import { supabase } from './supabase'
-import { S, THEME, calcMacro, CYCLE_PHASES } from './utils'
+import { S, THEME, calcMacro, CYCLE_PHASES, loadFavorites } from './utils'
 import WorkoutLog from './WorkoutLog'
 import WorkoutStats from './WorkoutStats'
 import DietLog from './DietLog'
@@ -13,6 +13,7 @@ export default function MemberDashboard({ user, onLogout }) {
 
   const [exercises, setExercises] = useState([{ slot: 1, exercise_type: 'weight', body_part: '', exercise_name: '', memo: '', description: '', sets: [{ id: null, weight: '', reps: '', media_url: '' }] }])
   const [allLogs, setAllLogs] = useState([])
+  const [favorites, setFavorites] = useState([])
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0])
   const [showCalcModal, setShowCalcModal] = useState(false)
   const [todayDiet, setTodayDiet] = useState([])
@@ -32,7 +33,12 @@ export default function MemberDashboard({ user, onLogout }) {
     } catch { return null }
   })
 
-  useEffect(() => { loadAllLogs(); loadTodayDiet(); loadMacroFromDB() }, [])
+  useEffect(() => { loadAllLogs(); loadTodayDiet(); loadMacroFromDB(); loadAllFavorites() }, [])
+
+  const loadAllFavorites = async () => {
+    const data = await loadFavorites(user.id, 'member_favorite_exercises', 'member_id')
+    setFavorites(data)
+  }
 
   const loadMacroFromDB = async () => {
     const { data, error } = await supabase
@@ -305,7 +311,7 @@ export default function MemberDashboard({ user, onLogout }) {
         {mainTab === 'workout' && (
           <>
             <SubTabs value={workoutSubTab} onChange={setWorkoutSubTab} />
-            {workoutSubTab === 'log' && <WorkoutLog user={user} selectedDate={selectedDate} setSelectedDate={setSelectedDate} exercises={exercises} setExercises={setExercises} onUpdate={loadAllLogs} weight={weight} muscle={muscle} />}
+            {workoutSubTab === 'log' && <WorkoutLog user={user} selectedDate={selectedDate} setSelectedDate={setSelectedDate} exercises={exercises} setExercises={setExercises} onUpdate={loadAllLogs} weight={weight} muscle={muscle} allLogs={allLogs} favorites={favorites} onFavoritesUpdate={loadAllFavorites} />}
             {workoutSubTab === 'stats' && <WorkoutStats allLogs={allLogs} />}
           </>
         )}
