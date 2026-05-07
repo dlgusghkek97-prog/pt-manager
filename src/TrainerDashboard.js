@@ -7,6 +7,7 @@ import DietLog from './DietLog'
 import HelpModal from './HelpModal'
 import MemberNotes from './MemberNotes'
 import DatePicker from './DatePicker'
+import InbodyModal from './InbodyModal'
 
 const NOTE_COLOR_POOL = [
   { name: '코랄', bg: '#FCE4E0', text: '#8E3D2E' },
@@ -69,6 +70,10 @@ export default function TrainerDashboard({ user, onLogout }) {
   const [showNotesMember, setShowNotesMember] = useState(null)
   const [importantNotes, setImportantNotes] = useState([])
   const [memberCategories, setMemberCategories] = useState([])
+
+  // 인바디 모달 상태 (트레이너가 회원 인바디 입력/추이 보기)
+  const [inbodyOpen, setInbodyOpen] = useState(false)
+  const [inbodyChartOpen, setInbodyChartOpen] = useState(false)
 
   const [goal, setGoal] = useState(() => localStorage.getItem(`tmacro_goal_${user.id}`) || '벌크업')
   const [gender, setGender] = useState(() => localStorage.getItem(`tmacro_gender_${user.id}`) || '남성')
@@ -693,6 +698,22 @@ export default function TrainerDashboard({ user, onLogout }) {
     )
   }
 
+  // 회원정보 박스 안에서 쓸 작은 액션 버튼 스타일
+  const memberActionBtn = {
+    background: '#FFF',
+    border: `0.5px solid ${THEME.primaryAccent}`,
+    color: THEME.primary,
+    padding: '5px 11px',
+    borderRadius: '14px',
+    fontSize: '11px',
+    fontWeight: '500',
+    cursor: 'pointer',
+    display: 'flex',
+    alignItems: 'center',
+    gap: '4px',
+    flexShrink: 0,
+  }
+
   return (
     <div style={S.container}>
       <div style={S.wrap}>
@@ -728,6 +749,32 @@ export default function TrainerDashboard({ user, onLogout }) {
             member={showNotesMember}
             onClose={() => setShowNotesMember(null)}
             onUpdate={() => loadMemberNotes(showNotesMember.id)}
+          />
+        )}
+
+        {/* 인바디 입력 모달 (트레이너가 선택한 회원의 인바디 입력) */}
+        {selectedMember && (
+          <InbodyModal
+            user={user}
+            memberId={selectedMember.id}
+            isOpen={inbodyOpen}
+            mode="input"
+            onClose={() => setInbodyOpen(false)}
+            table="trainer_inbody"
+            idField="trainer_id"
+          />
+        )}
+
+        {/* 인바디 추이 모달 (회원/트레이너 합쳐서 표시) */}
+        {selectedMember && (
+          <InbodyModal
+            user={user}
+            memberId={selectedMember.id}
+            isOpen={inbodyChartOpen}
+            mode="chart"
+            onClose={() => setInbodyChartOpen(false)}
+            table="trainer_inbody"
+            idField="trainer_id"
           />
         )}
 
@@ -949,13 +996,14 @@ export default function TrainerDashboard({ user, onLogout }) {
                   <p style={{ fontSize: '15px', fontWeight: '500', color: THEME.primaryDark, margin: '0 0 2px' }}>{selectedMember.name}</p>
                   <p style={{ fontSize: '12px', color: THEME.textSub, margin: 0 }}>{selectedMember.goal} · {selectedMember.gender} · {selectedMember.code}</p>
                 </div>
-                <button
-                  onClick={() => setShowNotesMember(selectedMember)}
-                  style={{ background: '#FFF', border: `0.5px solid ${THEME.primaryAccent}`, color: THEME.primary, padding: '5px 11px', borderRadius: '14px', fontSize: '11px', fontWeight: '500', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px', flexShrink: 0 }}
-                >
-                  <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke={THEME.primary} strokeWidth="2" strokeLinecap="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
-                  메모
-                </button>
+                <div style={{ display: 'flex', gap: '4px', flexShrink: 0, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+                  <button onClick={() => setShowNotesMember(selectedMember)} style={memberActionBtn}>
+                    <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke={THEME.primary} strokeWidth="2" strokeLinecap="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+                    메모
+                  </button>
+                  <button onClick={() => setInbodyOpen(true)} style={memberActionBtn}>인바디</button>
+                  <button onClick={() => setInbodyChartOpen(true)} style={memberActionBtn}>추이</button>
+                </div>
               </div>
 
               {importantNotes.length > 0 && (

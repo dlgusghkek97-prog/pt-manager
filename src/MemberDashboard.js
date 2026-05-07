@@ -5,6 +5,7 @@ import WorkoutLog from './WorkoutLog'
 import WorkoutStats from './WorkoutStats'
 import DietLog from './DietLog'
 import HelpModal from './HelpModal'
+import InbodyModal from './InbodyModal'
 
 export default function MemberDashboard({ user, onLogout }) {
   const [mainTab, setMainTab] = useState('workout')
@@ -18,6 +19,10 @@ export default function MemberDashboard({ user, onLogout }) {
   const [showCalcModal, setShowCalcModal] = useState(false)
   const [todayDiet, setTodayDiet] = useState([])
   const [showHelp, setShowHelp] = useState(false)
+
+  // 인바디 모달 상태
+  const [inbodyOpen, setInbodyOpen] = useState(false)
+  const [inbodyChartOpen, setInbodyChartOpen] = useState(false)
 
   const [goal, setGoal] = useState(() => localStorage.getItem(`macro_goal_${user.id}`) || user.goal || '다이어트')
   const [gender, setGender] = useState(() => localStorage.getItem(`macro_gender_${user.id}`) || user.gender || '여성')
@@ -150,6 +155,22 @@ export default function MemberDashboard({ user, onLogout }) {
     </div>
   )
 
+  // 인바디 작은 버튼 스타일
+  const inbodyBtnStyle = {
+    background: '#FFF',
+    border: `0.5px solid ${THEME.primaryAccent}`,
+    color: THEME.primary,
+    padding: '0 10px',
+    borderRadius: '12px',
+    cursor: 'pointer',
+    fontSize: '11px',
+    fontWeight: '500',
+    height: '26px',
+    display: 'flex',
+    alignItems: 'center',
+    flexShrink: 0,
+  }
+
   const MainTabBtn = ({ tabKey, label }) => {
     const active = mainTab === tabKey
     return (
@@ -200,9 +221,13 @@ export default function MemberDashboard({ user, onLogout }) {
     <div style={S.container}>
       <div style={S.wrap}>
         <div style={S.header}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flex: 1, minWidth: 0 }}>
             <PTLogo />
-            <span style={{ fontSize: '14px', color: THEME.text, fontWeight: '500' }}>{user.name}님</span>
+            <span style={{ fontSize: '14px', color: THEME.text, fontWeight: '500', flexShrink: 0 }}>{user.name}님</span>
+            <div style={{ display: 'flex', gap: '4px', marginLeft: '4px' }}>
+              <button style={inbodyBtnStyle} onClick={() => setInbodyOpen(true)}>인바디</button>
+              <button style={inbodyBtnStyle} onClick={() => setInbodyChartOpen(true)}>추이</button>
+            </div>
           </div>
           <div style={{ display: 'flex', gap: '5px', alignItems: 'center' }}>
             <button
@@ -217,6 +242,28 @@ export default function MemberDashboard({ user, onLogout }) {
         </div>
 
         {showHelp && <HelpModal type="member" onClose={() => setShowHelp(false)} />}
+
+        {/* 인바디 입력 모달 */}
+        <InbodyModal
+          user={user}
+          memberId={user.id}
+          isOpen={inbodyOpen}
+          mode="input"
+          onClose={() => setInbodyOpen(false)}
+          table="member_inbody"
+          idField="member_id"
+        />
+
+        {/* 인바디 추이 모달 */}
+        <InbodyModal
+          user={user}
+          memberId={user.id}
+          isOpen={inbodyChartOpen}
+          mode="chart"
+          onClose={() => setInbodyChartOpen(false)}
+          table="member_inbody"
+          idField="member_id"
+        />
 
         {showCalcModal && (
           <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.5)', zIndex: 1000, display: 'flex', alignItems: 'flex-end', justifyContent: 'center' }}>
