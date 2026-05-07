@@ -50,7 +50,6 @@ export const calcMacro = ({ goal, gender, weight, muscle, activity, intensity, c
   return { bmr, tdee, target, protein, fat, carbs }
 }
 
-// 웨이트 운동 순수 소비 칼로리 (BMR 제외, 옵션 C 절충안)
 export function calcWeightCalories({ volume = 0, totalSets = 0, weight, muscle }) {
   const w = parseFloat(weight) || 70
   const hours = (totalSets * 2.0) / 60
@@ -99,6 +98,9 @@ export const THEME = {
   surplus: '#5A9CAB',
   deficit: '#C5705C',
   todayHighlight: '#5A8E72',
+  inbodyWeight: '#5A8E72',
+  inbodyMuscle: '#5A9CAB',
+  inbodyFat: '#C28A52',
 }
 
 export const ICONS = {
@@ -159,7 +161,6 @@ export const calcTDEE = (macroResult, goal, intensity) => {
   return target - adj - 100
 }
 
-// PR(Personal Record) 계산 - 운동별 최고 무게/볼륨
 export const calcPRs = (allLogs) => {
   const prs = {}
   ;(allLogs || []).forEach(log => {
@@ -199,16 +200,12 @@ export const calcPRs = (allLogs) => {
   return Object.values(prs).sort((a, b) => b.maxWeight - a.maxWeight)
 }
 
-// 새 PR 갱신 체크 - 즐겨찾기 등록된 운동만 체크
-// favorites: [{body_part, exercise_name}, ...]
 export const checkNewPRs = (allLogs, todayDate, favorites = []) => {
   if (!allLogs || allLogs.length === 0) return []
   if (!favorites || favorites.length === 0) return []
 
-  // 즐겨찾기 키 셋 (빠른 조회용)
   const favSet = new Set(favorites.map(f => `${f.body_part}_${f.exercise_name}`))
 
-  // 오늘 기록한 웨이트 운동 중 즐겨찾기에 있는 것만
   const todayLogs = allLogs.filter(l =>
     l.log_date === todayDate &&
     l.exercise_type !== 'cardio' &&
@@ -217,7 +214,6 @@ export const checkNewPRs = (allLogs, todayDate, favorites = []) => {
   )
   if (todayLogs.length === 0) return []
 
-  // 운동별로 오늘 최고 무게 그룹핑
   const todayMaxByExercise = {}
   todayLogs.forEach(log => {
     const w = parseFloat(log.weight) || 0
@@ -234,7 +230,6 @@ export const checkNewPRs = (allLogs, todayDate, favorites = []) => {
 
   const newPRs = []
 
-  // 각 운동에 대해 과거 최고 기록과 비교
   Object.entries(todayMaxByExercise).forEach(([key, today]) => {
     const prevLogs = allLogs.filter(l =>
       l.log_date < todayDate &&
@@ -261,7 +256,6 @@ export const checkNewPRs = (allLogs, todayDate, favorites = []) => {
   return newPRs
 }
 
-// 즐겨찾기 운동 로드 (회원/트레이너 공용)
 export const loadFavorites = async (userId, table = 'member_favorite_exercises', idField = 'member_id') => {
   const { data, error } = await supabase
     .from(table)
@@ -275,7 +269,6 @@ export const loadFavorites = async (userId, table = 'member_favorite_exercises',
   return data || []
 }
 
-// 즐겨찾기 운동 추가
 export const addFavorite = async (userId, bodyPart, exerciseName, table = 'member_favorite_exercises', idField = 'member_id') => {
   if (!bodyPart || !exerciseName) return { success: false, error: '부위와 운동명이 필요합니다' }
   const payload = {
@@ -299,7 +292,6 @@ export const addFavorite = async (userId, bodyPart, exerciseName, table = 'membe
   return { success: true, data }
 }
 
-// 즐겨찾기 운동 삭제
 export const removeFavorite = async (favoriteId, table = 'member_favorite_exercises') => {
   const { error } = await supabase.from(table).delete().eq('id', favoriteId)
   if (error) {
@@ -309,8 +301,6 @@ export const removeFavorite = async (favoriteId, table = 'member_favorite_exerci
   return { success: true }
 }
 
-// 특정 운동의 가장 최근 기록 가져오기 (즐겨찾기 칩 클릭 시 표시용)
-// 결과: { date, weight, reps } 또는 null
 export const getLatestRecord = (allLogs, bodyPart, exerciseName) => {
   if (!allLogs || !bodyPart || !exerciseName) return null
   const matched = allLogs.filter(l =>
@@ -321,7 +311,6 @@ export const getLatestRecord = (allLogs, bodyPart, exerciseName) => {
     parseInt(l.reps) > 0
   )
   if (matched.length === 0) return null
-  // 가장 최근 날짜 → 그 날짜 중 무게 최대값
   matched.sort((a, b) => b.log_date.localeCompare(a.log_date))
   const latestDate = matched[0].log_date
   const sameDay = matched.filter(l => l.log_date === latestDate)
@@ -332,5 +321,99 @@ export const getLatestRecord = (allLogs, bodyPart, exerciseName) => {
     date: latestDate,
     weight: parseFloat(best.weight),
     reps: parseInt(best.reps),
+  }
+}
+
+// ─── 인바디 관련 함수들 (NEW) ───
+
+// 인바디 측정 기록 로드 (날짜 오름차순)
+export const loadInbody = async (userId, table = 'member_inbody', idField = 'member_id') => {
+  const { data, error } = await supabase
+    .from(table)
+    .select('*')
+    .eq(idField, userId)
+    .order('measured_date', { ascending: true })
+  if (error) {
+    console.error('[loadInbody] error:', error)
+    return []
+  }
+  return data || []
+}
+
+// 인바디 측정 기록 추가
+export const addInbody = async (userId, record, table = 'member_inbody', idField = 'member_id') => {
+  const { measured_date, weight, muscle_mass, body_fat_percent } = record
+  if (!measured_date || !weight || !muscle_mass || !body_fat_percent) {
+    return { success: false, error: '모든 항목을 입력해주세요' }
+  }
+  const payload = {
+    [idField]: userId,
+    measured_date,
+    weight: parseFloat(weight),
+    muscle_mass: parseFloat(muscle_mass),
+    body_fat_percent: parseFloat(body_fat_percent),
+  }
+  const { data, error } = await supabase
+    .from(table)
+    .insert(payload)
+    .select()
+    .single()
+  if (error) {
+    console.error('[addInbody] error:', error)
+    return { success: false, error: error.message }
+  }
+  return { success: true, data }
+}
+
+// 인바디 측정 기록 수정
+export const updateInbody = async (recordId, record, table = 'member_inbody') => {
+  const { measured_date, weight, muscle_mass, body_fat_percent } = record
+  const payload = {
+    measured_date,
+    weight: parseFloat(weight),
+    muscle_mass: parseFloat(muscle_mass),
+    body_fat_percent: parseFloat(body_fat_percent),
+    updated_at: new Date().toISOString(),
+  }
+  const { error } = await supabase.from(table).update(payload).eq('id', recordId)
+  if (error) {
+    console.error('[updateInbody] error:', error)
+    return { success: false, error: error.message }
+  }
+  return { success: true }
+}
+
+// 인바디 측정 기록 삭제
+export const deleteInbody = async (recordId, table = 'member_inbody') => {
+  const { error } = await supabase.from(table).delete().eq('id', recordId)
+  if (error) {
+    console.error('[deleteInbody] error:', error)
+    return { success: false, error: error.message }
+  }
+  return { success: true }
+}
+
+// 인바디 요약 통계 (현재값, 최고/최저값, 첫 측정 대비 변화량)
+export const getInbodyStats = (inbodyList, metric = 'weight') => {
+  if (!inbodyList || inbodyList.length === 0) {
+    return { current: 0, min: 0, max: 0, diff: 0, diffPercent: 0, count: 0 }
+  }
+  const values = inbodyList.map(r => parseFloat(r[metric]) || 0).filter(v => v > 0)
+  if (values.length === 0) {
+    return { current: 0, min: 0, max: 0, diff: 0, diffPercent: 0, count: 0 }
+  }
+  const current = values[values.length - 1]
+  const first = values[0]
+  const min = Math.min(...values)
+  const max = Math.max(...values)
+  const diff = Math.round((current - first) * 10) / 10
+  const diffPercent = first > 0 ? Math.round((current - first) / first * 1000) / 10 : 0
+  return {
+    current,
+    min,
+    max,
+    diff,
+    diffPercent,
+    count: values.length,
   }
 }
