@@ -1,13 +1,60 @@
-import React, { useState } from 'react'
-import { PARTS, PART_COLORS, S, THEME, getWeekNum, weekLabels, calcPRs } from './utils'
+import React, { useState, useEffect } from 'react'
+import { PARTS, PART_COLORS, S, THEME, getWeekNum, weekLabels, calcPRs, BIG4_EXERCISES, loadBig4PRs, saveBig4PR } from './utils'
 
-export default function WorkoutStats({ allLogs }) {
+export default function WorkoutStats({ allLogs, memberId }) {
   const [statsTab, setStatsTab] = useState('daily')
   const today = new Date()
   const todayStr = today.toISOString().split('T')[0]
   const [viewYear, setViewYear] = useState(today.getFullYear())
   const [viewMonth, setViewMonth] = useState(today.getMonth() + 1)
   const [selectedDate, setSelectedDate] = useState(todayStr)
+
+  // ─── 4대 종목 PR 상태 ───
+  const [big4State, setBig4State] = useState({})
+  const [big4Loading, setBig4Loading] = useState(false)
+  const [big4Draft, setBig4Draft] = useState({})
+
+  useEffect(() => {
+    if (statsTab === 'pr' && memberId) {
+      reloadBig4()
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [statsTab, memberId])
+
+  const reloadBig4 = async () => {
+    if (!memberId) return
+    setBig4Loading(true)
+    const data = await loadBig4PRs(memberId)
+    setBig4State(data)
+    const draft = {}
+    BIG4_EXERCISES.forEach(({ key }) => {
+      draft[key] = {
+        weight: data[key]?.weight != null ? String(data[key].weight) : '',
+        reps: data[key]?.reps != null ? String(data[key].reps) : '',
+      }
+    })
+    setBig4Draft(draft)
+    setBig4Loading(false)
+  }
+
+  const handleBig4Change = (key, field, value) => {
+    setBig4Draft(prev => ({
+      ...prev,
+      [key]: { ...(prev[key] || {}), [field]: value }
+    }))
+  }
+
+  const handleBig4Save = async (key) => {
+    if (!memberId) return
+    const draft = big4Draft[key] || {}
+    if (draft.weight === '' && draft.reps === '') return
+    const result = await saveBig4PR(memberId, key, draft.weight, draft.reps)
+    if (!result.success) {
+      alert('저장 실패: ' + result.error)
+      return
+    }
+    await reloadBig4()
+  }
 
   const yearStr = String(viewYear)
   const monthStr = String(viewMonth).padStart(2, '0')
@@ -89,6 +136,24 @@ export default function WorkoutStats({ allLogs }) {
       )}
     </div>
   )
+
+  // ─── 4대 종목 카드 입력 스타일 (A안: 같은 크기 한 줄) ───
+  const big4Input = {
+    background: 'transparent',
+    border: 'none',
+    outline: 'none',
+    fontSize: '20px',
+    fontWeight: '500',
+    color: THEME.primaryDark,
+    width: '50px',
+    padding: 0,
+    fontFamily: 'inherit',
+    textAlign: 'right',
+  }
+  const big4InputReps = {
+    ...big4Input,
+    width: '32px',
+  }
 
   return (
     <div>
@@ -384,60 +449,126 @@ export default function WorkoutStats({ allLogs }) {
       )}
 
       {statsTab === 'pr' && (
-        <div style={S.card}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
-            <p style={{ ...S.cardTitle, margin: 0 }}>개인 최고 기록 (PR)</p>
-            <span style={{ fontSize: '10px', color: THEME.textHint }}>{prs.length}개 운동</span>
-          </div>
+        <>
+          {/* ─── 4대 종목 강조 카드 (A안 컴팩트) ─── */}
+          {memberId && (
+            <div style={{ ...S.card, padding: '12px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
+                <p style={{ ...S.cardTitle, margin: 0 }}>4대 종목 PR</p>
+                <span style={{ fontSize: '10px', color: THEME.textHint }}>탭하여 직접 수정</span>
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px' }}>
+                {BIG4_EXERCISES.map(({ key, label }) => {
+                  const draft = big4Draft[key] || { weight: '', reps: '' }
+                  const saved = big4State[key]
+                  const recordedDate = saved?.recorded_date
 
-          {prs.length === 0 ? (
-            <p style={{ color: THEME.textSub, fontSize: '12px', textAlign: 'center', padding: '20px 0' }}>
-              아직 운동 기록이 없습니다
-            </p>
-          ) : (
-            <>
-              {PARTS.map(part => {
-                const partPRs = prs.filter(p => p.body_part === part)
-                if (partPRs.length === 0) return null
-                return (
-                  <div key={part} style={{ marginBottom: '14px' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '7px' }}>
-                      <span style={{
-                        fontSize: '10px',
-                        color: '#FFF',
-                        background: PART_COLORS[part],
-                        padding: '2px 8px',
-                        borderRadius: '4px',
-                        fontWeight: '500',
-                      }}>{part}</span>
-                      <span style={{ fontSize: '10px', color: THEME.textSub }}>{partPRs.length}개 운동</span>
+                  return (
+                    <div key={key} style={{
+                      background: THEME.cardAlt,
+                      border: `0.5px solid ${THEME.primaryAccent}`,
+                      borderRadius: '10px',
+                      padding: '9px',
+                    }}>
+                      <div style={{ fontSize: '11px', color: THEME.primary, marginBottom: '6px', fontWeight: '500' }}>
+                        {label}
+                      </div>
+
+                      <div style={{ display: 'flex', alignItems: 'baseline', gap: '4px', whiteSpace: 'nowrap' }}>
+                        <input
+                          type="number"
+                          inputMode="decimal"
+                          placeholder="0"
+                          value={draft.weight}
+                          onChange={e => handleBig4Change(key, 'weight', e.target.value)}
+                          onBlur={() => handleBig4Save(key)}
+                          style={big4Input}
+                        />
+                        <span style={{ fontSize: '10px', color: THEME.textSub }}>kg</span>
+                        <span style={{ fontSize: '11px', color: THEME.textSub, margin: '0 2px' }}>×</span>
+                        <input
+                          type="number"
+                          inputMode="numeric"
+                          placeholder="0"
+                          value={draft.reps}
+                          onChange={e => handleBig4Change(key, 'reps', e.target.value)}
+                          onBlur={() => handleBig4Save(key)}
+                          style={big4InputReps}
+                        />
+                        <span style={{ fontSize: '10px', color: THEME.textSub }}>회</span>
+                      </div>
+
+                      <div style={{ fontSize: '9px', color: THEME.textHint, marginTop: '3px' }}>
+                        {recordedDate ? recordedDate.replace(/-/g, '.') : '미기록'}
+                      </div>
                     </div>
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px' }}>
-                      {partPRs.map((pr, i) => (
-                        <div key={i} style={{
-                          background: THEME.cardAlt,
-                          border: `0.5px solid ${THEME.border}`,
-                          borderRadius: '8px',
-                          padding: '8px 10px',
-                        }}>
-                          <p style={{ fontSize: '10px', color: THEME.textSub, margin: '0 0 3px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                            {pr.exercise_name}
-                          </p>
-                          <p style={{ fontSize: '15px', color: THEME.primary, fontWeight: '500', margin: '0 0 2px', letterSpacing: '-0.3px' }}>
-                            {pr.maxWeight}<span style={{ fontSize: '9px', color: THEME.textSub, fontWeight: '400' }}>kg × {pr.maxWeightReps}회</span>
-                          </p>
-                          <p style={{ fontSize: '9px', color: THEME.textHint, margin: 0 }}>
-                            {pr.maxWeightDate.replace(/-/g, '.')} · {pr.totalSessions}회 운동
-                          </p>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )
-              })}
-            </>
+                  )
+                })}
+              </div>
+              {big4Loading && (
+                <p style={{ fontSize: '10px', color: THEME.textHint, textAlign: 'center', marginTop: '8px' }}>
+                  로딩 중...
+                </p>
+              )}
+            </div>
           )}
-        </div>
+
+          {/* ─── 기존 PR 그리드 ─── */}
+          <div style={S.card}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+              <p style={{ ...S.cardTitle, margin: 0 }}>개인 최고 기록 (PR)</p>
+              <span style={{ fontSize: '10px', color: THEME.textHint }}>{prs.length}개 운동</span>
+            </div>
+
+            {prs.length === 0 ? (
+              <p style={{ color: THEME.textSub, fontSize: '12px', textAlign: 'center', padding: '20px 0' }}>
+                아직 운동 기록이 없습니다
+              </p>
+            ) : (
+              <>
+                {PARTS.map(part => {
+                  const partPRs = prs.filter(p => p.body_part === part)
+                  if (partPRs.length === 0) return null
+                  return (
+                    <div key={part} style={{ marginBottom: '14px' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '7px' }}>
+                        <span style={{
+                          fontSize: '10px',
+                          color: '#FFF',
+                          background: PART_COLORS[part],
+                          padding: '2px 8px',
+                          borderRadius: '4px',
+                          fontWeight: '500',
+                        }}>{part}</span>
+                        <span style={{ fontSize: '10px', color: THEME.textSub }}>{partPRs.length}개 운동</span>
+                      </div>
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px' }}>
+                        {partPRs.map((pr, i) => (
+                          <div key={i} style={{
+                            background: THEME.cardAlt,
+                            border: `0.5px solid ${THEME.border}`,
+                            borderRadius: '8px',
+                            padding: '8px 10px',
+                          }}>
+                            <p style={{ fontSize: '10px', color: THEME.textSub, margin: '0 0 3px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                              {pr.exercise_name}
+                            </p>
+                            <p style={{ fontSize: '15px', color: THEME.primary, fontWeight: '500', margin: '0 0 2px', letterSpacing: '-0.3px' }}>
+                              {pr.maxWeight}<span style={{ fontSize: '9px', color: THEME.textSub, fontWeight: '400' }}>kg × {pr.maxWeightReps}회</span>
+                            </p>
+                            <p style={{ fontSize: '9px', color: THEME.textHint, margin: 0 }}>
+                              {pr.maxWeightDate.replace(/-/g, '.')} · {pr.totalSessions}회 운동
+                            </p>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )
+                })}
+              </>
+            )}
+          </div>
+        </>
       )}
     </div>
   )

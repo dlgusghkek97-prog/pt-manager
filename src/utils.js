@@ -326,10 +326,6 @@ export const getLatestRecord = (allLogs, bodyPart, exerciseName) => {
 
 // ─── 인바디 관련 함수들 (NEW v2 - 케이스 C: trainer_inbody에 trainer_id + member_id) ───
 
-// 인바디 측정 기록 로드 (단일 테이블, 날짜 오름차순)
-// 사용 예:
-//   회원: loadInbody(memberId)
-//   트레이너 본인: loadInbody(trainerId, 'trainer_inbody', 'trainer_id')
 export const loadInbody = async (userId, table = 'member_inbody', idField = 'member_id') => {
   const { data, error } = await supabase
     .from(table)
@@ -340,7 +336,6 @@ export const loadInbody = async (userId, table = 'member_inbody', idField = 'mem
     console.error('[loadInbody] error:', error)
     return []
   }
-  // 메타정보 부착 (수정/삭제 시 어느 테이블 행인지 알기 위함)
   return (data || []).map(r => ({
     ...r,
     _source: table === 'trainer_inbody' ? 'trainer' : 'member',
@@ -348,9 +343,6 @@ export const loadInbody = async (userId, table = 'member_inbody', idField = 'mem
   }))
 }
 
-// 특정 회원의 모든 인바디 기록을 합쳐서 로드 (member_inbody + trainer_inbody)
-// 추이 모달에서 사용. 회원 화면이든 트레이너 화면이든 동일하게 호출.
-// memberId: 대상 회원의 UUID
 export const loadInbodyMerged = async (memberId) => {
   if (!memberId) return []
 
@@ -381,7 +373,6 @@ export const loadInbodyMerged = async (memberId) => {
     _table: 'trainer_inbody',
   }))
 
-  // 날짜 오름차순으로 합쳐서 정렬 (같은 날짜면 created_at 순)
   const merged = [...memberData, ...trainerData].sort((a, b) => {
     if (a.measured_date !== b.measured_date) {
       return a.measured_date.localeCompare(b.measured_date)
@@ -392,9 +383,6 @@ export const loadInbodyMerged = async (memberId) => {
   return merged
 }
 
-// 인바디 측정 기록 추가
-// 회원이 입력: addInbody(memberId, record)  -> member_inbody
-// 트레이너가 회원의 인바디 입력: addInbody(trainerId, record, 'trainer_inbody', 'trainer_id', { member_id: memberId })
 export const addInbody = async (userId, record, table = 'member_inbody', idField = 'member_id', extra = {}) => {
   const { measured_date, weight, muscle_mass, body_fat_percent } = record
   if (!measured_date || !weight || !muscle_mass || !body_fat_percent) {
@@ -406,7 +394,7 @@ export const addInbody = async (userId, record, table = 'member_inbody', idField
     weight: parseFloat(weight),
     muscle_mass: parseFloat(muscle_mass),
     body_fat_percent: parseFloat(body_fat_percent),
-    ...extra, // trainer_inbody에 member_id 추가용
+    ...extra,
   }
   const { data, error } = await supabase
     .from(table)
@@ -420,8 +408,6 @@ export const addInbody = async (userId, record, table = 'member_inbody', idField
   return { success: true, data }
 }
 
-// 인바디 측정 기록 수정
-// table: 'member_inbody' | 'trainer_inbody' (어느 테이블의 행인지 명시 필요)
 export const updateInbody = async (recordId, record, table = 'member_inbody') => {
   const { measured_date, weight, muscle_mass, body_fat_percent } = record
   const payload = {
@@ -439,8 +425,6 @@ export const updateInbody = async (recordId, record, table = 'member_inbody') =>
   return { success: true }
 }
 
-// 인바디 측정 기록 삭제
-// table: 'member_inbody' | 'trainer_inbody'
 export const deleteInbody = async (recordId, table = 'member_inbody') => {
   const { error } = await supabase.from(table).delete().eq('id', recordId)
   if (error) {
@@ -450,7 +434,6 @@ export const deleteInbody = async (recordId, table = 'member_inbody') => {
   return { success: true }
 }
 
-// 인바디 요약 통계 (현재값, 최고/최저값, 첫 측정 대비 변화량)
 export const getInbodyStats = (inbodyList, metric = 'weight') => {
   if (!inbodyList || inbodyList.length === 0) {
     return { current: 0, min: 0, max: 0, diff: 0, diffPercent: 0, count: 0 }
@@ -473,4 +456,87 @@ export const getInbodyStats = (inbodyList, metric = 'weight') => {
     diffPercent,
     count: values.length,
   }
+}
+
+// ─── 4대 종목 PR (NEW v3) ───
+// 회원당 종목당 1행 (UNIQUE 제약)
+// 회원/트레이너 둘 다 양방향 수정 가능
+
+export const BIG4_EXERCISES = [
+  { key: 'squat',    label: '스쿼트',         color: THEME.primary },
+  { key: 'deadlift', label: '데드리프트',     color: THEME.primary },
+  { key: 'bench',    label: '벤치 프레스',    color: THEME.primary },
+  { key: 'ohp',      label: '오버헤드 프레스', color: THEME.primary },
+]
+
+// 4대 종목 PR 모두 로드 (메모리 표현: { squat: {...}, deadlift: {...}, ... })
+export const loadBig4PRs = async (memberId) => {
+  if (!memberId) return {}
+
+  const { data, error } = await supabase
+    .from('personal_records')
+    .select('*')
+    .eq('member_id', memberId)
+    .in('exercise_key', ['squat', 'deadlift', 'bench', 'ohp'])
+
+  if (error) {
+    console.error('[loadBig4PRs] error:', error)
+    return {}
+  }
+
+  // exercise_key 별로 매핑
+  const result = {}
+  ;(data || []).forEach(row => {
+    result[row.exercise_key] = {
+      id: row.id,
+      weight: row.weight,
+      reps: row.reps,
+      recorded_date: row.recorded_date,
+      updated_at: row.updated_at,
+    }
+  })
+  return result
+}
+
+// 4대 종목 PR 1개 저장 (upsert: 회원당 종목당 1행 보장)
+export const saveBig4PR = async (memberId, exerciseKey, weight, reps) => {
+  if (!memberId || !exerciseKey) {
+    return { success: false, error: '필수 정보가 누락되었습니다' }
+  }
+  if (!['squat', 'deadlift', 'bench', 'ohp'].includes(exerciseKey)) {
+    return { success: false, error: '유효하지 않은 종목입니다' }
+  }
+
+  const w = weight === '' || weight === null ? null : parseFloat(weight)
+  const r = reps === '' || reps === null ? null : parseInt(reps)
+
+  if (w !== null && (isNaN(w) || w < 0)) {
+    return { success: false, error: '무게가 올바르지 않습니다' }
+  }
+  if (r !== null && (isNaN(r) || r < 0)) {
+    return { success: false, error: '횟수가 올바르지 않습니다' }
+  }
+
+  const today = new Date().toISOString().split('T')[0]
+  const payload = {
+    member_id: memberId,
+    exercise_key: exerciseKey,
+    weight: w,
+    reps: r,
+    recorded_date: today,
+    updated_at: new Date().toISOString(),
+  }
+
+  // upsert: member_id + exercise_key 조합이 이미 있으면 업데이트, 없으면 인서트
+  const { data, error } = await supabase
+    .from('personal_records')
+    .upsert(payload, { onConflict: 'member_id,exercise_key' })
+    .select()
+    .single()
+
+  if (error) {
+    console.error('[saveBig4PR] error:', error)
+    return { success: false, error: error.message }
+  }
+  return { success: true, data }
 }

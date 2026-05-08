@@ -10,7 +10,7 @@ const CameraIcon = ({ color = '#A8C8B5', size = 20 }) => (
   </svg>
 )
 
-const TimerIcon = ({ color = '#5A8E72', size = 14 }) => (
+const TimerIcon = ({ color = '#FFF', size = 22 }) => (
   <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round">
     <circle cx="12" cy="13" r="8"/>
     <path d="M12 9v4l2 2M9 2h6M12 6V2"/>
@@ -29,15 +29,20 @@ export default function WorkoutLog({ user, selectedDate, setSelectedDate, exerci
   const [previewIdx, setPreviewIdx] = useState(null)
   const fileInputRefs = useRef({})
 
+  // ─── 휴식 타이머 (FAB 방식) ───
   const [timerActive, setTimerActive] = useState(false)
+  const [timerPaused, setTimerPaused] = useState(false)
+  const [timerDone, setTimerDone] = useState(false)
   const [timerSeconds, setTimerSeconds] = useState(0)
-  const [timerTotal, setTimerTotal] = useState(0)
+  const [timerInitial, setTimerInitial] = useState(60)
   const [showTimerSetup, setShowTimerSetup] = useState(false)
   const [customSeconds, setCustomSeconds] = useState('60')
   const timerIntervalRef = useRef(null)
 
-  // 즐겨찾기 영역에서 활성화된 부위 탭 (각 운동 카드별로 따로 관리)
-  const [activeFavTab, setActiveFavTab] = useState({})
+  // ─── 즐겨찾기 모달 ───
+  const [showFavModal, setShowFavModal] = useState(false)
+  const [favModalExIdx, setFavModalExIdx] = useState(null)
+  const [favModalActivePart, setFavModalActivePart] = useState('')
 
   useEffect(() => {
     if (user?.id && selectedDate) {
@@ -47,12 +52,13 @@ export default function WorkoutLog({ user, selectedDate, setSelectedDate, exerci
   }, [user.id, selectedDate])
 
   useEffect(() => {
-    if (timerActive && timerSeconds > 0) {
+    if (timerActive && !timerPaused && timerSeconds > 0) {
       timerIntervalRef.current = setInterval(() => {
         setTimerSeconds(prev => {
           if (prev <= 1) {
             clearInterval(timerIntervalRef.current)
             setTimerActive(false)
+            setTimerDone(true)
             if (navigator.vibrate) navigator.vibrate([300, 100, 300, 100, 300])
             try {
               const ctx = new (window.AudioContext || window.webkitAudioContext)()
@@ -74,19 +80,37 @@ export default function WorkoutLog({ user, selectedDate, setSelectedDate, exerci
       clearInterval(timerIntervalRef.current)
     }
     return () => clearInterval(timerIntervalRef.current)
-  }, [timerActive])
+  }, [timerActive, timerPaused])
 
   const startTimer = (sec) => {
     setTimerSeconds(sec)
-    setTimerTotal(sec)
+    setTimerInitial(sec)
     setTimerActive(true)
+    setTimerPaused(false)
+    setTimerDone(false)
     setShowTimerSetup(false)
   }
 
-  const stopTimer = () => {
+  const restartTimer = () => {
+    setTimerSeconds(timerInitial)
+    setTimerActive(true)
+    setTimerPaused(false)
+    setTimerDone(false)
+  }
+
+  const togglePauseTimer = () => {
+    setTimerPaused(p => !p)
+  }
+
+  const closeTimer = () => {
     setTimerActive(false)
+    setTimerPaused(false)
+    setTimerDone(false)
     setTimerSeconds(0)
-    setTimerTotal(0)
+  }
+
+  const adjustTimer = (delta) => {
+    setTimerSeconds(s => Math.max(1, s + delta))
   }
 
   const formatTimer = (s) => {
@@ -94,6 +118,8 @@ export default function WorkoutLog({ user, selectedDate, setSelectedDate, exerci
     const ss = s % 60
     return `${String(m).padStart(2, '0')}:${String(ss).padStart(2, '0')}`
   }
+
+  const isTimerVisible = timerActive || timerDone
 
   const loadExercises = async (uid, date) => {
     const { data } = await supabase.from(TABLE).select('*').eq(ID_FIELD, uid).eq('log_date', date).order('slot').order('id')
@@ -330,7 +356,6 @@ export default function WorkoutLog({ user, selectedDate, setSelectedDate, exerci
     return (w * r).toLocaleString()
   }
 
-  // ─── 즐겨찾기 관련 함수 ───
   const findFavorite = (bodyPart, exerciseName) => {
     if (!favorites || !bodyPart || !exerciseName) return null
     return favorites.find(f => f.body_part === bodyPart && f.exercise_name === exerciseName.trim())
@@ -356,11 +381,22 @@ export default function WorkoutLog({ user, selectedDate, setSelectedDate, exerci
     if (onFavoritesUpdate) await onFavoritesUpdate()
   }
 
-  const handleChipClick = (exIdx, bodyPart, exerciseName) => {
+  const openFavModal = (exIdx) => {
+    const ex = exercises[exIdx]
+    setFavModalExIdx(exIdx)
+    const partsWith = getPartsWithFavorites()
+    setFavModalActivePart(ex.body_part || partsWith[0] || '')
+    setShowFavModal(true)
+  }
+
+  const handleChipClick = (bodyPart, exerciseName) => {
+    if (favModalExIdx === null) return
     const u = JSON.parse(JSON.stringify(exercises))
-    u[exIdx].body_part = bodyPart
-    u[exIdx].exercise_name = exerciseName
+    u[favModalExIdx].body_part = bodyPart
+    u[favModalExIdx].exercise_name = exerciseName
     setExercises(u)
+    setShowFavModal(false)
+    setFavModalExIdx(null)
   }
 
   const getFavoritesByPart = (bodyPart) => {
@@ -373,7 +409,6 @@ export default function WorkoutLog({ user, selectedDate, setSelectedDate, exerci
     const parts = new Set(favorites.map(f => f.body_part))
     return PARTS.filter(p => parts.has(p))
   }
-  // ─── 즐겨찾기 끝 ───
 
   const weightExercises = exercises.filter(ex => ex.exercise_type !== 'cardio')
   const cardioExercises = exercises.filter(ex => ex.exercise_type === 'cardio')
@@ -389,7 +424,6 @@ export default function WorkoutLog({ user, selectedDate, setSelectedDate, exerci
   const cardioCaloriesTotal = cardioExercises.reduce((s, ex) => s + (ex.calories_burned || 0), 0)
   const totalBurnedCalories = weightCalories + cardioCaloriesTotal
 
-  // PR 알림 - 즐겨찾기 등록된 운동만
   const newPRs = checkNewPRs(allLogs || [], selectedDate, favorites || [])
 
   const inputBase = {
@@ -403,11 +437,12 @@ export default function WorkoutLog({ user, selectedDate, setSelectedDate, exerci
     fontFamily: 'inherit'
   }
 
+  // 세트 행 컴팩트 스타일
   const setNumInput = {
-    padding: '5px 4px',
+    padding: '2px 4px',
     borderRadius: '5px',
     border: `0.5px solid ${THEME.border}`,
-    fontSize: '13px',
+    fontSize: '12px',
     textAlign: 'center',
     width: '100%',
     boxSizing: 'border-box',
@@ -422,9 +457,12 @@ export default function WorkoutLog({ user, selectedDate, setSelectedDate, exerci
 
   const previewMediaUrl = previewIdx !== null ? exercises[previewIdx]?.sets[0]?.media_url : null
 
-  const timerProgress = timerTotal > 0 ? Math.round((timerSeconds / timerTotal) * 100) : 0
-
   const partsWithFav = getPartsWithFavorites()
+
+  const widgetBg = timerDone ? THEME.primaryAccent : THEME.primary
+  const widgetText = timerDone ? THEME.primaryDark : '#FFF'
+  const widgetSubBtnBg = timerDone ? 'rgba(47,92,69,0.15)' : 'rgba(255,255,255,0.2)'
+  const widgetSubBtnColor = timerDone ? THEME.primaryDark : '#FFF'
 
   return (
     <div>
@@ -491,23 +529,16 @@ export default function WorkoutLog({ user, selectedDate, setSelectedDate, exerci
       )}
 
       {showTimerSetup && (
-        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.5)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }}>
+        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.5)', zIndex: 1100, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }}>
           <div style={{ background: '#FFF', borderRadius: '14px', padding: '20px', width: '100%', maxWidth: '320px' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px' }}>
               <p style={{ fontSize: '14px', fontWeight: '500', color: THEME.text, margin: 0 }}>휴식 타이머</p>
               <button onClick={() => setShowTimerSetup(false)} style={{ background: 'none', border: 'none', fontSize: '18px', cursor: 'pointer', color: THEME.textSub }}>✕</button>
             </div>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '6px', marginBottom: '6px' }}>
-              {[60, 90, 120].map(s => (
-                <button key={s} onClick={() => startTimer(s)} style={{ background: THEME.primaryLight, border: `0.5px solid ${THEME.primaryAccent}`, color: THEME.primary, padding: '12px', borderRadius: '8px', fontSize: '13px', fontWeight: '500', cursor: 'pointer' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: '6px', marginBottom: '12px' }}>
+              {[30, 60, 90, 120].map(s => (
+                <button key={s} onClick={() => startTimer(s)} style={{ background: THEME.primaryLight, border: `0.5px solid ${THEME.primaryAccent}`, color: THEME.primary, padding: '11px 0', borderRadius: '8px', fontSize: '13px', fontWeight: '500', cursor: 'pointer', fontFamily: 'inherit' }}>
                   {s}초
-                </button>
-              ))}
-            </div>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px', marginBottom: '12px' }}>
-              {[150, 180].map(s => (
-                <button key={s} onClick={() => startTimer(s)} style={{ background: THEME.primaryLight, border: `0.5px solid ${THEME.primaryAccent}`, color: THEME.primary, padding: '12px', borderRadius: '8px', fontSize: '13px', fontWeight: '500', cursor: 'pointer' }}>
-                  {Math.floor(s/60)}분 {s%60 ? s%60 + '초' : ''}
                 </button>
               ))}
             </div>
@@ -519,28 +550,228 @@ export default function WorkoutLog({ user, selectedDate, setSelectedDate, exerci
                 onChange={e => setCustomSeconds(e.target.value)}
                 style={{ flex: 1, padding: '10px', border: `0.5px solid ${THEME.border}`, borderRadius: '8px', fontSize: '14px', textAlign: 'center', fontWeight: '500', color: THEME.text, boxSizing: 'border-box', fontFamily: 'inherit', outline: 'none' }}
               />
-              <button onClick={() => { const s = parseInt(customSeconds) || 60; if (s > 0) startTimer(s) }} style={{ background: THEME.primary, color: '#FFF', border: 'none', padding: '10px 18px', borderRadius: '8px', fontSize: '13px', fontWeight: '500', cursor: 'pointer' }}>시작</button>
+              <button onClick={() => { const s = parseInt(customSeconds) || 60; if (s > 0) startTimer(s) }} style={{ background: THEME.primary, color: '#FFF', border: 'none', padding: '10px 18px', borderRadius: '8px', fontSize: '13px', fontWeight: '500', cursor: 'pointer', fontFamily: 'inherit' }}>시작</button>
             </div>
           </div>
         </div>
       )}
 
-      {timerActive && (
-        <div style={{ position: 'sticky', top: '8px', zIndex: 50, background: THEME.primary, borderRadius: '12px', padding: '10px 14px', marginBottom: '10px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', boxShadow: '0 2px 8px rgba(47,92,69,0.2)', overflow: 'hidden' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-            <TimerIcon color="#FFF" size={18} />
-            <div>
-              <p style={{ fontSize: '10px', color: 'rgba(255,255,255,0.8)', margin: 0 }}>휴식 타이머</p>
-              <p style={{ fontSize: '22px', color: '#FFF', fontWeight: '500', margin: 0, letterSpacing: '-0.5px', lineHeight: 1.1 }}>{formatTimer(timerSeconds)}</p>
+      {showFavModal && (
+        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.5)', zIndex: 1050, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }}>
+          <div style={{ background: '#FFF', borderRadius: '14px', padding: '18px', width: '100%', maxWidth: '340px', maxHeight: '80vh', overflowY: 'auto' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+              <p style={{ fontSize: '14px', fontWeight: '500', color: THEME.text, margin: 0 }}>★ 즐겨찾기 목록</p>
+              <button onClick={() => { setShowFavModal(false); setFavModalExIdx(null) }} style={{ background: 'none', border: 'none', fontSize: '18px', cursor: 'pointer', color: THEME.textSub }}>✕</button>
             </div>
+            <p style={{ fontSize: '11px', color: THEME.textSub, margin: '0 0 12px' }}>운동을 탭하면 자동으로 닫힙니다</p>
+
+            {partsWithFav.length === 0 ? (
+              <div style={{ padding: '20px 0', textAlign: 'center', color: THEME.textHint, fontSize: '12px' }}>
+                등록된 즐겨찾기가 없습니다.<br/>
+                운동 카드에서 [등록] 버튼을 눌러주세요.
+              </div>
+            ) : (
+              <>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px', marginBottom: '12px' }}>
+                  {partsWithFav.map(p => {
+                    const isActive = favModalActivePart === p
+                    return (
+                      <span
+                        key={p}
+                        onClick={() => setFavModalActivePart(p)}
+                        style={{
+                          fontSize: '11px',
+                          padding: '4px 11px',
+                          borderRadius: '12px',
+                          background: isActive ? PART_COLORS[p] : '#FFF',
+                          color: isActive ? '#FFF' : THEME.textSub,
+                          border: `0.5px solid ${isActive ? PART_COLORS[p] : THEME.border}`,
+                          fontWeight: isActive ? '500' : '400',
+                          cursor: 'pointer',
+                          userSelect: 'none',
+                        }}
+                      >{p}</span>
+                    )
+                  })}
+                </div>
+
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '5px', marginBottom: '8px' }}>
+                  {getFavoritesByPart(favModalActivePart).map(f => {
+                    const currentEx = favModalExIdx !== null ? exercises[favModalExIdx] : null
+                    const isCurrent = currentEx && currentEx.body_part === f.body_part && currentEx.exercise_name === f.exercise_name
+                    return (
+                      <span
+                        key={f.id}
+                        onClick={() => handleChipClick(f.body_part, f.exercise_name)}
+                        style={{
+                          fontSize: '12px',
+                          padding: '6px 12px',
+                          borderRadius: '14px',
+                          background: isCurrent ? THEME.warning : '#FFF',
+                          color: isCurrent ? '#FFF' : THEME.warningDark,
+                          border: `0.5px solid ${isCurrent ? THEME.warning : THEME.warningBorder}`,
+                          fontWeight: isCurrent ? '500' : '400',
+                          cursor: 'pointer',
+                          userSelect: 'none',
+                        }}
+                      >{f.exercise_name}</span>
+                    )
+                  })}
+                </div>
+
+                {getFavoritesByPart(favModalActivePart).length === 0 && (
+                  <p style={{ fontSize: '11px', color: THEME.textHint, textAlign: 'center', margin: '8px 0' }}>
+                    {favModalActivePart} 부위에 등록된 운동이 없습니다.
+                  </p>
+                )}
+              </>
+            )}
           </div>
-          <div style={{ display: 'flex', gap: '6px' }}>
-            <button onClick={() => setTimerSeconds(s => s + 15)} style={{ background: 'rgba(255,255,255,0.2)', border: 'none', color: '#FFF', padding: '6px 10px', borderRadius: '6px', fontSize: '11px', fontWeight: '500', cursor: 'pointer' }}>+15s</button>
-            <button onClick={stopTimer} style={{ background: '#FFF', border: 'none', color: THEME.primary, padding: '6px 12px', borderRadius: '6px', fontSize: '11px', fontWeight: '500', cursor: 'pointer' }}>중지</button>
-          </div>
-          <div style={{ position: 'absolute', bottom: 0, left: 0, height: '3px', width: `${timerProgress}%`, background: 'rgba(255,255,255,0.4)', transition: 'width 1s linear' }} />
         </div>
       )}
+
+      <div style={{
+        position: 'fixed',
+        bottom: '16px',
+        right: '16px',
+        left: isTimerVisible ? '16px' : 'auto',
+        maxWidth: isTimerVisible ? '460px' : 'none',
+        margin: isTimerVisible ? '0 auto' : '0',
+        zIndex: 900,
+        pointerEvents: 'none',
+      }}>
+        {!isTimerVisible && (
+          <div style={{ display: 'flex', justifyContent: 'flex-end', pointerEvents: 'none' }}>
+            <button
+              onClick={() => setShowTimerSetup(true)}
+              aria-label="휴식 타이머"
+              style={{
+                background: THEME.primary,
+                color: '#FFF',
+                border: 'none',
+                width: '52px',
+                height: '52px',
+                borderRadius: '50%',
+                boxShadow: '0 3px 10px rgba(47,92,69,0.3)',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                pointerEvents: 'auto',
+                fontFamily: 'inherit',
+              }}
+            >
+              <TimerIcon color="#FFF" size={24} />
+            </button>
+          </div>
+        )}
+
+        {isTimerVisible && (
+          <div style={{
+            background: widgetBg,
+            padding: '10px 12px',
+            borderRadius: '14px',
+            boxShadow: '0 3px 12px rgba(47,92,69,0.35)',
+            border: timerDone ? `0.5px solid ${THEME.primary}` : 'none',
+            pointerEvents: 'auto',
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px' }}>
+              <button
+                onClick={() => adjustTimer(-15)}
+                style={{
+                  background: widgetSubBtnBg,
+                  color: widgetSubBtnColor,
+                  border: 'none',
+                  padding: '7px 0',
+                  borderRadius: '7px',
+                  fontSize: '11px',
+                  fontWeight: '500',
+                  width: '60px',
+                  cursor: 'pointer',
+                  fontFamily: 'inherit',
+                }}
+              >-15s</button>
+              <div style={{ flex: 1, textAlign: 'center' }}>
+                <div style={{ fontSize: '9px', color: widgetText, opacity: 0.85, lineHeight: 1 }}>
+                  {timerDone ? '휴식 완료' : (timerPaused ? '일시정지' : '휴식')}
+                </div>
+                <div style={{ fontSize: '22px', fontWeight: '500', color: widgetText, lineHeight: 1.1, fontVariantNumeric: 'tabular-nums' }}>
+                  {formatTimer(timerDone ? timerInitial : timerSeconds)}
+                </div>
+              </div>
+              <button
+                onClick={() => adjustTimer(15)}
+                style={{
+                  background: widgetSubBtnBg,
+                  color: widgetSubBtnColor,
+                  border: 'none',
+                  padding: '7px 0',
+                  borderRadius: '7px',
+                  fontSize: '11px',
+                  fontWeight: '500',
+                  width: '60px',
+                  cursor: 'pointer',
+                  fontFamily: 'inherit',
+                }}
+              >+15s</button>
+            </div>
+            <div style={{ display: 'flex', gap: '6px' }}>
+              {timerDone ? (
+                <button
+                  onClick={restartTimer}
+                  style={{
+                    flex: 1,
+                    background: THEME.primary,
+                    color: '#FFF',
+                    border: 'none',
+                    padding: '8px 0',
+                    borderRadius: '7px',
+                    fontSize: '12px',
+                    fontWeight: '500',
+                    cursor: 'pointer',
+                    fontFamily: 'inherit',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '4px',
+                  }}
+                >▶ 시작</button>
+              ) : (
+                <button
+                  onClick={togglePauseTimer}
+                  style={{
+                    flex: 1,
+                    background: '#FFF',
+                    color: THEME.primary,
+                    border: 'none',
+                    padding: '8px 0',
+                    borderRadius: '7px',
+                    fontSize: '12px',
+                    fontWeight: '500',
+                    cursor: 'pointer',
+                    fontFamily: 'inherit',
+                  }}
+                >{timerPaused ? '재개' : '중지'}</button>
+              )}
+              <button
+                onClick={closeTimer}
+                style={{
+                  flex: 1,
+                  background: widgetSubBtnBg,
+                  color: widgetSubBtnColor,
+                  border: 'none',
+                  padding: '8px 0',
+                  borderRadius: '7px',
+                  fontSize: '12px',
+                  fontWeight: '500',
+                  cursor: 'pointer',
+                  fontFamily: 'inherit',
+                }}
+              >닫기</button>
+            </div>
+          </div>
+        )}
+      </div>
 
       {newPRs.length > 0 && (
         <div style={{ background: THEME.warningLight, border: `0.5px solid ${THEME.warning}`, borderRadius: '12px', padding: '12px 14px', marginBottom: '10px' }}>
@@ -640,7 +871,7 @@ export default function WorkoutLog({ user, selectedDate, setSelectedDate, exerci
         )}
       </div>
 
-      <div style={S.card}>
+      <div style={{ ...S.card, paddingBottom: '90px' }}>
         <p style={{ ...S.cardTitle, margin: '0 0 10px' }}>운동 기록</p>
         <div style={{ marginBottom: '14px' }}>
           <DatePicker value={selectedDate} onChange={setSelectedDate} />
@@ -651,16 +882,10 @@ export default function WorkoutLog({ user, selectedDate, setSelectedDate, exerci
           const mediaUrl = ex.sets[0]?.media_url
           const hasMedia = !!mediaUrl
 
-          // 즐겨찾기 관련
           const currentFav = findFavorite(ex.body_part, ex.exercise_name)
           const isRegistered = !!currentFav
           const canRegister = ex.body_part && ex.exercise_name?.trim() && !isRegistered
 
-          // 활성 부위 탭 (기본: 현재 운동 부위, 없으면 즐겨찾기 있는 첫 부위)
-          const activePart = activeFavTab[realIdx] || ex.body_part || partsWithFav[0] || ''
-          const partFavorites = activePart ? getFavoritesByPart(activePart) : []
-
-          // 최근 기록
           const latest = isRegistered ? getLatestRecord(allLogs, ex.body_part, ex.exercise_name) : null
 
           return (
@@ -677,7 +902,7 @@ export default function WorkoutLog({ user, selectedDate, setSelectedDate, exerci
                 >✕</button>
               </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 110px', gap: '6px', marginBottom: '9px', alignItems: 'stretch' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 50px 50px', gap: '6px', marginBottom: '8px' }}>
                 <input
                   style={{ ...inputBase, color: THEME.textSub }}
                   placeholder="특이사항 (예: 무릎 불편)"
@@ -685,114 +910,84 @@ export default function WorkoutLog({ user, selectedDate, setSelectedDate, exerci
                   onChange={e => updateExField(realIdx, 'memo', e.target.value)}
                 />
                 <button
-                  onClick={() => setShowTimerSetup(true)}
-                  style={{ background: THEME.primaryLight, border: `0.5px solid ${THEME.primaryAccent}`, color: THEME.primary, padding: '7px 10px', borderRadius: '6px', fontSize: '11px', fontWeight: '500', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '5px', fontFamily: 'inherit' }}
-                >
-                  <TimerIcon color={THEME.primary} size={11} />
-                  휴식 타이머
-                </button>
-              </div>
-
-              {/* ───── 즐겨찾기 영역 ───── */}
-              <div style={{ background: THEME.warningLight, border: `0.5px solid ${THEME.warningBorder}`, borderRadius: '8px', padding: '9px 10px', marginBottom: '9px' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '7px' }}>
-                  <span style={{ fontSize: '10px', color: THEME.warningText, fontWeight: '500' }}>★ 즐겨찾기</span>
-                  {isRegistered ? (
-                    <button
-                      onClick={() => handleRemoveFavorite(currentFav.id)}
-                      style={{ background: THEME.warning, color: '#FFF', border: `0.5px solid ${THEME.warning}`, borderRadius: '5px', padding: '2px 8px', fontSize: '10px', fontWeight: '500', cursor: 'pointer', fontFamily: 'inherit' }}
-                    >등록됨 ✓</button>
-                  ) : canRegister ? (
-                    <button
-                      onClick={() => handleAddFavorite(ex.body_part, ex.exercise_name)}
-                      style={{ background: '#FFF', color: THEME.warningText, border: `0.5px solid ${THEME.warningBorder}`, borderRadius: '5px', padding: '2px 8px', fontSize: '10px', fontWeight: '500', cursor: 'pointer', fontFamily: 'inherit' }}
-                    >+ 등록</button>
-                  ) : (
-                    <span style={{ fontSize: '9px', color: THEME.warningText, opacity: 0.6 }}>부위·운동명 입력 후 등록</span>
-                  )}
-                </div>
-
-                {/* 부위 탭 */}
-                {partsWithFav.length > 0 && (
-                  <div style={{ display: 'flex', gap: '4px', marginBottom: '7px', flexWrap: 'wrap' }}>
-                    {partsWithFav.map(p => {
-                      const isActive = activePart === p
-                      return (
-                        <span
-                          key={p}
-                          onClick={() => setActiveFavTab({ ...activeFavTab, [realIdx]: p })}
-                          style={{
-                            fontSize: '10px',
-                            padding: '3px 9px',
-                            borderRadius: '10px',
-                            background: isActive ? PART_COLORS[p] : '#FFF',
-                            color: isActive ? '#FFF' : THEME.textSub,
-                            border: `0.5px solid ${isActive ? PART_COLORS[p] : THEME.border}`,
-                            fontWeight: isActive ? '500' : '400',
-                            cursor: 'pointer',
-                            userSelect: 'none',
-                          }}
-                        >{p}</span>
-                      )
-                    })}
-                  </div>
-                )}
-
-                {/* 운동 칩 */}
-                {partsWithFav.length === 0 ? (
-                  <p style={{ fontSize: '10px', color: THEME.warningText, opacity: 0.7, margin: 0, fontStyle: 'italic' }}>
-                    아직 등록된 즐겨찾기가 없습니다. 부위·운동명 입력 후 [등록] 버튼을 눌러주세요.
-                  </p>
-                ) : partFavorites.length === 0 ? (
-                  <p style={{ fontSize: '10px', color: THEME.warningText, opacity: 0.7, margin: 0, fontStyle: 'italic' }}>
-                    {activePart} 부위에 등록된 운동이 없습니다.
-                  </p>
+                  onClick={() => openFavModal(realIdx)}
+                  style={{
+                    background: THEME.warningLight,
+                    border: `0.5px solid ${THEME.warningBorder}`,
+                    color: THEME.warning,
+                    padding: '7px 0',
+                    borderRadius: '6px',
+                    fontSize: '14px',
+                    fontWeight: '500',
+                    cursor: 'pointer',
+                    fontFamily: 'inherit',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  }}
+                  title="즐겨찾기 목록"
+                >★</button>
+                {isRegistered ? (
+                  <button
+                    onClick={() => handleRemoveFavorite(currentFav.id)}
+                    style={{
+                      background: THEME.warning,
+                      color: '#FFF',
+                      border: 'none',
+                      borderRadius: '6px',
+                      padding: '7px 0',
+                      fontSize: '12px',
+                      fontWeight: '500',
+                      cursor: 'pointer',
+                      fontFamily: 'inherit',
+                    }}
+                    title="즐겨찾기 해제"
+                  >✓</button>
                 ) : (
-                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
-                    {partFavorites.map(f => {
-                      const isCurrent = isRegistered && currentFav.id === f.id
-                      return (
-                        <span
-                          key={f.id}
-                          onClick={() => handleChipClick(realIdx, f.body_part, f.exercise_name)}
-                          style={{
-                            fontSize: '11px',
-                            padding: '3px 11px',
-                            borderRadius: '12px',
-                            background: isCurrent ? THEME.warning : '#FFF',
-                            color: isCurrent ? '#FFF' : THEME.warningDark,
-                            border: `0.5px solid ${isCurrent ? THEME.warning : THEME.warningBorder}`,
-                            fontWeight: isCurrent ? '500' : '400',
-                            cursor: 'pointer',
-                            userSelect: 'none',
-                          }}
-                        >{f.exercise_name}</span>
-                      )
-                    })}
-                  </div>
-                )}
-
-                {/* 최근 기록 */}
-                {latest && (
-                  <div style={{ marginTop: '6px', background: THEME.primaryLight, border: `0.5px solid ${THEME.primaryAccent}`, borderRadius: '6px', padding: '5px 9px' }}>
-                    <span style={{ fontSize: '10px', color: THEME.primaryDark }}>
-                      최근: <span style={{ fontWeight: '500' }}>{latest.date.replace(/-/g, '.').slice(5)}</span> · {latest.weight}kg × {latest.reps}회
-                    </span>
-                  </div>
+                  <button
+                    onClick={() => handleAddFavorite(ex.body_part, ex.exercise_name)}
+                    disabled={!canRegister}
+                    style={{
+                      background: canRegister ? '#FFF' : '#F5F5F0',
+                      color: canRegister ? THEME.warningText : THEME.textHint,
+                      border: `0.5px solid ${canRegister ? THEME.warningBorder : THEME.border}`,
+                      borderRadius: '6px',
+                      padding: '7px 0',
+                      fontSize: '11px',
+                      fontWeight: '500',
+                      cursor: canRegister ? 'pointer' : 'not-allowed',
+                      fontFamily: 'inherit',
+                    }}
+                    title={canRegister ? '즐겨찾기 등록' : '부위·운동명 입력 후 등록'}
+                  >등록</button>
                 )}
               </div>
-              {/* ───── 즐겨찾기 영역 끝 ───── */}
 
+              {latest && (
+                <div style={{
+                  background: THEME.primaryLight,
+                  border: `0.5px solid ${THEME.primaryAccent}`,
+                  borderRadius: '6px',
+                  padding: '5px 9px',
+                  marginBottom: '8px',
+                }}>
+                  <span style={{ fontSize: '10px', color: THEME.primaryDark }}>
+                    최근: <span style={{ fontWeight: '500' }}>{latest.date.replace(/-/g, '.').slice(5)}</span> · {latest.weight}kg × {latest.reps}회
+                  </span>
+                </div>
+              )}
+
+              {/* ─── 세트 행 (더 컴팩트) ─── */}
               <div>
-                <div style={{ display: 'grid', gridTemplateColumns: '28px 1fr 1fr 56px 22px', gap: '5px', marginBottom: '4px', alignItems: 'center' }}>
-                  <span style={{ fontSize: '10px', color: THEME.textSub, textAlign: 'center', fontWeight: '500' }}>세트</span>
-                  <span style={{ fontSize: '10px', color: THEME.textSub, textAlign: 'center', fontWeight: '500' }}>무게(kg)</span>
-                  <span style={{ fontSize: '10px', color: THEME.textSub, textAlign: 'center', fontWeight: '500' }}>횟수</span>
-                  <span style={{ fontSize: '10px', color: THEME.textSub, textAlign: 'center', fontWeight: '500' }}>볼륨</span>
+                <div style={{ display: 'grid', gridTemplateColumns: '24px 1fr 1fr 50px 18px', gap: '4px', marginBottom: '3px', alignItems: 'center' }}>
+                  <span style={{ fontSize: '9px', color: THEME.textSub, textAlign: 'center', fontWeight: '500' }}>세트</span>
+                  <span style={{ fontSize: '9px', color: THEME.textSub, textAlign: 'center', fontWeight: '500' }}>무게(kg)</span>
+                  <span style={{ fontSize: '9px', color: THEME.textSub, textAlign: 'center', fontWeight: '500' }}>횟수</span>
+                  <span style={{ fontSize: '9px', color: THEME.textSub, textAlign: 'center', fontWeight: '500' }}>볼륨</span>
                   <span></span>
                 </div>
                 {ex.sets.map((set, setIdx) => (
-                  <div key={setIdx} style={{ display: 'grid', gridTemplateColumns: '28px 1fr 1fr 56px 22px', gap: '5px', marginBottom: '4px', alignItems: 'center' }}>
+                  <div key={setIdx} style={{ display: 'grid', gridTemplateColumns: '24px 1fr 1fr 50px 18px', gap: '4px', marginBottom: '2px', alignItems: 'center' }}>
                     <span style={{ fontSize: '11px', color: THEME.textSub, textAlign: 'center', fontWeight: '500' }}>{setIdx + 1}</span>
                     <input
                       style={setNumInput}
@@ -808,20 +1003,20 @@ export default function WorkoutLog({ user, selectedDate, setSelectedDate, exerci
                       value={set.reps}
                       onChange={e => updateSetField(realIdx, setIdx, 'reps', e.target.value)}
                     />
-                    <span style={{ fontSize: '13px', fontWeight: '500', color: THEME.primary, textAlign: 'center' }}>{getSetVolume(set)}</span>
+                    <span style={{ fontSize: '12px', fontWeight: '500', color: THEME.primary, textAlign: 'center' }}>{getSetVolume(set)}</span>
                     <button
-                      style={{ background: '#EAEAE5', color: '#888', border: 'none', borderRadius: '4px', padding: '4px 0', cursor: 'pointer', fontSize: '12px', height: '22px' }}
+                      style={{ background: '#EAEAE5', color: '#888', border: 'none', borderRadius: '4px', padding: 0, cursor: 'pointer', fontSize: '11px', height: '16px' }}
                       onClick={() => removeSet(realIdx, setIdx)}
                     >−</button>
                   </div>
                 ))}
                 <button
-                  style={{ background: 'transparent', border: `0.5px dashed ${THEME.primaryAccent}`, borderRadius: '6px', padding: '6px', fontSize: '11px', color: THEME.primary, width: '100%', cursor: 'pointer', marginTop: '4px', fontWeight: '500' }}
+                  style={{ background: 'transparent', border: `0.5px dashed ${THEME.primaryAccent}`, borderRadius: '6px', padding: '5px', fontSize: '11px', color: THEME.primary, width: '100%', cursor: 'pointer', marginTop: '4px', fontWeight: '500' }}
                   onClick={() => addSet(realIdx)}
                 >＋ 세트 추가</button>
               </div>
 
-              <div style={{ borderTop: `0.5px solid ${THEME.border}`, marginTop: '11px', paddingTop: '10px' }}>
+              <div style={{ borderTop: `0.5px solid ${THEME.border}`, marginTop: '10px', paddingTop: '10px' }}>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 46px', gap: '6px', alignItems: 'stretch' }}>
                   <textarea
                     style={{

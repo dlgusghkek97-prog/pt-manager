@@ -1042,7 +1042,7 @@ export default function TrainerDashboard({ user, onLogout }) {
               <>
                 <SubTabs value={memberSubTab} onChange={setMemberSubTab} />
                 {memberSubTab === 'log' && <WorkoutLog user={selectedMember} selectedDate={selectedDate} setSelectedDate={setSelectedDate} exercises={exercises} setExercises={setExercises} onUpdate={async () => { await loadMemberLogs(selectedMember.id) }} weight={memberWeight} muscle={memberMuscle} allLogs={allLogs} favorites={memberFavorites} onFavoritesUpdate={() => loadMemberFavorites(selectedMember.id)} />}
-                {memberSubTab === 'stats' && <WorkoutStats allLogs={allLogs} />}
+                {memberSubTab === 'stats' && <WorkoutStats allLogs={allLogs} memberId={selectedMember.id} />}
               </>
             )}
 
