@@ -324,7 +324,7 @@ export const getLatestRecord = (allLogs, bodyPart, exerciseName) => {
   }
 }
 
-// ─── 인바디 관련 함수들 (NEW v2 - 케이스 C: trainer_inbody에 trainer_id + member_id) ───
+// ─── 인바디 관련 함수들 ───
 
 export const loadInbody = async (userId, table = 'member_inbody', idField = 'member_id') => {
   const { data, error } = await supabase
@@ -458,9 +458,7 @@ export const getInbodyStats = (inbodyList, metric = 'weight') => {
   }
 }
 
-// ─── 4대 종목 PR (NEW v3) ───
-// 회원당 종목당 1행 (UNIQUE 제약)
-// 회원/트레이너 둘 다 양방향 수정 가능
+// ─── 4대 종목 PR (v4: 회원/트레이너 양쪽 지원) ───
 
 export const BIG4_EXERCISES = [
   { key: 'squat',    label: '스쿼트',         color: THEME.primary },
@@ -469,14 +467,20 @@ export const BIG4_EXERCISES = [
   { key: 'ohp',      label: '오버헤드 프레스', color: THEME.primary },
 ]
 
-// 4대 종목 PR 모두 로드 (메모리 표현: { squat: {...}, deadlift: {...}, ... })
-export const loadBig4PRs = async (memberId) => {
-  if (!memberId) return {}
+// 4대 종목 PR 모두 로드
+// 회원: loadBig4PRs(memberId) -> 기본값 personal_records, member_id 사용
+// 트레이너: loadBig4PRs(trainerId, 'trainer_personal_records', 'trainer_id')
+export const loadBig4PRs = async (
+  userId,
+  table = 'personal_records',
+  idField = 'member_id'
+) => {
+  if (!userId) return {}
 
   const { data, error } = await supabase
-    .from('personal_records')
+    .from(table)
     .select('*')
-    .eq('member_id', memberId)
+    .eq(idField, userId)
     .in('exercise_key', ['squat', 'deadlift', 'bench', 'ohp'])
 
   if (error) {
@@ -484,7 +488,6 @@ export const loadBig4PRs = async (memberId) => {
     return {}
   }
 
-  // exercise_key 별로 매핑
   const result = {}
   ;(data || []).forEach(row => {
     result[row.exercise_key] = {
@@ -498,9 +501,18 @@ export const loadBig4PRs = async (memberId) => {
   return result
 }
 
-// 4대 종목 PR 1개 저장 (upsert: 회원당 종목당 1행 보장)
-export const saveBig4PR = async (memberId, exerciseKey, weight, reps) => {
-  if (!memberId || !exerciseKey) {
+// 4대 종목 PR 1개 저장 (upsert)
+// 회원: saveBig4PR(memberId, 'squat', 80, 5) -> personal_records 사용
+// 트레이너: saveBig4PR(trainerId, 'squat', 100, 5, 'trainer_personal_records', 'trainer_id')
+export const saveBig4PR = async (
+  userId,
+  exerciseKey,
+  weight,
+  reps,
+  table = 'personal_records',
+  idField = 'member_id'
+) => {
+  if (!userId || !exerciseKey) {
     return { success: false, error: '필수 정보가 누락되었습니다' }
   }
   if (!['squat', 'deadlift', 'bench', 'ohp'].includes(exerciseKey)) {
@@ -519,7 +531,7 @@ export const saveBig4PR = async (memberId, exerciseKey, weight, reps) => {
 
   const today = new Date().toISOString().split('T')[0]
   const payload = {
-    member_id: memberId,
+    [idField]: userId,
     exercise_key: exerciseKey,
     weight: w,
     reps: r,
@@ -527,10 +539,10 @@ export const saveBig4PR = async (memberId, exerciseKey, weight, reps) => {
     updated_at: new Date().toISOString(),
   }
 
-  // upsert: member_id + exercise_key 조합이 이미 있으면 업데이트, 없으면 인서트
+  // upsert: idField + exercise_key 조합이 이미 있으면 업데이트, 없으면 인서트
   const { data, error } = await supabase
-    .from('personal_records')
-    .upsert(payload, { onConflict: 'member_id,exercise_key' })
+    .from(table)
+    .upsert(payload, { onConflict: `${idField},exercise_key` })
     .select()
     .single()
 

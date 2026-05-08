@@ -1,7 +1,12 @@
 import React, { useState, useEffect } from 'react'
 import { PARTS, PART_COLORS, S, THEME, getWeekNum, weekLabels, calcPRs, BIG4_EXERCISES, loadBig4PRs, saveBig4PR } from './utils'
 
-export default function WorkoutStats({ allLogs, memberId }) {
+export default function WorkoutStats({
+  allLogs,
+  memberId,
+  bigPrTable = 'personal_records',
+  bigPrIdField = 'member_id',
+}) {
   const [statsTab, setStatsTab] = useState('daily')
   const today = new Date()
   const todayStr = today.toISOString().split('T')[0]
@@ -19,12 +24,12 @@ export default function WorkoutStats({ allLogs, memberId }) {
       reloadBig4()
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [statsTab, memberId])
+  }, [statsTab, memberId, bigPrTable, bigPrIdField])
 
   const reloadBig4 = async () => {
     if (!memberId) return
     setBig4Loading(true)
-    const data = await loadBig4PRs(memberId)
+    const data = await loadBig4PRs(memberId, bigPrTable, bigPrIdField)
     setBig4State(data)
     const draft = {}
     BIG4_EXERCISES.forEach(({ key }) => {
@@ -48,13 +53,22 @@ export default function WorkoutStats({ allLogs, memberId }) {
     if (!memberId) return
     const draft = big4Draft[key] || {}
     if (draft.weight === '' && draft.reps === '') return
-    const result = await saveBig4PR(memberId, key, draft.weight, draft.reps)
+    const result = await saveBig4PR(memberId, key, draft.weight, draft.reps, bigPrTable, bigPrIdField)
     if (!result.success) {
       alert('저장 실패: ' + result.error)
       return
     }
     await reloadBig4()
   }
+
+  // 3대 중량 합계 (스쿼트 + 데드리프트 + 벤치)
+  const big3Total = ['squat', 'deadlift', 'bench'].reduce((sum, key) => {
+    const w = parseFloat(big4State[key]?.weight)
+    return sum + (isNaN(w) ? 0 : w)
+  }, 0)
+  const squatW = big4State.squat?.weight ?? '—'
+  const deadliftW = big4State.deadlift?.weight ?? '—'
+  const benchW = big4State.bench?.weight ?? '—'
 
   const yearStr = String(viewYear)
   const monthStr = String(viewMonth).padStart(2, '0')
@@ -137,7 +151,6 @@ export default function WorkoutStats({ allLogs, memberId }) {
     </div>
   )
 
-  // ─── 4대 종목 카드 입력 스타일 (A안: 같은 크기 한 줄) ───
   const big4Input = {
     background: 'transparent',
     border: 'none',
@@ -150,10 +163,7 @@ export default function WorkoutStats({ allLogs, memberId }) {
     fontFamily: 'inherit',
     textAlign: 'right',
   }
-  const big4InputReps = {
-    ...big4Input,
-    width: '32px',
-  }
+  const big4InputReps = { ...big4Input, width: '32px' }
 
   return (
     <div>
@@ -450,13 +460,47 @@ export default function WorkoutStats({ allLogs, memberId }) {
 
       {statsTab === 'pr' && (
         <>
-          {/* ─── 4대 종목 강조 카드 (A안 컴팩트) ─── */}
+          {/* ─── 4대 종목 강조 카드 (memberId 있을 때만) ─── */}
           {memberId && (
             <div style={{ ...S.card, padding: '12px' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
                 <p style={{ ...S.cardTitle, margin: 0 }}>4대 종목 PR</p>
                 <span style={{ fontSize: '10px', color: THEME.textHint }}>탭하여 직접 수정</span>
               </div>
+
+              {/* 3대 중량 합계 배너 */}
+              <div style={{
+                background: `linear-gradient(135deg, ${THEME.primary}, ${THEME.primaryDark})`,
+                borderRadius: '10px',
+                padding: '14px 16px',
+                marginBottom: '8px',
+                color: '#FFF',
+              }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <div>
+                    <div style={{ fontSize: '14px', fontWeight: '500', opacity: 0.95, marginBottom: '4px', letterSpacing: '-0.2px' }}>
+                      3대 중량
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'baseline', gap: '4px' }}>
+                      <span style={{ fontSize: '30px', fontWeight: '600', letterSpacing: '-0.8px', lineHeight: 1 }}>
+                        {big3Total > 0 ? big3Total : '—'}
+                      </span>
+                      <span style={{ fontSize: '13px', opacity: 0.9, fontWeight: '500' }}>kg</span>
+                    </div>
+                  </div>
+
+                  {/* 가운데 흰색 2px 세로선 */}
+                  <div style={{ width: '2px', height: '56px', background: '#FFF', borderRadius: '2px' }} />
+
+                  <div style={{ textAlign: 'right', fontSize: '11px', opacity: 0.9, lineHeight: 1.7 }}>
+                    <div>스쿼트 <span style={{ fontWeight: '500' }}>{squatW}</span></div>
+                    <div>데드리프트 <span style={{ fontWeight: '500' }}>{deadliftW}</span></div>
+                    <div>벤치 <span style={{ fontWeight: '500' }}>{benchW}</span></div>
+                  </div>
+                </div>
+              </div>
+
+              {/* 4대 종목 카드 그리드 */}
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px' }}>
                 {BIG4_EXERCISES.map(({ key, label }) => {
                   const draft = big4Draft[key] || { weight: '', reps: '' }

@@ -975,7 +975,7 @@ export default function TrainerDashboard({ user, onLogout }) {
               <>
                 <SubTabs value={trainerSubTab} onChange={setTrainerSubTab} />
                 {trainerSubTab === 'log' && <WorkoutLog user={trainerAsUser} selectedDate={selectedDate} setSelectedDate={setSelectedDate} exercises={exercises} setExercises={setExercises} onUpdate={loadTrainerLogs} tableOverride="trainer_workout_logs" trainerIdField="trainer_id" weight={weight} muscle={muscle} allLogs={allLogs} favorites={trainerFavorites} onFavoritesUpdate={loadTrainerFavorites} />}
-                {trainerSubTab === 'stats' && <WorkoutStats allLogs={allLogs} />}
+                {trainerSubTab === 'stats' && <WorkoutStats allLogs={allLogs} memberId={user.id} bigPrTable="trainer_personal_records" bigPrIdField="trainer_id" />}
               </>
             )}
 
