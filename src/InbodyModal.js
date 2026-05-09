@@ -98,14 +98,14 @@ const shortDate = (dateStr) => {
   return `${parseInt(parts[1])}/${parseInt(parts[2])}`
 }
 
-// ─── SVG 라인 차트 컴포넌트 ───
-function LineChart({ data, metrics, height = 200 }) {
+// ─── SVG 라인 차트 (단일 메트릭 전용) ───
+function LineChart({ data, metric, height = 180, showXLabels = true }) {
   const W = 420
   const H = height
-  const padL = 40
-  const padR = 20
-  const padT = 20
-  const padB = 32
+  const padL = 38
+  const padR = 16
+  const padT = 18
+  const padB = showXLabels ? 28 : 12
 
   const chartW = W - padL - padR
   const chartH = H - padT - padB
@@ -115,29 +115,26 @@ function LineChart({ data, metrics, height = 200 }) {
       <div style={{
         height: `${H}px`, display: 'flex',
         alignItems: 'center', justifyContent: 'center',
-        color: THEME.textHint, fontSize: '13px',
-        background: THEME.cardAlt, borderRadius: '10px',
+        color: THEME.textHint, fontSize: '12px',
+        background: THEME.cardAlt, borderRadius: '8px',
       }}>
         측정 기록이 없습니다
       </div>
     )
   }
 
-  let allValues = []
-  metrics.forEach(m => {
-    data.forEach(d => {
-      const v = parseFloat(d[m.key])
-      if (!isNaN(v) && v > 0) allValues.push(v)
-    })
-  })
+  // 이 메트릭에 한정된 값만 추출
+  const allValues = data
+    .map(d => parseFloat(d[metric.key]))
+    .filter(v => !isNaN(v) && v > 0)
 
   if (allValues.length === 0) {
     return (
       <div style={{
         height: `${H}px`, display: 'flex',
         alignItems: 'center', justifyContent: 'center',
-        color: THEME.textHint, fontSize: '13px',
-        background: THEME.cardAlt, borderRadius: '10px',
+        color: THEME.textHint, fontSize: '12px',
+        background: THEME.cardAlt, borderRadius: '8px',
       }}>
         표시할 데이터가 없습니다
       </div>
@@ -146,9 +143,9 @@ function LineChart({ data, metrics, height = 200 }) {
 
   const minV = Math.min(...allValues)
   const maxV = Math.max(...allValues)
-  const range = maxV - minV || 1
-  const yMin = minV - range * 0.15
-  const yMax = maxV + range * 0.15
+  const range = maxV - minV || Math.max(maxV * 0.1, 1)
+  const yMin = minV - range * 0.2
+  const yMax = maxV + range * 0.25
   const yRange = yMax - yMin || 1
 
   const xPos = (i) => {
@@ -163,12 +160,25 @@ function LineChart({ data, metrics, height = 200 }) {
     yTicks.push(v)
   }
 
+  const points = data
+    .map((d, i) => {
+      const v = parseFloat(d[metric.key])
+      if (isNaN(v) || v <= 0) return null
+      return { x: xPos(i), y: yPos(v), v, date: d.measured_date, source: d._source }
+    })
+    .filter(Boolean)
+
+  const linePath = points
+    .map((p, i) => `${i === 0 ? 'M' : 'L'} ${p.x} ${p.y}`)
+    .join(' ')
+
   return (
     <svg
       viewBox={`0 0 ${W} ${H}`}
       style={{ width: '100%', height: 'auto', display: 'block' }}
       preserveAspectRatio="xMidYMid meet"
     >
+      {/* y축 가이드 라인 */}
       {yTicks.map((v, i) => (
         <g key={`ytick-${i}`}>
           <line
@@ -184,55 +194,41 @@ function LineChart({ data, metrics, height = 200 }) {
         </g>
       ))}
 
-      {metrics.map((m, mi) => {
-        const points = data
-          .map((d, i) => {
-            const v = parseFloat(d[m.key])
-            if (isNaN(v) || v <= 0) return null
-            return { x: xPos(i), y: yPos(v), v, date: d.measured_date, source: d._source }
-          })
-          .filter(Boolean)
+      {/* 라인 + 포인트 */}
+      {points.length > 0 && (
+        <g>
+          <path d={linePath} stroke={metric.color} strokeWidth="2" fill="none" />
+          {points.map((p, i) => (
+            <g key={`pt-${i}`}>
+              {p.source === 'trainer' ? (
+                <rect
+                  x={p.x - 4} y={p.y - 4} width="8" height="8"
+                  fill={metric.color} stroke="#FFF" strokeWidth="1.5"
+                />
+              ) : (
+                <circle cx={p.x} cy={p.y} r="4" fill={metric.color} stroke="#FFF" strokeWidth="1.5" />
+              )}
+              <text
+                x={p.x} y={p.y - 9}
+                fontSize="10" fontWeight="600"
+                fill={metric.color} textAnchor="middle"
+              >
+                {p.v.toFixed(1)}
+              </text>
+            </g>
+          ))}
+        </g>
+      )}
 
-        if (points.length === 0) return null
-
-        const linePath = points
-          .map((p, i) => `${i === 0 ? 'M' : 'L'} ${p.x} ${p.y}`)
-          .join(' ')
-
-        return (
-          <g key={`line-${mi}`}>
-            <path d={linePath} stroke={m.color} strokeWidth="2" fill="none" />
-            {points.map((p, i) => (
-              <g key={`pt-${mi}-${i}`}>
-                {p.source === 'trainer' ? (
-                  <rect
-                    x={p.x - 4} y={p.y - 4} width="8" height="8"
-                    fill={m.color} stroke="#FFF" strokeWidth="1.5"
-                  />
-                ) : (
-                  <circle cx={p.x} cy={p.y} r="4" fill={m.color} stroke="#FFF" strokeWidth="1.5" />
-                )}
-                <text
-                  x={p.x} y={p.y - 9}
-                  fontSize="10" fontWeight="600"
-                  fill={m.color} textAnchor="middle"
-                >
-                  {p.v.toFixed(1)}
-                </text>
-              </g>
-            ))}
-          </g>
-        )
-      })}
-
-      {data.map((d, i) => {
+      {/* x축 라벨 (날짜) */}
+      {showXLabels && data.map((d, i) => {
         const show = data.length <= 6 || i === 0 || i === data.length - 1 ||
                      i === Math.floor(data.length / 2)
         if (!show) return null
         return (
           <text
             key={`xlbl-${i}`}
-            x={xPos(i)} y={H - 12}
+            x={xPos(i)} y={H - 10}
             fontSize="10" fill={THEME.textSub} textAnchor="middle"
           >
             {shortDate(d.measured_date)}
@@ -240,6 +236,35 @@ function LineChart({ data, metrics, height = 200 }) {
         )
       })}
     </svg>
+  )
+}
+
+// ─── 단일 메트릭 카드 (전체 탭에서 3개 쌓을 때 사용) ───
+function MiniMetricChart({ data, metric, isLast }) {
+  const stat = getInbodyStats(data, metric.key)
+  return (
+    <div style={{
+      background: THEME.cardAlt,
+      borderRadius: '10px',
+      padding: '10px 10px 8px',
+      marginBottom: isLast ? 0 : '8px',
+    }}>
+      <div style={{
+        display: 'flex',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        marginBottom: '6px',
+      }}>
+        <span style={{ fontSize: '12px', color: metric.color, fontWeight: '600' }}>
+          {metric.label}
+        </span>
+        <span style={{ fontSize: '12px', color: THEME.text }}>
+          <span style={{ fontWeight: '600' }}>{stat.current.toFixed(1)}</span>
+          <span style={{ color: THEME.textSub, fontSize: '10px', marginLeft: '2px' }}>{metric.unit}</span>
+        </span>
+      </div>
+      <LineChart data={data} metric={metric} height={140} showXLabels={isLast} />
+    </div>
   )
 }
 
@@ -390,11 +415,6 @@ export default function InbodyModal({
       body_fat_percent: '',
     })
   }
-
-  const chartMetrics = useMemo(() => {
-    if (activeTab === 'all') return [METRICS.weight, METRICS.muscle_mass, METRICS.body_fat_percent]
-    return [METRICS[activeTab]]
-  }, [activeTab])
 
   const stats = useMemo(() => ({
     weight: getInbodyStats(records, 'weight'),
@@ -570,26 +590,42 @@ export default function InbodyModal({
           </button>
         </div>
 
-        <div style={{
-          background: THEME.cardAlt, borderRadius: '12px',
-          padding: '12px', marginBottom: '14px',
-        }}>
-          <LineChart data={records} metrics={chartMetrics} height={220} />
+        {/* 차트 영역 - 전체 탭이면 3분할, 아니면 단일 차트 */}
+        {activeTab === 'all' ? (
+          <div style={{ marginBottom: '14px' }}>
+            <MiniMetricChart data={records} metric={METRICS.weight} isLast={false} />
+            <MiniMetricChart data={records} metric={METRICS.muscle_mass} isLast={false} />
+            <MiniMetricChart data={records} metric={METRICS.body_fat_percent} isLast={true} />
 
-          <div style={{
-            display: 'flex', justifyContent: 'center', gap: '14px',
-            marginTop: '6px', fontSize: '11px', flexWrap: 'wrap',
-          }}>
-            {activeTab === 'all' && chartMetrics.map(m => (
-              <span key={m.key} style={{ color: m.color, fontWeight: '600' }}>
-                ● {m.label}
+            <div style={{
+              display: 'flex', justifyContent: 'center', gap: '14px',
+              marginTop: '8px', fontSize: '10px', flexWrap: 'wrap',
+            }}>
+              <span style={{ color: THEME.textHint, fontSize: '10px' }}>
+                ● 회원입력 ■ 트레이너측정
               </span>
-            ))}
-            <span style={{ color: THEME.textHint, fontSize: '10px' }}>
-              ● 회원입력 ■ 트레이너측정
-            </span>
+            </div>
           </div>
-        </div>
+        ) : (
+          <div style={{
+            background: THEME.cardAlt, borderRadius: '12px',
+            padding: '12px', marginBottom: '14px',
+          }}>
+            <LineChart data={records} metric={METRICS[activeTab]} height={220} />
+
+            <div style={{
+              display: 'flex', justifyContent: 'center', gap: '14px',
+              marginTop: '6px', fontSize: '11px', flexWrap: 'wrap',
+            }}>
+              <span style={{ color: METRICS[activeTab].color, fontWeight: '600' }}>
+                ● {METRICS[activeTab].label}
+              </span>
+              <span style={{ color: THEME.textHint, fontSize: '10px' }}>
+                ● 회원입력 ■ 트레이너측정
+              </span>
+            </div>
+          </div>
+        )}
 
         {records.length > 0 && (
           <div style={{

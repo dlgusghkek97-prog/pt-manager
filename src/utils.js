@@ -32,11 +32,29 @@ export const CYCLE_PHASES = {
   '황체기 (17~28일)': 150,
 }
 
-export const calcMacro = ({ goal, gender, weight, muscle, activity, intensity, cyclePhase }) => {
+// ─── 직업 활동량 (NEW v5) ───
+// BMR × activity_multiplier × occupation_multiplier 로 TDEE 계산
+export const OCCUPATION_MULTIPLIER = {
+  '사무직 / 좌식': 1.0,
+  '일반 활동': 1.05,
+  '활동적': 1.10,
+  '매우 활동적': 1.15,
+}
+
+export const OCCUPATION_DESCRIPTION = {
+  '사무직 / 좌식': '사무, 운전, 콜센터, 학생',
+  '일반 활동': '매장 판매, 강사, 미용사',
+  '활동적': '간호사, 웨이터, 트레이너',
+  '매우 활동적': '택배, 이사, 건설, 농업',
+}
+
+export const calcMacro = ({ goal, gender, weight, muscle, activity, intensity, cyclePhase, occupation }) => {
   const leanMass = muscle * 1.4
   const bmr = Math.round(370 + 21.6 * leanMass)
   const actMap = { '가벼운 운동 (주 2~3회)': 1.375, '보통 운동 (주 4~5회)': 1.55, '고강도 운동 (주 6회+)': 1.725 }
-  const tdee = Math.round(bmr * (actMap[activity] || 1.55))
+  // 직업 활동량 multiplier 적용 (없거나 잘못된 값이면 ×1.0)
+  const occMult = OCCUPATION_MULTIPLIER[occupation] || 1.0
+  const tdee = Math.round(bmr * (actMap[activity] || 1.55) * occMult)
   const adjMap = goal === '벌크업'
     ? { '완만': 300, '일반': 400, '공격적': 500 }
     : { '완만': -300, '일반': -500, '공격적': -700 }
@@ -56,6 +74,29 @@ export function calcWeightCalories({ volume = 0, totalSets = 0, weight, muscle }
   const metKcal = 4.0 * w * hours
   const volumeKcal = volume * 0.025
   return Math.round(metKcal + volumeKcal)
+}
+
+// ─── 그날의 실제 일일 소비 (NEW v5.1) ───
+// 잉여/적자 계산용. 기존 calcTDEE의 "평균 TDEE"가 아닌 "그날 실제 소비"를 반환.
+//
+// 공식: BMR + NEAT + 웨이트 + 유산소
+// • BMR  = 370 + 21.6 × (골격근량 × 1.4)
+// • NEAT = BMR × (직업 활동량 multiplier - 1.0)
+//          (사무직 ×1.00 → NEAT 0, 매우 활동적 ×1.15 → BMR × 0.15)
+// • 웨이트, 유산소 = 그날 운동 기록에서 계산
+//
+// 골격근량 없으면 null 반환 → 호출부에서 calcTDEE로 fallback.
+export const calcDailyBurn = ({ muscle, occupation, weightCal = 0, cardioCal = 0 }) => {
+  const m = parseFloat(muscle) || 0
+  if (m <= 0) return null  // 골격근량 없으면 계산 불가 → null 반환
+
+  const leanMass = m * 1.4
+  const bmr = Math.round(370 + 21.6 * leanMass)
+
+  const occMult = OCCUPATION_MULTIPLIER[occupation] || 1.0
+  const neat = Math.round(bmr * (occMult - 1.0))
+
+  return bmr + neat + (weightCal || 0) + (cardioCal || 0)
 }
 
 export const THEME = {
@@ -147,6 +188,8 @@ export const S = {
   btnSecondary: { width: '100%', padding: '14px', borderRadius: '10px', border: `1px solid ${THEME.border}`, background: '#FFF', color: THEME.textSub, fontSize: '14px', cursor: 'pointer' },
 }
 
+// ─── 평균 TDEE 역산 (호환용 fallback) ───
+// 골격근량/직업 활동량 정보가 없을 때만 사용. 우선은 calcDailyBurn 사용.
 export const calcTDEE = (macroResult, goal, intensity) => {
   if (!macroResult || !macroResult.target) return null
   const target = parseInt(macroResult.target) || 0
@@ -467,9 +510,6 @@ export const BIG4_EXERCISES = [
   { key: 'ohp',      label: '오버헤드 프레스', color: THEME.primary },
 ]
 
-// 4대 종목 PR 모두 로드
-// 회원: loadBig4PRs(memberId) -> 기본값 personal_records, member_id 사용
-// 트레이너: loadBig4PRs(trainerId, 'trainer_personal_records', 'trainer_id')
 export const loadBig4PRs = async (
   userId,
   table = 'personal_records',
@@ -501,9 +541,6 @@ export const loadBig4PRs = async (
   return result
 }
 
-// 4대 종목 PR 1개 저장 (upsert)
-// 회원: saveBig4PR(memberId, 'squat', 80, 5) -> personal_records 사용
-// 트레이너: saveBig4PR(trainerId, 'squat', 100, 5, 'trainer_personal_records', 'trainer_id')
 export const saveBig4PR = async (
   userId,
   exerciseKey,
@@ -539,7 +576,6 @@ export const saveBig4PR = async (
     updated_at: new Date().toISOString(),
   }
 
-  // upsert: idField + exercise_key 조합이 이미 있으면 업데이트, 없으면 인서트
   const { data, error } = await supabase
     .from(table)
     .upsert(payload, { onConflict: `${idField},exercise_key` })

@@ -1,11 +1,114 @@
 import React, { useState, useEffect } from 'react'
 import { supabase } from './supabase'
-import { S, THEME, calcMacro, CYCLE_PHASES, loadFavorites } from './utils'
+import { S, THEME, calcMacro, CYCLE_PHASES, OCCUPATION_MULTIPLIER, OCCUPATION_DESCRIPTION, loadFavorites } from './utils'
 import WorkoutLog from './WorkoutLog'
 import WorkoutStats from './WorkoutStats'
 import DietLog from './DietLog'
 import HelpModal from './HelpModal'
 import InbodyModal from './InbodyModal'
+
+// ─── 목표 카드 input 스타일 (모듈 상수) ───
+const MACRO_INPUT_STYLE = {
+  background: 'transparent',
+  border: 'none',
+  fontSize: '16px',
+  fontWeight: '500',
+  textAlign: 'right',
+  padding: 0,
+  boxSizing: 'border-box',
+  outline: 'none',
+  width: '52px',
+  letterSpacing: '-0.3px',
+  fontFamily: 'inherit',
+}
+
+const MACRO_BAR_BG_STYLE = {
+  height: '3px',
+  background: '#FFF',
+  borderRadius: '2px',
+  width: '100%',
+  marginBottom: '4px',
+  overflow: 'hidden',
+}
+
+// ─── 목표 카드의 단일 영양소 셀 (React.memo로 격리) ───
+// 한 셀에 입력 중일 때 다른 3개 셀이 재렌더되지 않게 분리
+const MacroCell = React.memo(function MacroCell({
+  field, label, unit, value, current, bg, mid, dark, accent,
+  onChangeLocal, onCommit,
+}) {
+  const target = value
+  const pct = target > 0 ? Math.min(Math.round(current / target * 100), 100) : 0
+  const over = target > 0 && current > target
+
+  // 컨테이너 스타일 (셀별로 색이 다르므로 props 기반 메모)
+  const containerStyle = React.useMemo(() => ({
+    background: bg,
+    borderRadius: '12px',
+    padding: '10px 6px',
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'center',
+    minHeight: '105px',
+  }), [bg])
+
+  const labelStyle = React.useMemo(() => ({
+    fontSize: '10px', color: mid, lineHeight: 1, height: '12px',
+  }), [mid])
+
+  const inputStyle = React.useMemo(() => ({
+    ...MACRO_INPUT_STYLE,
+    color: dark,
+  }), [dark])
+
+  const unitStyle = React.useMemo(() => ({
+    fontSize: '8px', color: mid, opacity: 0.85,
+  }), [mid])
+
+  const barFillStyle = React.useMemo(() => ({
+    width: `${pct}%`,
+    background: over ? THEME.danger : accent,
+    height: '3px',
+    borderRadius: '2px',
+  }), [pct, over, accent])
+
+  const footStyle = React.useMemo(() => ({
+    fontSize: '9px',
+    color: over ? THEME.danger : mid,
+    fontWeight: '500',
+    lineHeight: 1,
+    height: '11px',
+  }), [over, mid])
+
+  return (
+    <div style={containerStyle}>
+      <div style={labelStyle}>{label}</div>
+      <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', width: '100%' }}>
+        <div style={{ display: 'flex', alignItems: 'baseline', gap: '2px', justifyContent: 'center' }}>
+          <input
+            type="text"
+            inputMode="numeric"
+            autoComplete="off"
+            autoCorrect="off"
+            autoCapitalize="off"
+            spellCheck="false"
+            value={value}
+            onChange={e => onChangeLocal(field, e.target.value)}
+            onBlur={onCommit}
+            style={inputStyle}
+          />
+          <span style={unitStyle}>{unit}</span>
+        </div>
+      </div>
+      <div style={MACRO_BAR_BG_STYLE}>
+        <div style={barFillStyle} />
+      </div>
+      <div style={footStyle}>
+        {Math.round(current)}{unit} ({pct}%)
+      </div>
+    </div>
+  )
+})
 
 export default function MemberDashboard({ user, onLogout }) {
   const [mainTab, setMainTab] = useState('workout')
@@ -20,7 +123,6 @@ export default function MemberDashboard({ user, onLogout }) {
   const [todayDiet, setTodayDiet] = useState([])
   const [showHelp, setShowHelp] = useState(false)
 
-  // 인바디 모달 상태
   const [inbodyOpen, setInbodyOpen] = useState(false)
   const [inbodyChartOpen, setInbodyChartOpen] = useState(false)
 
@@ -31,6 +133,9 @@ export default function MemberDashboard({ user, onLogout }) {
   const [activity, setActivity] = useState(() => localStorage.getItem(`macro_activity_${user.id}`) || '보통 운동 (주 4~5회)')
   const [intensity, setIntensity] = useState(() => localStorage.getItem(`macro_intensity_${user.id}`) || '일반')
   const [cyclePhase, setCyclePhase] = useState(() => localStorage.getItem(`macro_cycle_${user.id}`) || '')
+  const [occupation, setOccupation] = useState(() => localStorage.getItem(`macro_occupation_${user.id}`) || '')
+  const [hasOccupation, setHasOccupation] = useState(false)
+
   const [macroResult, setMacroResult] = useState(() => {
     try {
       const saved = localStorage.getItem(`macro_result_${user.id}`)
@@ -48,7 +153,7 @@ export default function MemberDashboard({ user, onLogout }) {
   const loadMacroFromDB = async () => {
     const { data, error } = await supabase
       .from('members')
-      .select('goal, gender, target_calories, target_carbs, target_protein, target_fat, macro_weight, macro_muscle, macro_activity, macro_intensity, macro_cycle')
+      .select('goal, gender, target_calories, target_carbs, target_protein, target_fat, macro_weight, macro_muscle, macro_activity, macro_intensity, macro_cycle, macro_occupation')
       .eq('id', user.id)
       .single()
 
@@ -76,14 +181,20 @@ export default function MemberDashboard({ user, onLogout }) {
     if (data.macro_activity) setActivity(data.macro_activity)
     if (data.macro_intensity) setIntensity(data.macro_intensity)
     if (data.macro_cycle) setCyclePhase(data.macro_cycle)
+    if (data.macro_occupation) {
+      setOccupation(data.macro_occupation)
+      setHasOccupation(true)
+    } else {
+      setHasOccupation(false)
+    }
   }
 
   const saveMacroToDB = async (macro, inputs = null) => {
     const payload = {
-      target_calories: macro.target || 0,
-      target_carbs: macro.carbs || 0,
-      target_protein: macro.protein || 0,
-      target_fat: macro.fat || 0,
+      target_calories: parseInt(macro.target) || 0,
+      target_carbs: parseInt(macro.carbs) || 0,
+      target_protein: parseInt(macro.protein) || 0,
+      target_fat: parseInt(macro.fat) || 0,
     }
     if (inputs) {
       payload.goal = inputs.goal
@@ -93,6 +204,7 @@ export default function MemberDashboard({ user, onLogout }) {
       payload.macro_activity = inputs.activity
       payload.macro_intensity = inputs.intensity
       payload.macro_cycle = inputs.cyclePhase || null
+      payload.macro_occupation = inputs.occupation || null
     }
     const { error } = await supabase.from('members').update(payload).eq('id', user.id)
     if (error) {
@@ -117,10 +229,12 @@ export default function MemberDashboard({ user, onLogout }) {
 
   const calculateMacro = async () => {
     if (!weight || !muscle) { alert('체중과 골격근량을 입력해주세요.'); return }
-    const result = calcMacro({ goal, gender, weight: parseFloat(weight), muscle: parseFloat(muscle), activity, intensity, cyclePhase })
-    const ok = await saveMacroToDB(result, { goal, gender, weight, muscle, activity, intensity, cyclePhase })
+    if (!occupation) { alert('직업 활동량을 선택해주세요.'); return }
+    const result = calcMacro({ goal, gender, weight: parseFloat(weight), muscle: parseFloat(muscle), activity, intensity, cyclePhase, occupation })
+    const ok = await saveMacroToDB(result, { goal, gender, weight, muscle, activity, intensity, cyclePhase, occupation })
     if (!ok) return
     setMacroResult(result)
+    setHasOccupation(true)
     localStorage.setItem(`macro_result_${user.id}`, JSON.stringify(result))
     localStorage.setItem(`macro_goal_${user.id}`, goal)
     localStorage.setItem(`macro_gender_${user.id}`, gender)
@@ -129,15 +243,31 @@ export default function MemberDashboard({ user, onLogout }) {
     localStorage.setItem(`macro_activity_${user.id}`, activity)
     localStorage.setItem(`macro_intensity_${user.id}`, intensity)
     localStorage.setItem(`macro_cycle_${user.id}`, cyclePhase)
+    localStorage.setItem(`macro_occupation_${user.id}`, occupation)
     setShowCalcModal(false)
   }
 
-  const updateMacroField = async (field, value) => {
-    const updated = { ...macroResult, [field]: parseInt(value) || 0 }
-    setMacroResult(updated)
-    localStorage.setItem(`macro_result_${user.id}`, JSON.stringify(updated))
-    await saveMacroToDB(updated)
-  }
+  // 입력 중: 로컬 state만 (string으로 보존 → input value 유지 안정화)
+  const updateMacroFieldLocal = React.useCallback((field, value) => {
+    setMacroResult(prev => prev ? { ...prev, [field]: value } : prev)
+  }, [])
+
+  // 입력 완료: localStorage + DB 저장
+  const commitMacroField = React.useCallback(() => {
+    setMacroResult(prev => {
+      if (!prev) return prev
+      // string으로 들어온 값을 정규화
+      const normalized = {
+        target: parseInt(prev.target) || 0,
+        carbs: parseInt(prev.carbs) || 0,
+        protein: parseInt(prev.protein) || 0,
+        fat: parseInt(prev.fat) || 0,
+      }
+      localStorage.setItem(`macro_result_${user.id}`, JSON.stringify(normalized))
+      saveMacroToDB(normalized)
+      return normalized
+    })
+  }, [user.id])
 
   const todayCalories = todayDiet.reduce((s, l) => s + (l.calories || 0), 0)
   const todayCarbs = todayDiet.reduce((s, l) => s + (l.carbs || 0), 0)
@@ -155,7 +285,6 @@ export default function MemberDashboard({ user, onLogout }) {
     </div>
   )
 
-  // 인바디 작은 버튼 스타일
   const inbodyBtnStyle = {
     background: '#FFF',
     border: `0.5px solid ${THEME.primaryAccent}`,
@@ -217,6 +346,15 @@ export default function MemberDashboard({ user, onLogout }) {
     </div>
   )
 
+  const showOccupationBanner = macroResult && !hasOccupation
+
+  const macroCells = macroResult ? [
+    { field: 'target',  label: '칼로리', unit: 'kcal', current: todayCalories, bg: THEME.nutCaloriesBg, mid: THEME.nutCaloriesText, dark: THEME.nutCaloriesDark, accent: THEME.nutCalories },
+    { field: 'carbs',   label: '탄수',   unit: 'g',    current: todayCarbs,    bg: THEME.nutCarbsBg,    mid: THEME.nutCarbsText,    dark: THEME.nutCarbsDark,    accent: THEME.nutCarbs },
+    { field: 'protein', label: '단백질', unit: 'g',    current: todayProtein,  bg: THEME.nutProteinBg,  mid: THEME.nutProteinText,  dark: THEME.nutProteinDark,  accent: THEME.nutProtein },
+    { field: 'fat',     label: '지방',   unit: 'g',    current: todayFat,      bg: THEME.nutFatBg,      mid: THEME.nutFatText,      dark: THEME.nutFatDark,      accent: THEME.nutFat },
+  ] : []
+
   return (
     <div style={S.container}>
       <div style={S.wrap}>
@@ -243,7 +381,6 @@ export default function MemberDashboard({ user, onLogout }) {
 
         {showHelp && <HelpModal type="member" onClose={() => setShowHelp(false)} />}
 
-        {/* 인바디 입력 모달 */}
         <InbodyModal
           user={user}
           memberId={user.id}
@@ -254,7 +391,6 @@ export default function MemberDashboard({ user, onLogout }) {
           idField="member_id"
         />
 
-        {/* 인바디 추이 모달 */}
         <InbodyModal
           user={user}
           memberId={user.id}
@@ -289,6 +425,31 @@ export default function MemberDashboard({ user, onLogout }) {
                 <option value="보통 운동 (주 4~5회)">보통 운동 (주 4~5회)</option>
                 <option value="고강도 운동 (주 6회+)">고강도 운동 (주 6회+)</option>
               </select>
+
+              <div style={{ marginBottom: '8px' }}>
+                <select
+                  style={{
+                    ...S.input,
+                    padding: '10px',
+                    fontSize: '13px',
+                    background: occupation ? '#FAFAFA' : THEME.warningLight,
+                    border: occupation ? `1px solid ${THEME.border}` : `1px solid ${THEME.warning}`,
+                  }}
+                  value={occupation}
+                  onChange={e => setOccupation(e.target.value)}
+                >
+                  <option value="">직업 활동량 선택 (필수)</option>
+                  {Object.keys(OCCUPATION_MULTIPLIER).map(key => (
+                    <option key={key} value={key}>
+                      {key} (×{OCCUPATION_MULTIPLIER[key].toFixed(2)}) — {OCCUPATION_DESCRIPTION[key]}
+                    </option>
+                  ))}
+                </select>
+                <p style={{ fontSize: '10px', color: THEME.textSub, margin: '4px 2px 0' }}>
+                  본업·일상 활동량을 선택하세요. 운동 빈도(위)와는 별개입니다.
+                </p>
+              </div>
+
               <select style={{ ...S.input, padding: '10px', marginBottom: '8px', fontSize: '13px' }} value={intensity} onChange={e => setIntensity(e.target.value)}>
                 <option value="완만">완만 {goal === '벌크업' ? '(+300kcal)' : '(-300kcal)'}</option>
                 <option value="일반">일반 {goal === '벌크업' ? '(+400kcal)' : '(-500kcal)'}</option>
@@ -307,6 +468,54 @@ export default function MemberDashboard({ user, onLogout }) {
           </div>
         )}
 
+        {showOccupationBanner && (
+          <div style={{
+            background: THEME.warningLight,
+            border: `0.5px solid ${THEME.warning}`,
+            borderRadius: '12px',
+            padding: '11px 13px',
+            marginBottom: '12px',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '10px',
+          }}>
+            <div style={{
+              width: '26px', height: '26px',
+              background: THEME.warning,
+              borderRadius: '50%',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              flexShrink: 0,
+            }}>
+              <span style={{ color: '#FFF', fontSize: '14px', fontWeight: '500' }}>!</span>
+            </div>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <p style={{ fontSize: '12px', fontWeight: '500', color: THEME.warningDark, margin: '0 0 2px' }}>
+                TDEE 공식이 더 정확해졌어요
+              </p>
+              <p style={{ fontSize: '10px', color: THEME.warningText, margin: 0, lineHeight: 1.5 }}>
+                직업 활동량 추가됨. 식단 설정을 다시 해주세요
+              </p>
+            </div>
+            <button
+              onClick={() => setShowCalcModal(true)}
+              style={{
+                background: THEME.warning,
+                color: '#FFF',
+                border: 'none',
+                padding: '7px 12px',
+                borderRadius: '8px',
+                fontSize: '11px',
+                fontWeight: '500',
+                cursor: 'pointer',
+                fontFamily: 'inherit',
+                flexShrink: 0,
+              }}
+            >설정</button>
+          </div>
+        )}
+
         {macroResult && (
           <div style={{ background: '#FFF', borderRadius: '14px', padding: '14px', marginBottom: '12px' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: '12px' }}>
@@ -314,38 +523,22 @@ export default function MemberDashboard({ user, onLogout }) {
               <span style={{ fontSize: '10px', color: THEME.textHint }}>탭하여 수정</span>
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: '8px' }}>
-              {[
-                { label: '칼로리', field: 'target', unit: 'kcal', current: todayCalories, bg: THEME.nutCaloriesBg, mid: THEME.nutCaloriesText, dark: THEME.nutCaloriesDark, accent: THEME.nutCalories },
-                { label: '탄수', field: 'carbs', unit: 'g', current: todayCarbs, bg: THEME.nutCarbsBg, mid: THEME.nutCarbsText, dark: THEME.nutCarbsDark, accent: THEME.nutCarbs },
-                { label: '단백질', field: 'protein', unit: 'g', current: todayProtein, bg: THEME.nutProteinBg, mid: THEME.nutProteinText, dark: THEME.nutProteinDark, accent: THEME.nutProtein },
-                { label: '지방', field: 'fat', unit: 'g', current: todayFat, bg: THEME.nutFatBg, mid: THEME.nutFatText, dark: THEME.nutFatDark, accent: THEME.nutFat },
-              ].map(({ label, field, unit, current, bg, mid, dark, accent }) => {
-                const target = macroResult[field]
-                const pct = target > 0 ? Math.min(Math.round(current / target * 100), 100) : 0
-                const over = target > 0 && current > target
-                return (
-                  <div key={field} style={{ background: bg, borderRadius: '12px', padding: '10px 6px', display: 'flex', flexDirection: 'column', alignItems: 'center', minHeight: '105px' }}>
-                    <div style={{ fontSize: '10px', color: mid, lineHeight: 1, height: '12px' }}>{label}</div>
-                    <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', width: '100%' }}>
-                      <div style={{ display: 'flex', alignItems: 'baseline', gap: '2px', justifyContent: 'center' }}>
-                        <input
-                          type="number"
-                          value={macroResult[field]}
-                          onChange={e => updateMacroField(field, e.target.value)}
-                          style={{ background: 'transparent', border: 'none', color: dark, fontSize: '16px', fontWeight: '500', textAlign: 'right', padding: 0, boxSizing: 'border-box', outline: 'none', width: '52px', letterSpacing: '-0.3px', fontFamily: 'inherit' }}
-                        />
-                        <span style={{ fontSize: '8px', color: mid, opacity: 0.85 }}>{unit}</span>
-                      </div>
-                    </div>
-                    <div style={{ height: '3px', background: '#FFF', borderRadius: '2px', width: '100%', marginBottom: '4px', overflow: 'hidden' }}>
-                      <div style={{ width: `${pct}%`, background: over ? THEME.danger : accent, height: '3px', borderRadius: '2px' }} />
-                    </div>
-                    <div style={{ fontSize: '9px', color: over ? THEME.danger : mid, fontWeight: '500', lineHeight: 1, height: '11px' }}>
-                      {Math.round(current)}{unit} ({pct}%)
-                    </div>
-                  </div>
-                )
-              })}
+              {macroCells.map(c => (
+                <MacroCell
+                  key={c.field}
+                  field={c.field}
+                  label={c.label}
+                  unit={c.unit}
+                  value={macroResult[c.field]}
+                  current={c.current}
+                  bg={c.bg}
+                  mid={c.mid}
+                  dark={c.dark}
+                  accent={c.accent}
+                  onChangeLocal={updateMacroFieldLocal}
+                  onCommit={commitMacroField}
+                />
+              ))}
             </div>
           </div>
         )}
@@ -366,7 +559,7 @@ export default function MemberDashboard({ user, onLogout }) {
         {mainTab === 'diet' && (
           <>
             <SubTabs value={dietSubTab} onChange={setDietSubTab} />
-            <DietLog user={user} onDietUpdate={loadTodayDiet} weight={weight} muscle={muscle} forcedTab={dietSubTab} macroResult={macroResult} goal={goal} intensity={intensity} />
+            <DietLog user={user} onDietUpdate={loadTodayDiet} weight={weight} muscle={muscle} occupation={occupation} forcedTab={dietSubTab} macroResult={macroResult} goal={goal} intensity={intensity} />
           </>
         )}
 
