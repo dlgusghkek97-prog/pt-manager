@@ -26,44 +26,139 @@ export default function App() {
   const [memberCode, setMemberCode] = useState('')
   const [memberName, setMemberName] = useState('')
 
-  // 자동로그인
+  // ─── 자동 로그인 ───
+  // 1. localStorage에서 user 정보 복원
+  // 2. Supabase Auth 세션도 같이 복원 (RLS 작동을 위해)
   useEffect(() => {
-    const savedUser = localStorage.getItem('pt_user')
-    if (savedUser) {
-      setUser(JSON.parse(savedUser))
+    const restoreSession = async () => {
+      const savedUser = localStorage.getItem('pt_user')
+      if (!savedUser) {
+        setLoading(false)
+        return
+      }
+
+      const parsedUser = JSON.parse(savedUser)
+
+      // Supabase Auth 세션 확인
+      const { data: { session } } = await supabase.auth.getSession()
+
+      if (!session) {
+        // Auth 세션이 없는데 localStorage에는 user 정보가 있음 → 만료된 세션
+        // → 로그아웃 처리
+        localStorage.removeItem('pt_user')
+        setLoading(false)
+        return
+      }
+
+      // 세션 있으면 user 복원
+      setUser(parsedUser)
+      setLoading(false)
     }
-    setLoading(false)
+
+    restoreSession()
   }, [])
 
+  // ─── 트레이너 로그인 ───
   const trainerLogin = async () => {
     setLoading(true); setError('')
     const { data, error } = await supabase.auth.signInWithPassword({ email, password })
-    if (error) { setError('이메일 또는 비밀번호가 올바르지 않습니다.') }
-    else {
-      const u = { type: 'trainer', ...data.user }
-      setUser(u)
-      localStorage.setItem('pt_user', JSON.stringify(u))
+    if (error) { 
+      setError('이메일 또는 비밀번호가 올바르지 않습니다.')
+      setLoading(false)
+      return
     }
+    const u = { type: 'trainer', ...data.user }
+    setUser(u)
+    localStorage.setItem('pt_user', JSON.stringify(u))
     setLoading(false)
   }
 
+  // ─── 회원 로그인 (익명 Auth + 자동 매칭) ───
   const memberLogin = async () => {
     setLoading(true); setError('')
-    const { data, error } = await supabase.from('members').select('*').eq('code', memberCode.toUpperCase()).single()
-    if (error || !data) { setError('코드를 확인해주세요.') }
-    else if (data.name !== memberName.trim()) { setError('이름이 일치하지 않습니다.') }
-    else {
-      const u = { type: 'member', ...data }
+
+    try {
+      // 1. 코드 + 이름으로 회원 찾기
+      const { data: memberData, error: memberError } = await supabase
+        .from('members')
+        .select('*')
+        .eq('code', memberCode.toUpperCase())
+        .maybeSingle()
+
+      if (memberError || !memberData) {
+        setError('코드를 확인해주세요.')
+        setLoading(false)
+        return
+      }
+
+      if (memberData.name !== memberName.trim()) {
+        setError('이름이 일치하지 않습니다.')
+        setLoading(false)
+        return
+      }
+
+      // 2. 현재 익명 Auth 세션이 있는지 확인
+      const { data: { session: existingSession } } = await supabase.auth.getSession()
+
+      let authUserId = existingSession?.user?.id
+
+      // 3. 세션 없으면 익명 Auth 새로 생성
+      if (!authUserId) {
+        const { data: anonData, error: anonError } = await supabase.auth.signInAnonymously()
+        if (anonError) {
+          console.error('[memberLogin] anonymous auth error:', anonError)
+          setError('로그인에 실패했습니다. 다시 시도해주세요.')
+          setLoading(false)
+          return
+        }
+        authUserId = anonData.user.id
+      }
+
+      // 4. 회원과 익명 user.id 매칭 처리
+      // case A: members.auth_user_id가 비어있음 → 이번에 매칭 (첫 로그인 또는 폰 변경)
+      // case B: 이미 같은 auth_user_id → 그대로 사용
+      // case C: 다른 auth_user_id로 저장돼있음 → 폰 바꿈 → 덮어쓰기
+      if (memberData.auth_user_id !== authUserId) {
+        const { error: updateError } = await supabase
+          .from('members')
+          .update({ auth_user_id: authUserId })
+          .eq('id', memberData.id)
+
+        if (updateError) {
+          console.error('[memberLogin] auth_user_id 업데이트 실패:', updateError)
+          // RLS가 켜진 후엔 이 업데이트가 실패할 수 있음 (회원이 자기 row UPDATE 권한 필요)
+          // 일단 에러 무시하고 진행 — 나중에 RLS 정책에 SELECT/UPDATE 둘 다 포함
+          setError('회원 인증에 실패했습니다. 트레이너에게 문의해주세요.')
+          await supabase.auth.signOut()
+          setLoading(false)
+          return
+        }
+
+        memberData.auth_user_id = authUserId
+      }
+
+      // 5. user 세팅 + localStorage 저장
+      const u = { type: 'member', ...memberData }
       setUser(u)
       localStorage.setItem('pt_user', JSON.stringify(u))
+      setLoading(false)
+    } catch (e) {
+      console.error('[memberLogin] unexpected error:', e)
+      setError('로그인 중 오류가 발생했습니다.')
+      setLoading(false)
     }
-    setLoading(false)
   }
 
-  const logout = () => {
+  // ─── 로그아웃 ───
+  const logout = async () => {
     localStorage.removeItem('pt_user')
-    supabase.auth.signOut()
-    setUser(null); setMode('select'); setEmail(''); setPassword(''); setMemberCode(''); setMemberName('')
+    await supabase.auth.signOut()
+    setUser(null)
+    setMode('select')
+    setEmail('')
+    setPassword('')
+    setMemberCode('')
+    setMemberName('')
   }
 
   if (loading) return (
