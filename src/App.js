@@ -58,6 +58,29 @@ export default function App() {
     restoreSession()
   }, [])
 
+  // ─── 푸시 알림 URL 쿼리 처리 ───
+  // SW가 앱 닫힌 상태에서 푸시 클릭 시 ?notif_link=... 로 새 창 열어줌
+  // user 로그인 완료 후 1번만 dispatch (3번 시도 X)
+  useEffect(() => {
+    if (!user) return
+
+    const params = new URLSearchParams(window.location.search)
+    const notifLink = params.get('notif_link')
+    if (!notifLink) return
+
+    // 쿼리 즉시 제거 (재진입 시 중복 방지)
+    window.history.replaceState({}, '', window.location.pathname)
+
+    // dashboard listener가 등록될 시간 확보 후 1번만 dispatch
+    const timer = setTimeout(() => {
+      window.dispatchEvent(new CustomEvent('pt-notification-navigate', {
+        detail: { link: notifLink }
+      }))
+    }, 800)
+
+    return () => clearTimeout(timer)
+  }, [user?.id])  // user 객체 전체 아닌 id만 — 불필요한 재실행 방지
+
   // ─── 트레이너 로그인 ───
   const trainerLogin = async () => {
     setLoading(true); setError('')
