@@ -370,15 +370,17 @@ export default function TrainerDashboard({ user, onLogout }) {
   const [cyclePhase, setCyclePhase] = useState(() => localStorage.getItem(`tmacro_cycle_${user.id}`) || '')
   const [occupation, setOccupation] = useState(() => localStorage.getItem(`tmacro_occupation_${user.id}`) || '')
 
-  {showHelp && <HelpModal type="trainer" onClose={() => setShowHelp(false)} />}
+  useEffect(() => {
+    loadMembers(); loadTrainerMacro(); loadTrainerTodayDiet(); loadTrainerFavorites()
 
-        {showPushPrompt && (
-          <PushPromptModal
-            userId={user.id}
-            userType="trainer"
-            onClose={() => setShowPushPrompt(false)}
-          />
-        )}
+    // 푸시 알림 안내 모달 (2초 뒤 — 화면 렌더 안정화 후)
+    const timer = setTimeout(async () => {
+      const { shouldShowPushPrompt } = await import('./utils')
+      const should = await shouldShowPushPrompt(user.id)
+      if (should) setShowPushPrompt(true)
+    }, 2000)
+    return () => clearTimeout(timer)
+  }, [])
 
   useEffect(() => {
     if (members.length > 0) loadStatsByDate(members, memberListDate)
@@ -1256,6 +1258,14 @@ export default function TrainerDashboard({ user, onLogout }) {
         </div>
 
         {showHelp && <HelpModal type="trainer" onClose={() => setShowHelp(false)} />}
+
+        {showPushPrompt && (
+          <PushPromptModal
+            userId={user.id}
+            userType="trainer"
+            onClose={() => setShowPushPrompt(false)}
+          />
+        )}
 
         {/* 채팅 목록 모달 */}
         <ChatList
