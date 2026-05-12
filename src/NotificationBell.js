@@ -77,6 +77,8 @@ export default function NotificationBell({ userId, userType, onNavigate }) {
           filter: `recipient_id=eq.${userId}`,
         },
         (payload) => {
+          // 채팅 알림은 🔔에서 제외 (💬 아이콘에서만 표시)
+          if (payload.new.kind === 'chat_message') return
           setNotifications(prev => [payload.new, ...prev])
           setUnreadCount(prev => prev + 1)
         }

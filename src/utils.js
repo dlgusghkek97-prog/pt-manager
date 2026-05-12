@@ -627,6 +627,7 @@ export const loadNotifications = async (recipientId, limit = 30) => {
     .from('notifications')
     .select('*')
     .eq('recipient_id', recipientId)
+    .neq('kind', 'chat_message')
     .order('created_at', { ascending: false })
     .limit(limit)
   if (error) {
@@ -644,6 +645,7 @@ export const getUnreadNotificationCount = async (recipientId) => {
     .select('*', { count: 'exact', head: true })
     .eq('recipient_id', recipientId)
     .eq('is_read', false)
+    .neq('kind', 'chat_message')
   if (error) {
     console.error('[getUnreadNotificationCount] error:', error)
     return 0
@@ -1013,18 +1015,9 @@ export const sendMessage = async ({
     .update(updatePayload)
     .eq('id', conversationId)
 
-  // 3. 상대방에게 알림
-  const recipientType = senderType === 'trainer' ? 'member' : 'trainer'
-  const recipientId = senderType === 'trainer' ? conv.member_id : conv.trainer_id
-  await sendNotification({
-    recipientType,
-    recipientId,
-    senderType,
-    senderId,
-    kind: 'chat_message',
-    content: preview,
-    link: `chat:${conversationId}`,
-  })
+  // 3. 채팅 알림은 notifications 테이블에 INSERT하지 않음
+  //    → 채팅은 💬 아이콘의 미읽음 카운트로만 표시
+  //    → 푸시 알림은 별도 경로 (messages INSERT trigger + Edge Function)에서 처리
 
   return { success: true, data: msg }
 }
