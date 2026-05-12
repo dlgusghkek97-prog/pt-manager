@@ -1,13 +1,14 @@
 import React, { useState, useEffect } from 'react'
 import { supabase } from './supabase'
-import { S, THEME, calcMacro, CYCLE_PHASES, OCCUPATION_MULTIPLIER, OCCUPATION_DESCRIPTION, loadFavorites } from './utils'
+import { S, THEME, calcMacro, CYCLE_PHASES, OCCUPATION_MULTIPLIER, OCCUPATION_DESCRIPTION, loadFavorites, calcPtRemaining, markTodayComplete, isTodayCompleted } from './utils'
 import WorkoutLog from './WorkoutLog'
 import WorkoutStats from './WorkoutStats'
 import DietLog from './DietLog'
 import HelpModal from './HelpModal'
 import InbodyModal from './InbodyModal'
+import NotificationBell from './NotificationBell'
+import ChatRoom from './ChatRoom'
 
-// ─── 목표 카드 input 스타일 (모듈 상수) ───
 const MACRO_INPUT_STYLE = {
   background: 'transparent',
   border: 'none',
@@ -31,8 +32,12 @@ const MACRO_BAR_BG_STYLE = {
   overflow: 'hidden',
 }
 
-// ─── 목표 카드의 단일 영양소 셀 (React.memo로 격리) ───
-// 한 셀에 입력 중일 때 다른 3개 셀이 재렌더되지 않게 분리
+const ChatBubbleIcon = ({ color = THEME.textSub, size = 14 }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+  </svg>
+)
+
 const MacroCell = React.memo(function MacroCell({
   field, label, unit, value, current, bg, mid, dark, accent,
   onChangeLocal, onCommit,
@@ -41,7 +46,6 @@ const MacroCell = React.memo(function MacroCell({
   const pct = target > 0 ? Math.min(Math.round(current / target * 100), 100) : 0
   const over = target > 0 && current > target
 
-  // 컨테이너 스타일 (셀별로 색이 다르므로 props 기반 메모)
   const containerStyle = React.useMemo(() => ({
     background: bg,
     borderRadius: '12px',
@@ -126,6 +130,13 @@ export default function MemberDashboard({ user, onLogout }) {
   const [inbodyOpen, setInbodyOpen] = useState(false)
   const [inbodyChartOpen, setInbodyChartOpen] = useState(false)
 
+  const [memberInfo, setMemberInfo] = useState(user)
+  const [completingToday, setCompletingToday] = useState(false)
+
+  // 채팅
+  const [chatOpen, setChatOpen] = useState(false)
+  const [trainerName, setTrainerName] = useState('트레이너')
+
   const [goal, setGoal] = useState(() => localStorage.getItem(`macro_goal_${user.id}`) || user.goal || '다이어트')
   const [gender, setGender] = useState(() => localStorage.getItem(`macro_gender_${user.id}`) || user.gender || '여성')
   const [weight, setWeight] = useState(() => localStorage.getItem(`macro_weight_${user.id}`) || '')
@@ -143,7 +154,46 @@ export default function MemberDashboard({ user, onLogout }) {
     } catch { return null }
   })
 
-  useEffect(() => { loadAllLogs(); loadTodayDiet(); loadMacroFromDB(); loadAllFavorites() }, [])
+  useEffect(() => {
+    loadAllLogs()
+    loadTodayDiet()
+    loadMacroFromDB()
+    loadAllFavorites()
+    refreshMemberInfo()
+    loadTrainerName()
+  }, [])
+
+  const refreshMemberInfo = async () => {
+    const { data, error } = await supabase
+      .from('members')
+      .select('*')
+      .eq('id', user.id)
+      .single()
+    if (error) {
+      console.error('[MemberDashboard] refreshMemberInfo error:', error)
+      return
+    }
+    if (data) {
+      setMemberInfo(data)
+      const updatedUser = { ...user, ...data, type: 'member' }
+      localStorage.setItem('pt_user', JSON.stringify(updatedUser))
+    }
+  }
+
+  // 담당 트레이너 이름 로드
+  const loadTrainerName = async () => {
+    if (!user.trainer_id) return
+    const { data, error } = await supabase
+      .from('trainers')
+      .select('name')
+      .eq('id', user.trainer_id)
+      .single()
+    if (error) {
+      console.error('[MemberDashboard] loadTrainerName error:', error)
+      return
+    }
+    if (data?.name) setTrainerName(data.name)
+  }
 
   const loadAllFavorites = async () => {
     const data = await loadFavorites(user.id, 'member_favorite_exercises', 'member_id')
@@ -247,16 +297,13 @@ export default function MemberDashboard({ user, onLogout }) {
     setShowCalcModal(false)
   }
 
-  // 입력 중: 로컬 state만 (string으로 보존 → input value 유지 안정화)
   const updateMacroFieldLocal = React.useCallback((field, value) => {
     setMacroResult(prev => prev ? { ...prev, [field]: value } : prev)
   }, [])
 
-  // 입력 완료: localStorage + DB 저장
   const commitMacroField = React.useCallback(() => {
     setMacroResult(prev => {
       if (!prev) return prev
-      // string으로 들어온 값을 정규화
       const normalized = {
         target: parseInt(prev.target) || 0,
         carbs: parseInt(prev.carbs) || 0,
@@ -268,6 +315,43 @@ export default function MemberDashboard({ user, onLogout }) {
       return normalized
     })
   }, [user.id])
+
+  const handleTodayComplete = async () => {
+    if (completingToday) return
+    if (!window.confirm('오늘 운동과 식단 기록을 모두 완료했습니까?\n트레이너에게 알림이 전송됩니다.')) return
+    setCompletingToday(true)
+    const result = await markTodayComplete(user.id)
+    setCompletingToday(false)
+    if (!result.success) {
+      if (result.alreadyDone) {
+        alert('오늘은 이미 완료를 누르셨어요!')
+      } else {
+        alert(result.error || '처리 실패')
+      }
+      return
+    }
+    alert('오늘 기록 완료! 트레이너에게 알림이 전송되었습니다.')
+    await refreshMemberInfo()
+  }
+
+  // 알림 클릭 시 navigation
+  const handleNavigate = (link) => {
+    if (!link) return
+    if (link.startsWith('chat:')) {
+      setChatOpen(true)
+    } else if (link.startsWith('diet:')) {
+      // 식단 탭으로 이동 + 해당 날짜 자동 선택
+      const date = link.split(':')[1]
+      setMainTab('diet')
+      setDietSubTab('log')
+      if (date) {
+        // 식단의 selectedDate는 DietLog 내부 state라 직접 못 바꿈
+        // 일단 식단 탭으로만 이동 (날짜 동기화는 추후 개선)
+      }
+      // 화면 상단으로 스크롤
+      window.scrollTo({ top: 0, behavior: 'smooth' })
+    }
+  }
 
   const todayCalories = todayDiet.reduce((s, l) => s + (l.calories || 0), 0)
   const todayCarbs = todayDiet.reduce((s, l) => s + (l.carbs || 0), 0)
@@ -355,31 +439,132 @@ export default function MemberDashboard({ user, onLogout }) {
     { field: 'fat',     label: '지방',   unit: 'g',    current: todayFat,      bg: THEME.nutFatBg,      mid: THEME.nutFatText,      dark: THEME.nutFatDark,      accent: THEME.nutFat },
   ] : []
 
+  const { total: ptTotal, remaining: ptRemaining, hasNoPt } = calcPtRemaining(memberInfo)
+  const ptIsZero = hasNoPt || ptRemaining <= 0
+  const ptIsLow = !hasNoPt && ptRemaining <= 5 && ptRemaining > 0
+
+  let ptBadgeBg, ptBadgeBorder, ptBadgeColor, ptBadgeText
+  if (hasNoPt) {
+    ptBadgeBg = THEME.warningLight
+    ptBadgeBorder = THEME.warning
+    ptBadgeColor = THEME.warningDark
+    ptBadgeText = 'PT 미등록'
+  } else if (ptRemaining <= 0) {
+    ptBadgeBg = THEME.dangerLight
+    ptBadgeBorder = THEME.danger
+    ptBadgeColor = THEME.dangerDark
+    ptBadgeText = `PT 0회`
+  } else if (ptIsLow) {
+    ptBadgeBg = THEME.warningLight
+    ptBadgeBorder = THEME.warning
+    ptBadgeColor = THEME.warningDark
+    ptBadgeText = `PT ${ptRemaining}회`
+  } else {
+    ptBadgeBg = THEME.primaryLight
+    ptBadgeBorder = THEME.primaryAccent
+    ptBadgeColor = THEME.primaryDark
+    ptBadgeText = `PT ${ptRemaining}회`
+  }
+
+  const todayDone = isTodayCompleted(memberInfo)
+
   return (
     <div style={S.container}>
       <div style={S.wrap}>
         <div style={S.header}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flex: 1, minWidth: 0 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flex: 1, minWidth: 0 }}>
             <PTLogo />
-            <span style={{ fontSize: '14px', color: THEME.text, fontWeight: '500', flexShrink: 0 }}>{user.name}님</span>
-            <div style={{ display: 'flex', gap: '4px', marginLeft: '4px' }}>
+            <span style={{ fontSize: '13px', color: THEME.text, fontWeight: '500', flexShrink: 0 }}>{user.name}님</span>
+            <div
+              style={{
+                background: ptBadgeBg,
+                border: `0.5px solid ${ptBadgeBorder}`,
+                color: ptBadgeColor,
+                padding: '3px 8px',
+                borderRadius: '10px',
+                fontSize: '10px',
+                fontWeight: '500',
+                whiteSpace: 'nowrap',
+                flexShrink: 0,
+              }}
+              title={hasNoPt ? 'PT 미등록' : `잔여 ${ptRemaining}회 / 총 ${ptTotal}회`}
+            >
+              {ptBadgeText}
+            </div>
+            <div style={{ display: 'flex', gap: '3px' }}>
               <button style={inbodyBtnStyle} onClick={() => setInbodyOpen(true)}>인바디</button>
               <button style={inbodyBtnStyle} onClick={() => setInbodyChartOpen(true)}>추이</button>
             </div>
           </div>
-          <div style={{ display: 'flex', gap: '5px', alignItems: 'center' }}>
+          <div style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
+            <NotificationBell userId={user.id} userType="member" onNavigate={handleNavigate} />
+            <button
+              onClick={() => setChatOpen(true)}
+              style={{ background: '#FFF', border: `0.5px solid ${THEME.border}`, color: THEME.textSub, width: '30px', height: '30px', borderRadius: '50%', cursor: 'pointer', padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}
+              title="트레이너와 채팅"
+            >
+              <ChatBubbleIcon color={THEME.textSub} size={14} />
+            </button>
             <button
               onClick={() => setShowHelp(true)}
               style={{ background: '#FFF', border: `0.5px solid ${THEME.border}`, color: THEME.textSub, width: '30px', height: '30px', borderRadius: '50%', cursor: 'pointer', fontSize: '13px', fontWeight: '500', padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}
               title="도움말"
             >?</button>
-            <button onClick={() => setShowCalcModal(true)} style={{ background: '#FFF', border: `0.5px solid ${THEME.border}`, color: THEME.primary, padding: '0 12px', borderRadius: '15px', cursor: 'pointer', fontSize: '11px', fontWeight: '500', height: '30px', display: 'flex', alignItems: 'center', flexShrink: 0 }}>
+            <button onClick={() => setShowCalcModal(true)} style={{ background: '#FFF', border: `0.5px solid ${THEME.border}`, color: THEME.primary, padding: '0 10px', borderRadius: '15px', cursor: 'pointer', fontSize: '11px', fontWeight: '500', height: '30px', display: 'flex', alignItems: 'center', flexShrink: 0 }}>
               식단 설정
             </button>
           </div>
         </div>
 
+        <button
+          onClick={handleTodayComplete}
+          disabled={todayDone || completingToday}
+          style={{
+            width: '100%',
+            background: todayDone ? THEME.primaryAccent : THEME.primary,
+            color: todayDone ? THEME.primaryDark : '#FFF',
+            border: 'none',
+            padding: '11px',
+            borderRadius: '12px',
+            fontSize: '13px',
+            fontWeight: '500',
+            cursor: (todayDone || completingToday) ? 'default' : 'pointer',
+            fontFamily: 'inherit',
+            marginBottom: '12px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: '6px',
+            opacity: completingToday ? 0.7 : 1,
+          }}
+        >
+          {todayDone ? (
+            <>
+              <span style={{ fontSize: '14px' }}>✓</span>
+              오늘 완료됨
+            </>
+          ) : (
+            <>
+              <span style={{ fontSize: '14px' }}>📝</span>
+              {completingToday ? '처리 중...' : '오늘 기록 완료 (트레이너에게 알림)'}
+            </>
+          )}
+        </button>
+
         {showHelp && <HelpModal type="member" onClose={() => setShowHelp(false)} />}
+
+        {chatOpen && user.trainer_id && (
+          <ChatRoom
+            trainerId={user.trainer_id}
+            memberId={user.id}
+            trainerName={trainerName}
+            memberName={user.name}
+            viewerType="member"
+            viewerId={user.id}
+            onClose={() => setChatOpen(false)}
+            ptIsZero={ptIsZero}
+          />
+        )}
 
         <InbodyModal
           user={user}
@@ -516,6 +701,39 @@ export default function MemberDashboard({ user, onLogout }) {
           </div>
         )}
 
+        {ptIsZero && (
+          <div style={{
+            background: THEME.dangerLight,
+            border: `0.5px solid ${THEME.danger}`,
+            borderRadius: '12px',
+            padding: '11px 13px',
+            marginBottom: '12px',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '10px',
+          }}>
+            <div style={{
+              width: '26px', height: '26px',
+              background: THEME.danger,
+              borderRadius: '50%',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              flexShrink: 0,
+            }}>
+              <span style={{ color: '#FFF', fontSize: '14px', fontWeight: '500' }}>!</span>
+            </div>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <p style={{ fontSize: '12px', fontWeight: '500', color: THEME.dangerDark, margin: '0 0 2px' }}>
+                {hasNoPt ? 'PT가 등록되지 않았습니다' : 'PT 잔여 횟수가 없습니다'}
+              </p>
+              <p style={{ fontSize: '10px', color: THEME.danger, margin: 0, lineHeight: 1.5 }}>
+                트레이너에게 결제 문의 · 사진/영상 업로드 제한
+              </p>
+            </div>
+          </div>
+        )}
+
         {macroResult && (
           <div style={{ background: '#FFF', borderRadius: '14px', padding: '14px', marginBottom: '12px' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: '12px' }}>
@@ -551,7 +769,7 @@ export default function MemberDashboard({ user, onLogout }) {
         {mainTab === 'workout' && (
           <>
             <SubTabs value={workoutSubTab} onChange={setWorkoutSubTab} />
-            {workoutSubTab === 'log' && <WorkoutLog user={user} selectedDate={selectedDate} setSelectedDate={setSelectedDate} exercises={exercises} setExercises={setExercises} onUpdate={loadAllLogs} weight={weight} muscle={muscle} allLogs={allLogs} favorites={favorites} onFavoritesUpdate={loadAllFavorites} />}
+            {workoutSubTab === 'log' && <WorkoutLog user={user} selectedDate={selectedDate} setSelectedDate={setSelectedDate} exercises={exercises} setExercises={setExercises} onUpdate={loadAllLogs} weight={weight} muscle={muscle} allLogs={allLogs} favorites={favorites} onFavoritesUpdate={loadAllFavorites} ptIsZero={ptIsZero} />}
             {workoutSubTab === 'stats' && <WorkoutStats allLogs={allLogs} memberId={user.id} />}
           </>
         )}
@@ -559,7 +777,7 @@ export default function MemberDashboard({ user, onLogout }) {
         {mainTab === 'diet' && (
           <>
             <SubTabs value={dietSubTab} onChange={setDietSubTab} />
-            <DietLog user={user} onDietUpdate={loadTodayDiet} weight={weight} muscle={muscle} occupation={occupation} forcedTab={dietSubTab} macroResult={macroResult} goal={goal} intensity={intensity} />
+            <DietLog user={user} onDietUpdate={loadTodayDiet} weight={weight} muscle={muscle} occupation={occupation} forcedTab={dietSubTab} macroResult={macroResult} goal={goal} intensity={intensity} ptIsZero={ptIsZero} />
           </>
         )}
 

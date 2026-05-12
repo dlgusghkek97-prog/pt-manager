@@ -351,6 +351,7 @@ export default function InbodyModal({
     }
     setLoading(true)
     let result
+    const wasNew = !editId  // 새로 추가인지 기억
     if (editId) {
       result = await updateInbody(editId, form, editTable || table)
     } else {
@@ -362,6 +363,21 @@ export default function InbodyModal({
       alert(result.error || '저장 실패')
       return
     }
+
+    // 회원이 본인 인바디를 새로 입력했을 때 → 트레이너에게 알림
+    if (wasNew && !isTrainerInput && user.trainer_id) {
+      const { sendNotification } = await import('./utils')
+      await sendNotification({
+        recipientType: 'trainer',
+        recipientId: user.trainer_id,
+        senderType: 'member',
+        senderId: user.id,
+        kind: 'inbody_added',
+        content: `${user.name || '회원'}님이 인바디를 입력했어요 (${form.measured_date.replace(/-/g, '.')})`,
+        link: `inbody:${user.id}`,
+      })
+    }
+
     setEditId(null)
     setEditTable(null)
     setForm({

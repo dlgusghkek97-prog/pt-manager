@@ -10,6 +10,13 @@ const CameraIcon = ({ color = '#A8C8B5', size = 20 }) => (
   </svg>
 )
 
+const LockIcon = ({ color = '#C5705C', size = 16 }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="1.8" strokeLinecap="round">
+    <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
+    <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+  </svg>
+)
+
 const TimerIcon = ({ color = '#FFF', size = 22 }) => (
   <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round">
     <circle cx="12" cy="13" r="8"/>
@@ -17,7 +24,7 @@ const TimerIcon = ({ color = '#FFF', size = 22 }) => (
   </svg>
 )
 
-export default function WorkoutLog({ user, selectedDate, setSelectedDate, exercises, setExercises, onUpdate, tableOverride, trainerIdField, weight, muscle, allLogs, favorites, onFavoritesUpdate }) {
+export default function WorkoutLog({ user, selectedDate, setSelectedDate, exercises, setExercises, onUpdate, tableOverride, trainerIdField, weight, muscle, allLogs, favorites, onFavoritesUpdate, ptIsZero = false }) {
   const TABLE = tableOverride || 'workout_logs'
   const ID_FIELD = trainerIdField || 'member_id'
   const FAV_TABLE = trainerIdField ? 'trainer_favorite_exercises' : 'member_favorite_exercises'
@@ -29,7 +36,6 @@ export default function WorkoutLog({ user, selectedDate, setSelectedDate, exerci
   const [previewIdx, setPreviewIdx] = useState(null)
   const fileInputRefs = useRef({})
 
-  // ─── 휴식 타이머 (FAB 방식) ───
   const [timerActive, setTimerActive] = useState(false)
   const [timerPaused, setTimerPaused] = useState(false)
   const [timerDone, setTimerDone] = useState(false)
@@ -39,7 +45,6 @@ export default function WorkoutLog({ user, selectedDate, setSelectedDate, exerci
   const [customSeconds, setCustomSeconds] = useState('60')
   const timerIntervalRef = useRef(null)
 
-  // ─── 즐겨찾기 모달 ───
   const [showFavModal, setShowFavModal] = useState(false)
   const [favModalExIdx, setFavModalExIdx] = useState(null)
   const [favModalActivePart, setFavModalActivePart] = useState('')
@@ -299,6 +304,10 @@ export default function WorkoutLog({ user, selectedDate, setSelectedDate, exerci
   }
 
   const uploadMedia = async (exIdx, file) => {
+    if (ptIsZero) {
+      alert('PT 잔여 횟수가 없어 사진/영상 업로드가 제한됩니다.\n트레이너에게 추가 결제를 문의해주세요.')
+      return
+    }
     try {
       const ext = file.name.split('.').pop().toLowerCase()
       const fileName = `${user.id}/${selectedDate}_${Date.now()}.${ext}`
@@ -340,12 +349,21 @@ export default function WorkoutLog({ user, selectedDate, setSelectedDate, exerci
     if (mediaUrl) {
       setPreviewIdx(exIdx)
     } else {
+      // PT 0회면 차단
+      if (ptIsZero) {
+        alert('PT 잔여 횟수가 없어 사진/영상 업로드가 제한됩니다.\n트레이너에게 추가 결제를 문의해주세요.')
+        return
+      }
       const ref = fileInputRefs.current[exIdx]
       if (ref) ref.click()
     }
   }
 
   const triggerFileSelect = (exIdx) => {
+    if (ptIsZero) {
+      alert('PT 잔여 횟수가 없어 사진/영상 변경이 제한됩니다.')
+      return
+    }
     const ref = fileInputRefs.current[exIdx]
     if (ref) ref.click()
   }
@@ -437,7 +455,6 @@ export default function WorkoutLog({ user, selectedDate, setSelectedDate, exerci
     fontFamily: 'inherit'
   }
 
-  // 세트 행 컴팩트 스타일
   const setNumInput = {
     padding: '2px 4px',
     borderRadius: '5px',
@@ -482,10 +499,12 @@ export default function WorkoutLog({ user, selectedDate, setSelectedDate, exerci
             )}
           </div>
           <div style={{ display: 'flex', gap: '10px', marginTop: '14px' }}>
-            <button
-              onClick={() => triggerFileSelect(previewIdx)}
-              style={{ background: 'rgba(255,255,255,0.15)', color: '#FFF', border: 'none', padding: '10px 18px', borderRadius: '8px', cursor: 'pointer', fontSize: '13px', fontWeight: '500' }}
-            >변경</button>
+            {!ptIsZero && (
+              <button
+                onClick={() => triggerFileSelect(previewIdx)}
+                style={{ background: 'rgba(255,255,255,0.15)', color: '#FFF', border: 'none', padding: '10px 18px', borderRadius: '8px', cursor: 'pointer', fontSize: '13px', fontWeight: '500' }}
+              >변경</button>
+            )}
             <button
               onClick={() => removeMedia(previewIdx)}
               style={{ background: 'rgba(255,107,92,0.9)', color: '#FFF', border: 'none', padding: '10px 18px', borderRadius: '8px', cursor: 'pointer', fontSize: '13px', fontWeight: '500' }}
@@ -888,6 +907,12 @@ export default function WorkoutLog({ user, selectedDate, setSelectedDate, exerci
 
           const latest = isRegistered ? getLatestRecord(allLogs, ex.body_part, ex.exercise_name) : null
 
+          // 카메라 박스 색상/스타일 결정
+          const cameraDisabled = ptIsZero && !hasMedia
+          const cameraBg = hasMedia ? THEME.primaryLight : (cameraDisabled ? '#F5F5F0' : '#FFF')
+          const cameraBorder = hasMedia ? `0.5px solid ${THEME.primary}` : (cameraDisabled ? `0.5px dashed ${THEME.border}` : `0.5px dashed ${THEME.border}`)
+          const cameraIconColor = hasMedia ? THEME.primary : (cameraDisabled ? THEME.textHint : THEME.textHint)
+
           return (
             <div key={exIdx} style={{ background: THEME.cardAlt, borderRadius: '10px', padding: '10px', marginBottom: '10px' }}>
               <div style={{ display: 'grid', gridTemplateColumns: '70px 1fr 26px', gap: '6px', marginBottom: '7px' }}>
@@ -977,7 +1002,6 @@ export default function WorkoutLog({ user, selectedDate, setSelectedDate, exerci
                 </div>
               )}
 
-              {/* ─── 세트 행 (더 컴팩트) ─── */}
               <div>
                 <div style={{ display: 'grid', gridTemplateColumns: '24px 1fr 1fr 50px 18px', gap: '4px', marginBottom: '3px', alignItems: 'center' }}>
                   <span style={{ fontSize: '9px', color: THEME.textSub, textAlign: 'center', fontWeight: '500' }}>세트</span>
@@ -1033,17 +1057,23 @@ export default function WorkoutLog({ user, selectedDate, setSelectedDate, exerci
                     onClick={() => handleCameraClick(realIdx)}
                     style={{
                       position: 'relative',
-                      background: hasMedia ? THEME.primaryLight : '#FFF',
-                      border: hasMedia ? `0.5px solid ${THEME.primary}` : `0.5px dashed ${THEME.border}`,
+                      background: cameraBg,
+                      border: cameraBorder,
                       borderRadius: '6px',
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'center',
-                      cursor: 'pointer',
-                      height: '46px'
+                      cursor: cameraDisabled ? 'not-allowed' : 'pointer',
+                      height: '46px',
+                      opacity: cameraDisabled ? 0.6 : 1,
                     }}
+                    title={cameraDisabled ? 'PT 잔여 없음 - 업로드 제한' : (hasMedia ? '사진/영상 보기' : '사진/영상 추가')}
                   >
-                    <CameraIcon color={hasMedia ? THEME.primary : THEME.textHint} size={20} />
+                    {cameraDisabled ? (
+                      <LockIcon color={THEME.danger} size={16} />
+                    ) : (
+                      <CameraIcon color={cameraIconColor} size={20} />
+                    )}
                     {hasMedia && (
                       <div style={{ position: 'absolute', top: '5px', right: '5px', width: '7px', height: '7px', background: THEME.primary, borderRadius: '50%', border: '1.5px solid #FFF' }} />
                     )}

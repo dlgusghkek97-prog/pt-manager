@@ -33,7 +33,6 @@ export const CYCLE_PHASES = {
 }
 
 // ─── 직업 활동량 (NEW v5) ───
-// BMR × activity_multiplier × occupation_multiplier 로 TDEE 계산
 export const OCCUPATION_MULTIPLIER = {
   '사무직 / 좌식': 1.0,
   '일반 활동': 1.05,
@@ -52,7 +51,6 @@ export const calcMacro = ({ goal, gender, weight, muscle, activity, intensity, c
   const leanMass = muscle * 1.4
   const bmr = Math.round(370 + 21.6 * leanMass)
   const actMap = { '가벼운 운동 (주 2~3회)': 1.375, '보통 운동 (주 4~5회)': 1.55, '고강도 운동 (주 6회+)': 1.725 }
-  // 직업 활동량 multiplier 적용 (없거나 잘못된 값이면 ×1.0)
   const occMult = OCCUPATION_MULTIPLIER[occupation] || 1.0
   const tdee = Math.round(bmr * (actMap[activity] || 1.55) * occMult)
   const adjMap = goal === '벌크업'
@@ -76,19 +74,9 @@ export function calcWeightCalories({ volume = 0, totalSets = 0, weight, muscle }
   return Math.round(metKcal + volumeKcal)
 }
 
-// ─── 그날의 실제 일일 소비 (NEW v5.1) ───
-// 잉여/적자 계산용. 기존 calcTDEE의 "평균 TDEE"가 아닌 "그날 실제 소비"를 반환.
-//
-// 공식: BMR + NEAT + 웨이트 + 유산소
-// • BMR  = 370 + 21.6 × (골격근량 × 1.4)
-// • NEAT = BMR × (직업 활동량 multiplier - 1.0)
-//          (사무직 ×1.00 → NEAT 0, 매우 활동적 ×1.15 → BMR × 0.15)
-// • 웨이트, 유산소 = 그날 운동 기록에서 계산
-//
-// 골격근량 없으면 null 반환 → 호출부에서 calcTDEE로 fallback.
 export const calcDailyBurn = ({ muscle, occupation, weightCal = 0, cardioCal = 0 }) => {
   const m = parseFloat(muscle) || 0
-  if (m <= 0) return null  // 골격근량 없으면 계산 불가 → null 반환
+  if (m <= 0) return null
 
   const leanMass = m * 1.4
   const bmr = Math.round(370 + 21.6 * leanMass)
@@ -188,8 +176,6 @@ export const S = {
   btnSecondary: { width: '100%', padding: '14px', borderRadius: '10px', border: `1px solid ${THEME.border}`, background: '#FFF', color: THEME.textSub, fontSize: '14px', cursor: 'pointer' },
 }
 
-// ─── 평균 TDEE 역산 (호환용 fallback) ───
-// 골격근량/직업 활동량 정보가 없을 때만 사용. 우선은 calcDailyBurn 사용.
 export const calcTDEE = (macroResult, goal, intensity) => {
   if (!macroResult || !macroResult.target) return null
   const target = parseInt(macroResult.target) || 0
@@ -587,4 +573,661 @@ export const saveBig4PR = async (
     return { success: false, error: error.message }
   }
   return { success: true, data }
+}
+
+// ═══════════════════════════════════════════════════════════
+// Phase 1A: 알림 + PT 세션 + 채팅 (NEW v5.2)
+// ═══════════════════════════════════════════════════════════
+
+// ─── 알림 ───
+
+// 알림 생성. recipientType: 'trainer' | 'member'
+// link 예시: "chat:conversation_uuid", "member:member_uuid", null
+export const sendNotification = async ({
+  recipientType,
+  recipientId,
+  senderType = 'system',
+  senderId = null,
+  kind,
+  content,
+  link = null,
+}) => {
+  if (!recipientType || !recipientId || !kind || !content) {
+    console.error('[sendNotification] missing required params')
+    return { success: false, error: '필수 정보 누락' }
+  }
+
+  const payload = {
+    recipient_type: recipientType,
+    recipient_id: recipientId,
+    sender_type: senderType,
+    sender_id: senderId,
+    kind,
+    content,
+    link,
+  }
+
+  const { data, error } = await supabase
+    .from('notifications')
+    .insert(payload)
+    .select()
+    .single()
+
+  if (error) {
+    console.error('[sendNotification] error:', error)
+    return { success: false, error: error.message }
+  }
+  return { success: true, data }
+}
+
+// 알림 목록 가져오기
+export const loadNotifications = async (recipientId, limit = 30) => {
+  if (!recipientId) return []
+  const { data, error } = await supabase
+    .from('notifications')
+    .select('*')
+    .eq('recipient_id', recipientId)
+    .order('created_at', { ascending: false })
+    .limit(limit)
+  if (error) {
+    console.error('[loadNotifications] error:', error)
+    return []
+  }
+  return data || []
+}
+
+// 미읽음 알림 개수
+export const getUnreadNotificationCount = async (recipientId) => {
+  if (!recipientId) return 0
+  const { count, error } = await supabase
+    .from('notifications')
+    .select('*', { count: 'exact', head: true })
+    .eq('recipient_id', recipientId)
+    .eq('is_read', false)
+  if (error) {
+    console.error('[getUnreadNotificationCount] error:', error)
+    return 0
+  }
+  return count || 0
+}
+
+// 알림 1개 읽음 처리
+export const markNotificationRead = async (notificationId) => {
+  const { error } = await supabase
+    .from('notifications')
+    .update({ is_read: true })
+    .eq('id', notificationId)
+  if (error) {
+    console.error('[markNotificationRead] error:', error)
+    return { success: false, error: error.message }
+  }
+  return { success: true }
+}
+
+// 모든 알림 읽음 처리
+export const markAllNotificationsRead = async (recipientId) => {
+  const { error } = await supabase
+    .from('notifications')
+    .update({ is_read: true })
+    .eq('recipient_id', recipientId)
+    .eq('is_read', false)
+  if (error) {
+    console.error('[markAllNotificationsRead] error:', error)
+    return { success: false, error: error.message }
+  }
+  return { success: true }
+}
+
+// ─── PT 세션 ───
+
+// PT 1회 차감. 10/5회 알림 자동 발송.
+// 반환: { success, remaining, total } 또는 { success: false, error }
+export const usePtSession = async (memberId) => {
+  if (!memberId) return { success: false, error: 'memberId 누락' }
+
+  // 1. 현재 회원 정보 가져오기
+  const { data: member, error: memErr } = await supabase
+    .from('members')
+    .select('id, name, trainer_id, pt_total_sessions, pt_used_sessions, pt_alert_10_sent, pt_alert_5_sent')
+    .eq('id', memberId)
+    .single()
+
+  if (memErr || !member) {
+    console.error('[usePtSession] member load error:', memErr)
+    return { success: false, error: '회원 정보 조회 실패' }
+  }
+
+  const total = member.pt_total_sessions || 0
+  const used = member.pt_used_sessions || 0
+
+  if (total <= 0) {
+    return { success: false, error: 'PT 횟수가 등록되지 않았습니다' }
+  }
+
+  if (used >= total) {
+    return { success: false, error: 'PT 잔여 횟수가 없습니다' }
+  }
+
+  // 2. 차감
+  const newUsed = used + 1
+  const remaining = total - newUsed
+
+  const { error: updErr } = await supabase
+    .from('members')
+    .update({ pt_used_sessions: newUsed })
+    .eq('id', memberId)
+
+  if (updErr) {
+    console.error('[usePtSession] update error:', updErr)
+    return { success: false, error: '차감 실패: ' + updErr.message }
+  }
+
+  // 3. 10회/5회 알림 (트레이너에게)
+  if (remaining === 10 && !member.pt_alert_10_sent) {
+    await sendNotification({
+      recipientType: 'trainer',
+      recipientId: member.trainer_id,
+      senderType: 'system',
+      kind: 'pt_low_10',
+      content: `${member.name} 회원 PT 10회 남았어요`,
+      link: `member:${member.id}`,
+    })
+    await supabase
+      .from('members')
+      .update({ pt_alert_10_sent: true })
+      .eq('id', memberId)
+  } else if (remaining === 5 && !member.pt_alert_5_sent) {
+    await sendNotification({
+      recipientType: 'trainer',
+      recipientId: member.trainer_id,
+      senderType: 'system',
+      kind: 'pt_low_5',
+      content: `${member.name} 회원 PT 5회 남았어요`,
+      link: `member:${member.id}`,
+    })
+    await supabase
+      .from('members')
+      .update({ pt_alert_5_sent: true })
+      .eq('id', memberId)
+  }
+
+  return { success: true, remaining, total, used: newUsed }
+}
+
+// PT 횟수 충전. 충전 시 알림 플래그 리셋해서 다음 10/5회 도달 시 다시 알림.
+export const addPtSessions = async (memberId, count) => {
+  if (!memberId || !count || count <= 0) {
+    return { success: false, error: '잘못된 값' }
+  }
+
+  const { data: member, error: memErr } = await supabase
+    .from('members')
+    .select('pt_total_sessions, pt_used_sessions')
+    .eq('id', memberId)
+    .single()
+
+  if (memErr || !member) {
+    return { success: false, error: '회원 조회 실패' }
+  }
+
+  const newTotal = (member.pt_total_sessions || 0) + parseInt(count)
+  const used = member.pt_used_sessions || 0
+  const remaining = newTotal - used
+
+  // 충전 후 잔여가 10회 초과면 알림 플래그 리셋 (다음에 또 도달 시 알림)
+  // 잔여가 5회 초과면 5회 알림 리셋
+  const updatePayload = {
+    pt_total_sessions: newTotal,
+  }
+  if (remaining > 10) {
+    updatePayload.pt_alert_10_sent = false
+  }
+  if (remaining > 5) {
+    updatePayload.pt_alert_5_sent = false
+  }
+
+  const { error: updErr } = await supabase
+    .from('members')
+    .update(updatePayload)
+    .eq('id', memberId)
+
+  if (updErr) {
+    console.error('[addPtSessions] update error:', updErr)
+    return { success: false, error: updErr.message }
+  }
+
+  return { success: true, newTotal, remaining }
+}
+
+// PT 잔여 횟수 계산 (헬퍼)
+export const calcPtRemaining = (member) => {
+  if (!member) return { total: 0, used: 0, remaining: 0, hasNoPt: true }
+  const total = member.pt_total_sessions || 0
+  const used = member.pt_used_sessions || 0
+  return {
+    total,
+    used,
+    remaining: Math.max(0, total - used),
+    hasNoPt: total <= 0,
+  }
+}
+
+// ─── 오늘 기록 완료 ───
+
+// 회원이 "오늘 기록 완료" 누름. 트레이너에게 알림.
+// 같은 날 중복 누르면 false 반환.
+export const markTodayComplete = async (memberId) => {
+  if (!memberId) return { success: false, error: 'memberId 누락' }
+
+  const today = new Date().toISOString().split('T')[0]
+
+  const { data: member, error: memErr } = await supabase
+    .from('members')
+    .select('id, name, trainer_id, daily_complete_date')
+    .eq('id', memberId)
+    .single()
+
+  if (memErr || !member) {
+    return { success: false, error: '회원 조회 실패' }
+  }
+
+  if (member.daily_complete_date === today) {
+    return { success: false, error: '이미 오늘 완료됨', alreadyDone: true }
+  }
+
+  const { error: updErr } = await supabase
+    .from('members')
+    .update({ daily_complete_date: today })
+    .eq('id', memberId)
+
+  if (updErr) {
+    return { success: false, error: updErr.message }
+  }
+
+  // 트레이너에게 알림
+  await sendNotification({
+    recipientType: 'trainer',
+    recipientId: member.trainer_id,
+    senderType: 'member',
+    senderId: memberId,
+    kind: 'today_complete',
+    content: `${member.name} 회원이 오늘 기록을 완료했어요`,
+    link: `member:${memberId}`,
+  })
+
+  return { success: true }
+}
+
+// 오늘 이미 완료했는지 체크 (UI 비활성화용)
+export const isTodayCompleted = (member) => {
+  if (!member) return false
+  const today = new Date().toISOString().split('T')[0]
+  return member.daily_complete_date === today
+}
+
+// ─── 채팅 ───
+
+// 트레이너-회원 대화방 가져오거나 생성
+export const getOrCreateConversation = async (trainerId, memberId) => {
+  if (!trainerId || !memberId) {
+    return { success: false, error: 'ID 누락' }
+  }
+
+  // 1. 기존 대화방 찾기
+  const { data: existing, error: findErr } = await supabase
+    .from('conversations')
+    .select('*')
+    .eq('trainer_id', trainerId)
+    .eq('member_id', memberId)
+    .maybeSingle()
+
+  if (findErr) {
+    console.error('[getOrCreateConversation] find error:', findErr)
+    return { success: false, error: findErr.message }
+  }
+
+  if (existing) {
+    return { success: true, data: existing }
+  }
+
+  // 2. 새로 생성
+  const { data: created, error: createErr } = await supabase
+    .from('conversations')
+    .insert({
+      trainer_id: trainerId,
+      member_id: memberId,
+    })
+    .select()
+    .single()
+
+  if (createErr) {
+    console.error('[getOrCreateConversation] create error:', createErr)
+    return { success: false, error: createErr.message }
+  }
+
+  return { success: true, data: created }
+}
+
+// 트레이너의 모든 대화방 (채팅 목록용)
+export const loadConversationsForTrainer = async (trainerId) => {
+  if (!trainerId) return []
+  const { data, error } = await supabase
+    .from('conversations')
+    .select('*')
+    .eq('trainer_id', trainerId)
+    .order('last_message_at', { ascending: false, nullsFirst: false })
+  if (error) {
+    console.error('[loadConversationsForTrainer] error:', error)
+    return []
+  }
+  if (!data || data.length === 0) return []
+
+  // 회원 정보 따로 가져와서 합치기
+  const memberIds = data.map(c => c.member_id)
+  const { data: mems } = await supabase
+    .from('members')
+    .select('id, name')
+    .in('id', memberIds)
+  const memberMap = {}
+  ;(mems || []).forEach(m => { memberMap[m.id] = m })
+  return data.map(c => ({ ...c, members: memberMap[c.member_id] || null }))
+}
+
+// 메시지 목록
+export const loadMessages = async (conversationId, limit = 100) => {
+  if (!conversationId) return []
+  const { data, error } = await supabase
+    .from('messages')
+    .select('*')
+    .eq('conversation_id', conversationId)
+    .order('created_at', { ascending: true })
+    .limit(limit)
+  if (error) {
+    console.error('[loadMessages] error:', error)
+    return []
+  }
+  return data || []
+}
+
+// 메시지 전송 + conversation 메타데이터 업데이트 + 상대방에게 알림
+export const sendMessage = async ({
+  conversationId,
+  senderType,
+  senderId,
+  content = null,
+  mediaUrl = null,
+  mediaType = null,
+}) => {
+  if (!conversationId || !senderType || !senderId) {
+    return { success: false, error: '필수 정보 누락' }
+  }
+  if (!content && !mediaUrl) {
+    return { success: false, error: '내용이 비어있습니다' }
+  }
+
+  // 1. 메시지 저장
+  const { data: msg, error: msgErr } = await supabase
+    .from('messages')
+    .insert({
+      conversation_id: conversationId,
+      sender_type: senderType,
+      sender_id: senderId,
+      content,
+      media_url: mediaUrl,
+      media_type: mediaType,
+    })
+    .select()
+    .single()
+
+  if (msgErr) {
+    console.error('[sendMessage] insert error:', msgErr)
+    return { success: false, error: msgErr.message }
+  }
+
+  // 2. conversation 메타데이터 업데이트 + 상대 미읽음 +1
+  const { data: conv, error: convErr } = await supabase
+    .from('conversations')
+    .select('trainer_id, member_id, trainer_unread_count, member_unread_count')
+    .eq('id', conversationId)
+    .single()
+
+  if (convErr || !conv) {
+    console.error('[sendMessage] conv load error:', convErr)
+    return { success: true, data: msg }
+  }
+
+  const preview = mediaUrl ? '사진 1장' : (content?.length > 30 ? content.substring(0, 30) + '...' : content)
+
+  const updatePayload = {
+    last_message_at: new Date().toISOString(),
+    last_message_preview: preview,
+  }
+  if (senderType === 'trainer') {
+    updatePayload.member_unread_count = (conv.member_unread_count || 0) + 1
+  } else {
+    updatePayload.trainer_unread_count = (conv.trainer_unread_count || 0) + 1
+  }
+
+  await supabase
+    .from('conversations')
+    .update(updatePayload)
+    .eq('id', conversationId)
+
+  // 3. 상대방에게 알림
+  const recipientType = senderType === 'trainer' ? 'member' : 'trainer'
+  const recipientId = senderType === 'trainer' ? conv.member_id : conv.trainer_id
+  await sendNotification({
+    recipientType,
+    recipientId,
+    senderType,
+    senderId,
+    kind: 'chat_message',
+    content: preview,
+    link: `chat:${conversationId}`,
+  })
+
+  return { success: true, data: msg }
+}
+
+// 메시지 읽음 처리. 자기가 받은 메시지들 is_read=true + conversation unread 0으로.
+export const markMessagesRead = async (conversationId, viewerType) => {
+  if (!conversationId || !viewerType) return { success: false }
+
+  // viewerType이 trainer면 회원이 보낸 메시지를 읽은 것
+  const senderTypeToRead = viewerType === 'trainer' ? 'member' : 'trainer'
+
+  await supabase
+    .from('messages')
+    .update({ is_read: true })
+    .eq('conversation_id', conversationId)
+    .eq('sender_type', senderTypeToRead)
+    .eq('is_read', false)
+
+  // conversation의 본인 unread count 0으로
+  const updatePayload = {}
+  if (viewerType === 'trainer') {
+    updatePayload.trainer_unread_count = 0
+  } else {
+    updatePayload.member_unread_count = 0
+  }
+
+  await supabase
+    .from('conversations')
+    .update(updatePayload)
+    .eq('id', conversationId)
+
+  return { success: true }
+}
+
+// 채팅 사진 업로드 (workout-media bucket 사용)
+export const uploadChatImage = async (conversationId, senderId, file) => {
+  try {
+    const ext = file.name.split('.').pop().toLowerCase()
+    const fileName = `chat/${conversationId}/${senderId}_${Date.now()}.${ext}`
+    const { error: uploadError } = await supabase.storage
+      .from('workout-media')
+      .upload(fileName, file, { upsert: false })
+    if (uploadError) {
+      console.error('[uploadChatImage] upload error:', uploadError)
+      return { success: false, error: uploadError.message }
+    }
+    const { data: urlData } = supabase.storage
+      .from('workout-media')
+      .getPublicUrl(fileName)
+    return { success: true, url: urlData.publicUrl }
+  } catch (e) {
+    console.error('[uploadChatImage] exception:', e)
+    return { success: false, error: e.message }
+  }
+}
+// ═══════════════════════════════════════════════════════════
+// Phase 1.5: PWA 푸시 알림 (NEW)
+// ═══════════════════════════════════════════════════════════
+
+// VAPID 키 base64 → Uint8Array 변환 (구독 등록 시 필요)
+const urlBase64ToUint8Array = (base64String) => {
+  const padding = '='.repeat((4 - base64String.length % 4) % 4)
+  const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/')
+  const rawData = window.atob(base64)
+  const outputArray = new Uint8Array(rawData.length)
+  for (let i = 0; i < rawData.length; ++i) {
+    outputArray[i] = rawData.charCodeAt(i)
+  }
+  return outputArray
+}
+
+// 푸시 알림 지원 여부 확인
+export const isPushSupported = () => {
+  return 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window
+}
+
+// 현재 푸시 알림 상태 가져오기
+// 반환: 'granted' | 'denied' | 'default' | 'unsupported'
+export const getPushPermissionStatus = () => {
+  if (!isPushSupported()) return 'unsupported'
+  return Notification.permission
+}
+
+// 현재 사용자의 구독 정보가 DB에 저장돼 있는지 확인
+export const isPushSubscribed = async (userId) => {
+  if (!userId || !isPushSupported()) return false
+  try {
+    const registration = await navigator.serviceWorker.ready
+    const subscription = await registration.pushManager.getSubscription()
+    if (!subscription) return false
+
+    // DB에도 있는지 확인
+    const { data, error } = await supabase
+      .from('push_subscriptions')
+      .select('id')
+      .eq('user_id', userId)
+      .eq('endpoint', subscription.endpoint)
+      .maybeSingle()
+    if (error) {
+      console.error('[isPushSubscribed] error:', error)
+      return false
+    }
+    return !!data
+  } catch (e) {
+    console.error('[isPushSubscribed] exception:', e)
+    return false
+  }
+}
+
+// 푸시 알림 구독 등록
+// 1) 알림 권한 요청 (처음이면)
+// 2) PushManager로 구독
+// 3) DB에 저장
+export const subscribeToPush = async (userId, userType) => {
+  if (!isPushSupported()) {
+    return { success: false, error: '이 브라우저는 푸시 알림을 지원하지 않습니다.' }
+  }
+  if (!userId || !userType) {
+    return { success: false, error: '사용자 정보가 없습니다.' }
+  }
+
+  const vapidPublicKey = process.env.REACT_APP_VAPID_PUBLIC_KEY
+  if (!vapidPublicKey) {
+    return { success: false, error: 'VAPID 키가 설정되지 않았습니다.' }
+  }
+
+  try {
+    // 1. 권한 요청
+    const permission = await Notification.requestPermission()
+    if (permission !== 'granted') {
+      return { success: false, error: '알림 권한이 거부되었습니다. 브라우저 설정에서 허용해주세요.' }
+    }
+
+    // 2. Service Worker 준비
+    const registration = await navigator.serviceWorker.ready
+
+    // 3. 기존 구독 있으면 해제
+    const existingSub = await registration.pushManager.getSubscription()
+    if (existingSub) {
+      await existingSub.unsubscribe()
+    }
+
+    // 4. 새로 구독
+    const subscription = await registration.pushManager.subscribe({
+      userVisibleOnly: true,
+      applicationServerKey: urlBase64ToUint8Array(vapidPublicKey),
+    })
+
+    // 5. 구독 정보 DB 저장
+    const subJson = subscription.toJSON()
+    const payload = {
+      user_id: userId,
+      user_type: userType,
+      endpoint: subscription.endpoint,
+      p256dh: subJson.keys.p256dh,
+      auth: subJson.keys.auth,
+      user_agent: navigator.userAgent,
+      updated_at: new Date().toISOString(),
+    }
+
+    // upsert (같은 endpoint면 업데이트, 없으면 새로 추가)
+    const { error: dbError } = await supabase
+      .from('push_subscriptions')
+      .upsert(payload, { onConflict: 'user_id,endpoint' })
+
+    if (dbError) {
+      console.error('[subscribeToPush] DB error:', dbError)
+      return { success: false, error: 'DB 저장 실패: ' + dbError.message }
+    }
+
+    return { success: true }
+  } catch (e) {
+    console.error('[subscribeToPush] exception:', e)
+    return { success: false, error: e.message }
+  }
+}
+
+// 푸시 알림 구독 해제
+export const unsubscribeFromPush = async (userId) => {
+  if (!isPushSupported()) return { success: false, error: '미지원' }
+  try {
+    const registration = await navigator.serviceWorker.ready
+    const subscription = await registration.pushManager.getSubscription()
+
+    if (subscription) {
+      // DB에서 삭제
+      const { error: dbError } = await supabase
+        .from('push_subscriptions')
+        .delete()
+        .eq('user_id', userId)
+        .eq('endpoint', subscription.endpoint)
+
+      if (dbError) {
+        console.error('[unsubscribeFromPush] DB error:', dbError)
+      }
+
+      // 브라우저 구독도 해제
+      await subscription.unsubscribe()
+    }
+
+    return { success: true }
+  } catch (e) {
+    console.error('[unsubscribeFromPush] exception:', e)
+    return { success: false, error: e.message }
+  }
 }

@@ -21,7 +21,6 @@ const NUTRIENTS = [
 const COLOR_SURPLUS = THEME.surplus
 const COLOR_DEFICIT = THEME.deficit
 
-// ─── 모듈 상수 (매 렌더마다 새 객체 생성 방지) ───
 const ROW_STYLE = {
   display: 'grid',
   gridTemplateColumns: '42px 1fr 1fr 1fr 1fr',
@@ -83,7 +82,13 @@ const CameraIcon = () => (
   </svg>
 )
 
-// 탄·단·지로 칼로리 계산 (탄·단×4 + 지×9)
+const LockIcon = () => (
+  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
+    <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
+    <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+  </svg>
+)
+
 const computeCal = (carbs, protein, fat) => {
   const c = parseFloat(carbs) || 0
   const p = parseFloat(protein) || 0
@@ -92,7 +97,6 @@ const computeCal = (carbs, protein, fat) => {
   return Math.round(c * 4 + p * 4 + f * 9)
 }
 
-// ─── MealRow: React.memo로 메모이제이션 ───
 const MealRow = React.memo(function MealRow({ mealKey, label, meal, onUpdate, onBlurField }) {
   const kcalStyle = meal.calorieManual ? CELL_STYLE : CELL_STYLE_AUTO
   return (
@@ -134,7 +138,7 @@ const MealRow = React.memo(function MealRow({ mealKey, label, meal, onUpdate, on
   )
 })
 
-export default function DietLog({ user, onDietUpdate, tableOverride, trainerIdField, weight, muscle, occupation, workoutTable, workoutIdField, forcedTab, macroResult, goal, intensity }) {
+export default function DietLog({ user, onDietUpdate, tableOverride, trainerIdField, weight, muscle, occupation, workoutTable, workoutIdField, forcedTab, macroResult, goal, intensity, ptIsZero = false }) {
   const TABLE = tableOverride || 'diet_logs'
   const ID_FIELD = trainerIdField || 'member_id'
   const W_TABLE = workoutTable || 'workout_logs'
@@ -235,31 +239,42 @@ export default function DietLog({ user, onDietUpdate, tableOverride, trainerIdFi
       if (error) { alert('피드백 저장 실패: ' + error.message); setSavingFeedback(false); return }
       if (data) setFeedbackId(data.id)
     }
+
+    // 트레이너가 회원 식단에 피드백 작성 시 → 회원에게 알림
+    // (회원 본인은 자기 식단이라 알림 안 보냄. trainerIdField 있으면 트레이너 테이블이므로 skip)
+    if (!trainerIdField && feedback?.trim()) {
+      const { sendNotification } = await import('./utils')
+      await sendNotification({
+        recipientType: 'member',
+        recipientId: user.id,
+        senderType: 'trainer',
+        kind: 'diet_feedback',
+        content: `식단 피드백이 도착했어요 (${selectedDate.replace(/-/g, '.')})`,
+        link: `diet:${selectedDate}`,
+      })
+    }
+
     setSavingFeedback(false)
     alert('피드백이 저장되었습니다.')
   }
 
-  // 입력 중: state만 업데이트 (자동 재계산 X) → 다른 input value 안 바뀜 → 키보드 안 내려감
   const updateField = React.useCallback((mealKey, field, value) => {
     setMeals(prev => {
       const cur = prev[mealKey]
       const next = { ...cur, [field]: value }
 
       if (field === 'calories') {
-        // 칼로리 직접 입력
         if (value === '' || value === null) {
           next.calorieManual = false
         } else {
           next.calorieManual = true
         }
       }
-      // 탄·단·지는 입력 중엔 칼로리 재계산 안 함 → onBlur에서만
 
       return { ...prev, [mealKey]: next }
     })
   }, [])
 
-  // 입력 완료(onBlur) 시: 자동 모드면 칼로리 재계산
   const onBlurField = React.useCallback((mealKey) => {
     setMeals(prev => {
       const cur = prev[mealKey]
@@ -297,6 +312,10 @@ export default function DietLog({ user, onDietUpdate, tableOverride, trainerIdFi
   }
 
   const uploadMealPhoto = async (mealKey, file) => {
+    if (ptIsZero) {
+      alert('PT 잔여 횟수가 없어 사진 업로드가 제한됩니다.\n트레이너에게 추가 결제를 문의해주세요.')
+      return
+    }
     try {
       const ext = file.name.split('.').pop().toLowerCase()
       const fileName = `diet/${user.id}/${selectedDate}_${mealKey}_${Date.now()}.${ext}`
@@ -336,7 +355,6 @@ export default function DietLog({ user, onDietUpdate, tableOverride, trainerIdFi
       const protein = parseFloat(meal.protein) || 0
       const fat = parseFloat(meal.fat) || 0
       let calories = parseFloat(meal.calories) || 0
-      // 칼로리 비어있으면 탄단지로 자동 계산해서 저장
       if (!calories && (carbs || protein || fat)) {
         calories = computeCal(carbs, protein, fat)
       }
@@ -407,7 +425,6 @@ export default function DietLog({ user, onDietUpdate, tableOverride, trainerIdFi
     setStatsWorkouts(wData || [])
   }
 
-  // 합계: 칼로리 비어있어도 탄단지로 즉시 계산해서 표시 (입력 중에도 합계는 살아있음)
   const totals = {
     carbs: Object.values(meals).reduce((s, m) => s + (parseFloat(m.carbs) || 0), 0),
     protein: Object.values(meals).reduce((s, m) => s + (parseFloat(m.protein) || 0), 0),
@@ -802,6 +819,14 @@ export default function DietLog({ user, onDietUpdate, tableOverride, trainerIdFi
           </div>
 
           <p style={{ fontSize: '11px', color: THEME.textSub, fontWeight: '500', margin: '14px 0 8px' }}>식사 사진</p>
+          {ptIsZero && (
+            <div style={{ background: THEME.dangerLight, border: `0.5px solid ${THEME.danger}`, borderRadius: '8px', padding: '8px 10px', marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <LockIcon />
+              <span style={{ fontSize: '10px', color: THEME.dangerDark, lineHeight: 1.4 }}>
+                PT 잔여 없음 — 사진 업로드 제한 (트레이너에게 추가 결제 문의)
+              </span>
+            </div>
+          )}
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', marginBottom: '12px' }}>
             {MEALS.map(m => {
               const url = meals[m.key].media_url
@@ -822,6 +847,27 @@ export default function DietLog({ user, onDietUpdate, tableOverride, trainerIdFi
                       style={{ width: '100%', height: '90px', borderRadius: '8px', overflow: 'hidden', cursor: 'pointer', background: THEME.cardAlt }}
                     >
                       <img src={url} alt={m.label} style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
+                    </div>
+                  ) : ptIsZero ? (
+                    <div
+                      style={{
+                        cursor: 'not-allowed',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: '4px',
+                        background: '#F5F5F0',
+                        border: `0.5px dashed ${THEME.border}`,
+                        borderRadius: '8px',
+                        height: '90px',
+                        color: THEME.danger,
+                        opacity: 0.7,
+                      }}
+                      title="PT 잔여 없음 - 업로드 제한"
+                    >
+                      <LockIcon />
+                      <span style={{ fontSize: '9px' }}>업로드 제한</span>
                     </div>
                   ) : (
                     <label style={{ cursor: 'pointer', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '4px', background: THEME.cardAlt, border: `0.5px dashed ${THEME.primaryAccent}`, borderRadius: '8px', height: '90px', color: THEME.textSub }}>
