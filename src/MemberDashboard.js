@@ -335,6 +335,8 @@ export default function MemberDashboard({ user, onLogout }) {
   }
 
   // 알림 클릭 시 navigation
+  const handleNavigateRef = React.useRef()
+
   const handleNavigate = (link) => {
     if (!link) return
     if (link.startsWith('chat:')) {
@@ -352,6 +354,32 @@ export default function MemberDashboard({ user, onLogout }) {
       window.scrollTo({ top: 0, behavior: 'smooth' })
     }
   }
+
+  // 항상 최신 handleNavigate를 ref에 저장 (listener 재등록 방지용)
+  handleNavigateRef.current = handleNavigate
+
+  // SW(푸시 클릭) + URL 쿼리에서 오는 navigation 이벤트 listener
+  // 빈 배열 → 마운트 시 1번만 등록, 언마운트 시 해제 (무한 재등록 방지)
+  useEffect(() => {
+    const handleSwMessage = (event) => {
+      if (event.data?.type === 'NAVIGATE_FROM_NOTIFICATION' && event.data.link) {
+        handleNavigateRef.current?.(event.data.link)
+      }
+    }
+    const handleCustomEvent = (event) => {
+      if (event.detail?.link) {
+        handleNavigateRef.current?.(event.detail.link)
+      }
+    }
+
+    navigator.serviceWorker?.addEventListener('message', handleSwMessage)
+    window.addEventListener('pt-notification-navigate', handleCustomEvent)
+
+    return () => {
+      navigator.serviceWorker?.removeEventListener('message', handleSwMessage)
+      window.removeEventListener('pt-notification-navigate', handleCustomEvent)
+    }
+  }, [])
 
   const todayCalories = todayDiet.reduce((s, l) => s + (l.calories || 0), 0)
   const todayCarbs = todayDiet.reduce((s, l) => s + (l.carbs || 0), 0)
