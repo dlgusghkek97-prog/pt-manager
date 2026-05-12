@@ -887,6 +887,8 @@ export default function TrainerDashboard({ user, onLogout }) {
   }
 
   // 알림 클릭 → navigation
+  const handleNavigateRef = React.useRef()
+
   const handleNavigate = async (link) => {
     if (!link) return
     if (link.startsWith('chat:')) {
@@ -925,6 +927,32 @@ export default function TrainerDashboard({ user, onLogout }) {
       if (member) openMember(member)
     }
   }
+
+  // 항상 최신 handleNavigate를 ref에 저장 (listener 재등록 방지용)
+  handleNavigateRef.current = handleNavigate
+
+  // SW(푸시 클릭) + URL 쿼리에서 오는 navigation 이벤트 listener
+  // 빈 배열 → 마운트 시 1번만 등록 (members 같은 state 변경에도 재등록 안 됨)
+  useEffect(() => {
+    const handleSwMessage = (event) => {
+      if (event.data?.type === 'NAVIGATE_FROM_NOTIFICATION' && event.data.link) {
+        handleNavigateRef.current?.(event.data.link)
+      }
+    }
+    const handleCustomEvent = (event) => {
+      if (event.detail?.link) {
+        handleNavigateRef.current?.(event.detail.link)
+      }
+    }
+
+    navigator.serviceWorker?.addEventListener('message', handleSwMessage)
+    window.addEventListener('pt-notification-navigate', handleCustomEvent)
+
+    return () => {
+      navigator.serviceWorker?.removeEventListener('message', handleSwMessage)
+      window.removeEventListener('pt-notification-navigate', handleCustomEvent)
+    }
+  }, [])
 
   const trainerAsUser = { id: user.id, name: '트레이너', goal: '벌크업', gender: '남성', type: 'trainer_self' }
 
