@@ -1224,3 +1224,32 @@ export const unsubscribeFromPush = async (userId) => {
     return { success: false, error: e.message }
   }
 }
+// ─── 푸시 알림 안내 모달 헬퍼 ───
+
+// 푸시 안내 모달을 보여줘야 하는지 체크
+// - 푸시 미지원 → 안 보임
+// - 이미 권한 거절(denied) → 안 보임
+// - 이미 구독됨 → 안 보임
+// - 1일 이내 "나중에" 눌렀음 → 안 보임
+export const shouldShowPushPrompt = async (userId) => {
+  if (!isPushSupported()) return false
+  const status = getPushPermissionStatus()
+  if (status === 'denied') return false  // 브라우저 차단 — 모달로 풀 수 없음
+  if (status === 'granted') {
+    const subscribed = await isPushSubscribed(userId)
+    if (subscribed) return false  // 이미 구독됨
+  }
+  // "나중에" 눌렀던 적 있나?
+  const dismissed = localStorage.getItem(`push_prompt_dismissed_${userId}`)
+  if (dismissed) {
+    const dismissedAt = parseInt(dismissed)
+    const oneDayMs = 24 * 60 * 60 * 1000
+    if (Date.now() - dismissedAt < oneDayMs) return false
+  }
+  return true
+}
+
+// "나중에" 눌렀을 때 호출
+export const dismissPushPrompt = (userId) => {
+  localStorage.setItem(`push_prompt_dismissed_${userId}`, String(Date.now()))
+}

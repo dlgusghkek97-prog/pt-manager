@@ -8,6 +8,7 @@ import HelpModal from './HelpModal'
 import InbodyModal from './InbodyModal'
 import NotificationBell from './NotificationBell'
 import ChatRoom from './ChatRoom'
+import PushPromptModal from './PushPromptModal'
 
 const MACRO_INPUT_STYLE = {
   background: 'transparent',
@@ -137,6 +138,9 @@ export default function MemberDashboard({ user, onLogout }) {
   const [chatOpen, setChatOpen] = useState(false)
   const [trainerName, setTrainerName] = useState('트레이너')
 
+  // 푸시 알림 안내 모달
+  const [showPushPrompt, setShowPushPrompt] = useState(false)
+
   const [goal, setGoal] = useState(() => localStorage.getItem(`macro_goal_${user.id}`) || user.goal || '다이어트')
   const [gender, setGender] = useState(() => localStorage.getItem(`macro_gender_${user.id}`) || user.gender || '여성')
   const [weight, setWeight] = useState(() => localStorage.getItem(`macro_weight_${user.id}`) || '')
@@ -161,6 +165,14 @@ export default function MemberDashboard({ user, onLogout }) {
     loadAllFavorites()
     refreshMemberInfo()
     loadTrainerName()
+
+    // 푸시 알림 안내 모달 (2초 뒤 — 화면 렌더 안정화 후)
+    const timer = setTimeout(async () => {
+      const { shouldShowPushPrompt } = await import('./utils')
+      const should = await shouldShowPushPrompt(user.id)
+      if (should) setShowPushPrompt(true)
+    }, 2000)
+    return () => clearTimeout(timer)
   }, [])
 
   const refreshMemberInfo = async () => {
@@ -580,6 +592,14 @@ export default function MemberDashboard({ user, onLogout }) {
         </button>
 
         {showHelp && <HelpModal type="member" onClose={() => setShowHelp(false)} />}
+
+        {showPushPrompt && (
+          <PushPromptModal
+            userId={user.id}
+            userType="member"
+            onClose={() => setShowPushPrompt(false)}
+          />
+        )}
 
         {chatOpen && user.trainer_id && (
           <ChatRoom

@@ -11,6 +11,7 @@ import InbodyModal from './InbodyModal'
 import NotificationBell from './NotificationBell'
 import ChatList from './ChatList'
 import ChatRoom from './ChatRoom'
+import PushPromptModal from './PushPromptModal'
 
 const NOTE_COLOR_POOL = [
   { name: '코랄', bg: '#FCE4E0', text: '#8E3D2E' },
@@ -357,6 +358,9 @@ export default function TrainerDashboard({ user, onLogout }) {
   const [chatListOpen, setChatListOpen] = useState(false)
   const [chatRoomTarget, setChatRoomTarget] = useState(null) // { memberId, memberName }
 
+  // 푸시 알림 안내 모달
+  const [showPushPrompt, setShowPushPrompt] = useState(false)
+
   const [goal, setGoal] = useState(() => localStorage.getItem(`tmacro_goal_${user.id}`) || '벌크업')
   const [gender, setGender] = useState(() => localStorage.getItem(`tmacro_gender_${user.id}`) || '남성')
   const [weight, setWeight] = useState(() => localStorage.getItem(`tmacro_weight_${user.id}`) || '')
@@ -366,7 +370,15 @@ export default function TrainerDashboard({ user, onLogout }) {
   const [cyclePhase, setCyclePhase] = useState(() => localStorage.getItem(`tmacro_cycle_${user.id}`) || '')
   const [occupation, setOccupation] = useState(() => localStorage.getItem(`tmacro_occupation_${user.id}`) || '')
 
-  useEffect(() => { loadMembers(); loadTrainerMacro(); loadTrainerTodayDiet(); loadTrainerFavorites() }, [])
+  {showHelp && <HelpModal type="trainer" onClose={() => setShowHelp(false)} />}
+
+        {showPushPrompt && (
+          <PushPromptModal
+            userId={user.id}
+            userType="trainer"
+            onClose={() => setShowPushPrompt(false)}
+          />
+        )}
 
   useEffect(() => {
     if (members.length > 0) loadStatsByDate(members, memberListDate)
