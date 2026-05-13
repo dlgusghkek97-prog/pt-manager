@@ -112,7 +112,7 @@ export default function WorkoutStats({
   const yearOptions = []
   for (let y = today.getFullYear(); y >= today.getFullYear() - 3; y--) yearOptions.push(y)
 
-  const formatVol = (v) => v >= 1000 ? (v / 1000).toFixed(1) + 't' : v + 'kg'
+  const formatVol = (v) => (v || 0).toLocaleString() + 'kg'
 
   const firstDayOfWeek = new Date(viewYear, viewMonth - 1, 1).getDay()
   const lastDate = new Date(viewYear, viewMonth, 0).getDate()
@@ -408,7 +408,7 @@ export default function WorkoutStats({
           {weeklyTotals.every(v => v === 0) ? (
             <p style={{ color: THEME.textSub, fontSize: '12px', textAlign: 'center', padding: '16px 0' }}>운동 기록이 없습니다</p>
           ) : (
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: '8px' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
               {weekLabels.map((label, wk) => {
                 if (weeklyTotals[wk] === 0) return null
                 return (
@@ -443,7 +443,7 @@ export default function WorkoutStats({
           {Object.values(monthlyByMonth).every(d => d.total === 0) ? (
             <p style={{ color: THEME.textSub, fontSize: '12px', textAlign: 'center', padding: '16px 0' }}>운동 기록이 없습니다</p>
           ) : (
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: '8px' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
               {Object.entries(monthlyByMonth).filter(([, d]) => d.total > 0).map(([mStr, d]) => (
                 <div key={mStr} style={{ background: THEME.cardAlt, borderRadius: '12px', padding: '10px', minWidth: 0 }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: '8px', gap: '4px' }}>

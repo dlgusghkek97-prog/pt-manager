@@ -1177,7 +1177,7 @@ export default function DietLog({ user, onDietUpdate, tableOverride, trainerIdFi
               {weekDates.filter(d => weekDailyTotals[d].calories > 0).length === 0 ? (
                 <p style={{ color: THEME.textSub, fontSize: '12px', textAlign: 'center', padding: '12px 0' }}>기록이 없습니다</p>
               ) : (
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: '6px' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px' }}>
                   {weekDates.filter(d => weekDailyTotals[d].calories > 0).map(date => {
                     const d = weekDailyTotals[date]
                     const isTodayLine = date === today
@@ -1215,7 +1215,7 @@ export default function DietLog({ user, onDietUpdate, tableOverride, trainerIdFi
               {recordedMonths === 0 ? (
                 <p style={{ color: THEME.textSub, fontSize: '12px', textAlign: 'center', padding: '12px 0' }}>기록이 없습니다</p>
               ) : (
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: '6px' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px' }}>
                   {Object.entries(yearMonthlyAvg).filter(([, v]) => v.days > 0).map(([month, d]) => {
                     const m = parseInt(month)
                     const isThisMonthLine = isThisYear && m === thisMonth
