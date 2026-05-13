@@ -209,20 +209,18 @@ export default function App() {
     setInfo('비밀번호 재설정 메일을 보냈어요. 메일에서 링크를 누르면 새 비밀번호를 설정할 수 있어요.')
   }
 
-  // ─── 이메일 찾기 (이름 + 휴대폰 → trainers 매칭 → 마스킹된 이메일) ───
+  // ─── 이메일 찾기 (이름 + 휴대폰 → RPC → 마스킹된 이메일) ───
+  // RPC 가 SECURITY DEFINER 라 trainers RLS 우회. 비로그인 상태에서도 조회 가능.
   const findEmail = async () => {
     setLoading(true); setError(''); setInfo(''); setFoundEmail('')
     if (!findName.trim() || !findPhone.trim()) {
       setError('이름과 휴대폰 번호를 입력해주세요.'); setLoading(false); return
     }
-    // 휴대폰 정규화 (공백·하이픈 제거)
     const phoneNorm = findPhone.replace(/[\s-]/g, '')
-    const { data, error: findError } = await supabase
-      .from('trainers')
-      .select('email')
-      .eq('name', findName.trim())
-      .eq('phone', phoneNorm)
-      .maybeSingle()
+    const { data, error: findError } = await supabase.rpc('find_trainer_email', {
+      name_input: findName.trim(),
+      phone_input: phoneNorm,
+    })
     setLoading(false)
     if (findError) {
       setError('조회 실패: ' + findError.message); return
@@ -231,11 +229,7 @@ export default function App() {
       setError('일치하는 트레이너 정보를 찾지 못했어요. 이름·휴대폰을 다시 확인해주세요.')
       return
     }
-    // 이메일 마스킹: a***@gmail.com
-    const e = data.email
-    const [local, domain] = e.split('@')
-    const masked = (local[0] || '') + '*'.repeat(Math.max(local.length - 1, 2)) + '@' + (domain || '')
-    setFoundEmail(masked)
+    setFoundEmail(data)
   }
 
   // ─── 비밀번호 재설정 (메일 링크 클릭 후) ───
