@@ -48,7 +48,7 @@ const formatRelativeTime = (createdAt) => {
   return `${created.getMonth() + 1}/${created.getDate()}`
 }
 
-export default function NotificationBell({ userId, userType, onNavigate }) {
+export default function NotificationBell({ userId, userType, onNavigate, size = 30, wide = false }) {
   const [open, setOpen] = useState(false)
   const [notifications, setNotifications] = useState([])
   const [unreadCount, setUnreadCount] = useState(0)
@@ -186,9 +186,9 @@ export default function NotificationBell({ userId, userType, onNavigate }) {
           background: '#FFF',
           border: `0.5px solid ${THEME.border}`,
           color: THEME.textSub,
-          width: '30px',
-          height: '30px',
-          borderRadius: '50%',
+          width: wide ? '100%' : `${size}px`,
+          height: `${size}px`,
+          borderRadius: wide ? `${Math.round(size / 2)}px` : '50%',
           cursor: 'pointer',
           padding: 0,
           display: 'flex',
@@ -196,10 +196,11 @@ export default function NotificationBell({ userId, userType, onNavigate }) {
           justifyContent: 'center',
           flexShrink: 0,
           position: 'relative',
+          boxSizing: 'border-box',
         }}
         title="알림"
       >
-        <BellIcon color={THEME.textSub} size={15} />
+        <BellIcon color={THEME.textSub} size={Math.round(size * 0.5)} />
         {unreadCount > 0 && (
           <span style={{
             position: 'absolute',

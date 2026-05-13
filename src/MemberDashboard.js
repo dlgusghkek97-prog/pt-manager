@@ -533,31 +533,35 @@ export default function MemberDashboard({ user, onLogout }) {
               {ptBadgeText}
             </div>
           </div>
-          <div style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
-            <NotificationBell userId={user.id} userType="member" onNavigate={handleNavigate} />
-            <button
-              onClick={() => setChatOpen(true)}
-              style={{ position: 'relative', background: '#FFF', border: `0.5px solid ${THEME.border}`, color: THEME.textSub, width: '30px', height: '30px', borderRadius: '50%', cursor: 'pointer', padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}
-              title="트레이너와 채팅"
-            >
-              <ChatBubbleIcon color={THEME.textSub} size={14} />
-              <ChatUnreadBadge userId={user.id} userType="member" />
-            </button>
-            <button
-              onClick={() => setShowHelp(true)}
-              style={{ background: '#FFF', border: `0.5px solid ${THEME.border}`, color: THEME.textSub, width: '30px', height: '30px', borderRadius: '50%', cursor: 'pointer', fontSize: '13px', fontWeight: '500', padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}
-              title="도움말"
-            >?</button>
-            <button onClick={() => setShowCalcModal(true)} style={{ background: '#FFF', border: `0.5px solid ${THEME.border}`, color: THEME.primary, padding: '0 10px', borderRadius: '15px', cursor: 'pointer', fontSize: '11px', fontWeight: '500', height: '30px', display: 'flex', alignItems: 'center', flexShrink: 0 }}>
-              식단 설정
-            </button>
-          </div>
+          <button onClick={() => setShowCalcModal(true)} style={{ background: '#FFF', border: `0.5px solid ${THEME.border}`, color: THEME.primary, padding: '0 12px', borderRadius: '18px', cursor: 'pointer', fontSize: '12px', fontWeight: '500', height: '36px', display: 'flex', alignItems: 'center', flexShrink: 0 }}>
+            식단 설정
+          </button>
         </div>
 
-        {/* 인바디/추이 — 좁은 화면에서 헤더와 겹치지 않게 별도 줄 */}
-        <div style={{ display: 'flex', gap: '6px', marginBottom: '10px' }}>
-          <button style={{ ...inbodyBtnStyle, flex: 1 }} onClick={() => setInbodyOpen(true)}>인바디</button>
-          <button style={{ ...inbodyBtnStyle, flex: 1 }} onClick={() => setInbodyChartOpen(true)}>추이</button>
+        {/* 헤더 다음 줄: [인바디] [추이] [🔔] [💬] [?] 5칸 균등 캡슐 */}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: '6px', marginBottom: '10px' }}>
+          <button
+            onClick={() => setInbodyOpen(true)}
+            style={{ background: '#FFF', border: `0.5px solid ${THEME.primaryAccent}`, color: THEME.primary, padding: '0 8px', borderRadius: '18px', cursor: 'pointer', fontSize: '12px', fontWeight: '500', height: '36px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'inherit' }}
+          >인바디</button>
+          <button
+            onClick={() => setInbodyChartOpen(true)}
+            style={{ background: '#FFF', border: `0.5px solid ${THEME.primaryAccent}`, color: THEME.primary, padding: '0 8px', borderRadius: '18px', cursor: 'pointer', fontSize: '12px', fontWeight: '500', height: '36px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'inherit' }}
+          >추이</button>
+          <NotificationBell userId={user.id} userType="member" onNavigate={handleNavigate} size={36} wide />
+          <button
+            onClick={() => setChatOpen(true)}
+            style={{ position: 'relative', background: '#FFF', border: `0.5px solid ${THEME.border}`, color: THEME.textSub, width: '100%', height: '36px', borderRadius: '18px', cursor: 'pointer', padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', boxSizing: 'border-box' }}
+            title="트레이너와 채팅"
+          >
+            <ChatBubbleIcon color={THEME.textSub} size={17} />
+            <ChatUnreadBadge userId={user.id} userType="member" />
+          </button>
+          <button
+            onClick={() => setShowHelp(true)}
+            style={{ background: '#FFF', border: `0.5px solid ${THEME.border}`, color: THEME.textSub, width: '100%', height: '36px', borderRadius: '18px', cursor: 'pointer', fontSize: '15px', fontWeight: '500', padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', boxSizing: 'border-box', fontFamily: 'inherit' }}
+            title="도움말"
+          >?</button>
         </div>
 
         <button
