@@ -1243,7 +1243,14 @@ export default function TrainerDashboard({ user, onLogout }) {
     <div style={S.container}>
       <div style={S.wrap}>
         <div style={S.header}>
-          <PTLogo />
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', minWidth: 0, flex: 1 }}>
+            <PTLogo />
+            {user?.name && (
+              <span style={{ fontSize: '16px', color: THEME.text, fontWeight: '500', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', minWidth: 0 }}>
+                {user.name}님
+              </span>
+            )}
+          </div>
           <div style={{ display: 'flex', gap: '5px', alignItems: 'center' }}>
             <NotificationBell userId={user.id} userType="trainer" onNavigate={handleNavigate} />
             <button

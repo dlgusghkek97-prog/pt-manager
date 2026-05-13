@@ -75,6 +75,16 @@ export default function App() {
         return
       }
 
+      // 트레이너면 name 보강 (옛 user 객체에 name 없을 수 있음)
+      if (parsedUser.type === 'trainer' && !parsedUser.name) {
+        const { data: trainerRow } = await supabase
+          .from('trainers').select('name').eq('id', parsedUser.id).single()
+        if (trainerRow?.name) {
+          parsedUser.name = trainerRow.name
+          localStorage.setItem('pt_user', JSON.stringify(parsedUser))
+        }
+      }
+
       // 세션 있으면 user 복원
       setUser(parsedUser)
       setLoading(false)
@@ -172,7 +182,7 @@ export default function App() {
         },
         { onConflict: 'id', ignoreDuplicates: true }
       )
-      const u = { type: 'trainer', ...data.user }
+      const u = { type: 'trainer', ...data.user, name: signupName.trim() }
       setUser(u)
       localStorage.setItem('pt_user', JSON.stringify(u))
     } else {
@@ -258,18 +268,23 @@ export default function App() {
       return
     }
     // 본인 trainers row 보장 (메일 인증 후 첫 로그인 시 자동 생성)
+    let trainerName = data.user.user_metadata?.name || data.user.email.split('@')[0]
     if (data?.user) {
       await supabase.from('trainers').upsert(
         {
           id: data.user.id,
-          name: data.user.user_metadata?.name || data.user.email.split('@')[0],
+          name: trainerName,
           email: data.user.email,
           phone: data.user.user_metadata?.phone || null,
         },
         { onConflict: 'id', ignoreDuplicates: true }
       )
+      // 기존 trainer 라면 trainers.name 이 신뢰할 만한 값 (옛 가입자는 metadata 없을 수 있음)
+      const { data: trainerRow } = await supabase
+        .from('trainers').select('name').eq('id', data.user.id).single()
+      if (trainerRow?.name) trainerName = trainerRow.name
     }
-    const u = { type: 'trainer', ...data.user }
+    const u = { type: 'trainer', ...data.user, name: trainerName }
     setUser(u)
     localStorage.setItem('pt_user', JSON.stringify(u))
     setLoading(false)
