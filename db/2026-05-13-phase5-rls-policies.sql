@@ -190,8 +190,9 @@ CREATE POLICY "p5_all" ON public.conversations FOR ALL TO authenticated
   WITH CHECK (trainer_id = auth.uid() OR public.is_self_member(member_id));
 
 -- ── messages (대화방 참여자만 / 본인이 발신자만 INSERT) ──
+-- SELECT 에 sender_id 포함: INSERT...RETURNING 통과 보장
 CREATE POLICY "p5_select" ON public.messages FOR SELECT TO authenticated
-  USING (public.is_my_conv(conversation_id));
+  USING (public.is_my_conv(conversation_id) OR public.is_my_user_id(sender_id));
 CREATE POLICY "p5_insert" ON public.messages FOR INSERT TO authenticated
   WITH CHECK (public.is_my_conv(conversation_id) AND public.is_my_user_id(sender_id));
 CREATE POLICY "p5_update" ON public.messages FOR UPDATE TO authenticated
@@ -201,8 +202,10 @@ CREATE POLICY "p5_delete" ON public.messages FOR DELETE TO authenticated
   USING (public.is_my_user_id(sender_id));
 
 -- ── notifications (수신자 SELECT/UPDATE/DELETE / 발신자 INSERT) ──
+-- SELECT 에 sender_id 포함: INSERT...RETURNING 시 발신자 본인이 자기 row 를
+-- 받아갈 수 있어야 함 (RETURNING 은 SELECT 정책으로 평가됨)
 CREATE POLICY "p5_select" ON public.notifications FOR SELECT TO authenticated
-  USING (public.is_my_user_id(recipient_id));
+  USING (public.is_my_user_id(recipient_id) OR public.is_my_user_id(sender_id));
 CREATE POLICY "p5_insert" ON public.notifications FOR INSERT TO authenticated
   WITH CHECK (sender_id IS NULL OR public.is_my_user_id(sender_id));
 CREATE POLICY "p5_update" ON public.notifications FOR UPDATE TO authenticated
