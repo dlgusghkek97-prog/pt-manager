@@ -147,7 +147,7 @@ export const ICONS = {
 export const S = {
   container: { minHeight: '100vh', background: THEME.bg, display: 'flex', alignItems: 'flex-start', justifyContent: 'center', fontFamily: "'Apple SD Gothic Neo', sans-serif", padding: '12px 10px' },
   wrap: { width: '100%', maxWidth: '480px', paddingTop: '8px' },
-  header: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px' },
+  header: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px', flexWrap: 'wrap', rowGap: '6px' },
   headerTitle: { color: THEME.primary, fontSize: '20px', fontWeight: '700', margin: 0 },
   logoutBtn: { background: 'transparent', border: `1px solid ${THEME.primary}`, color: THEME.primary, padding: '6px 14px', borderRadius: '8px', cursor: 'pointer', fontSize: '13px' },
   card: { background: THEME.card, borderRadius: '16px', padding: '16px', marginBottom: '12px' },
