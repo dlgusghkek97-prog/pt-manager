@@ -5,18 +5,21 @@
 -- =========================================
 
 -- 1) 백필 — auth.users 에 있고 이메일 있는 사용자 중 trainers row 없는 것 채움
+--    DISTINCT ON (email): 같은 email row 가 SELECT 결과에 둘 이상 떠도 1건만
+--    NOT EXISTS: trainers.id UNIQUE 또는 trainers.email UNIQUE 충돌 미리 차단
 INSERT INTO public.trainers (id, name, email, phone)
-SELECT
+SELECT DISTINCT ON (u.email)
   u.id,
   COALESCE(NULLIF(trim(u.raw_user_meta_data->>'name'), ''), split_part(u.email, '@', 1)),
   u.email,
   NULLIF(trim(u.raw_user_meta_data->>'phone'), '')
 FROM auth.users u
-LEFT JOIN public.trainers t ON t.id = u.id
 WHERE u.email IS NOT NULL
   AND u.email <> ''
-  AND t.id IS NULL
-ON CONFLICT (id) DO NOTHING;
+  AND NOT EXISTS (
+    SELECT 1 FROM public.trainers t WHERE t.id = u.id OR t.email = u.email
+  )
+ORDER BY u.email, u.created_at DESC;
 
 -- 2) 트리거 부활 — EXCEPTION 처리로 어떤 에러가 나도 가입 자체는 통과
 CREATE OR REPLACE FUNCTION public.handle_new_trainer_signup()
