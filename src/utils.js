@@ -330,6 +330,18 @@ export const removeFavorite = async (favoriteId, table = 'member_favorite_exerci
   return { success: true }
 }
 
+// ── 미디어 업로드 공통 ──
+export const MAX_MEDIA_BYTES = 100 * 1024 * 1024 // 100MB
+
+export const checkMediaSize = (file) => {
+  if (!file) return { ok: false, error: '파일이 없습니다' }
+  if (file.size > MAX_MEDIA_BYTES) {
+    const sizeMb = (file.size / 1024 / 1024).toFixed(1)
+    return { ok: false, error: `파일이 너무 큽니다 (${sizeMb}MB). 100MB 이하로 줄여주세요.` }
+  }
+  return { ok: true }
+}
+
 // ── 식단 즐겨찾기 ──
 export const loadDietFavorites = async (userId, table = 'diet_favorites', idField = 'member_id') => {
   const { data, error } = await supabase
@@ -1088,6 +1100,8 @@ export const markMessagesRead = async (conversationId, viewerType) => {
 
 // 채팅 사진 업로드 (workout-media bucket 사용)
 export const uploadChatImage = async (conversationId, senderId, file) => {
+  const sizeCheck = checkMediaSize(file)
+  if (!sizeCheck.ok) return { success: false, error: sizeCheck.error }
   try {
     const ext = file.name.split('.').pop().toLowerCase()
     const fileName = `chat/${conversationId}/${senderId}_${Date.now()}.${ext}`

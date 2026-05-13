@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react'
 import { supabase } from './supabase'
-import { S, THEME, calcWeightCalories, calcTDEE, calcDailyBurn } from './utils'
+import { S, THEME, calcWeightCalories, calcTDEE, calcDailyBurn, checkMediaSize } from './utils'
 import DatePicker from './DatePicker'
 import DietFavModal from './DietFavModal'
 import useModalBackButton from './useModalBackButton'
@@ -472,6 +472,8 @@ export default function DietLog({ user, onDietUpdate, tableOverride, trainerIdFi
       alert('PT 잔여 횟수가 없어 사진 업로드가 제한됩니다.\n트레이너에게 추가 결제를 문의해주세요.')
       return
     }
+    const sizeCheck = checkMediaSize(file)
+    if (!sizeCheck.ok) { alert(sizeCheck.error); return }
     try {
       const ext = file.name.split('.').pop().toLowerCase()
       const fileName = `diet/${user.id}/${selectedDate}_slot${slot}_${Date.now()}.${ext}`

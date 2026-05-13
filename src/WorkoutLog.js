@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react'
 import { supabase } from './supabase'
-import { PARTS, PART_COLORS, S, THEME, calcWeightCalories, checkNewPRs, getLatestRecord, addFavorite, removeFavorite } from './utils'
+import { PARTS, PART_COLORS, S, THEME, calcWeightCalories, checkNewPRs, getLatestRecord, addFavorite, removeFavorite, checkMediaSize } from './utils'
 import DatePicker from './DatePicker'
 import useModalBackButton from './useModalBackButton'
 
@@ -371,6 +371,8 @@ export default function WorkoutLog({ user, selectedDate, setSelectedDate, exerci
       alert('PT 잔여 횟수가 없어 사진/영상 업로드가 제한됩니다.\n트레이너에게 추가 결제를 문의해주세요.')
       return
     }
+    const sizeCheck = checkMediaSize(file)
+    if (!sizeCheck.ok) { alert(sizeCheck.error); return }
     try {
       const ext = file.name.split('.').pop().toLowerCase()
       const fileName = `${user.id}/${selectedDate}_${Date.now()}.${ext}`
