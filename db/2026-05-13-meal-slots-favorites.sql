@@ -86,3 +86,9 @@ CREATE INDEX IF NOT EXISTS trainer_diet_favorites_trainer_id_idx ON trainer_diet
 --    이거 안 하면 새 테이블은 Supabase 기본 RLS 가 켜져 있어 INSERT 가 막힘.
 ALTER TABLE diet_favorites         DISABLE ROW LEVEL SECURITY;
 ALTER TABLE trainer_diet_favorites DISABLE ROW LEVEL SECURITY;
+
+-- 6) PostgREST 가 사용하는 anon / authenticated 역할에 권한 부여 + 스키마 캐시 리로드
+--    빠뜨리면 "new row violates row-level security policy" 또는 "permission denied" 가 계속 뜸.
+GRANT ALL ON public.diet_favorites         TO anon, authenticated, service_role;
+GRANT ALL ON public.trainer_diet_favorites TO anon, authenticated, service_role;
+NOTIFY pgrst, 'reload schema';
