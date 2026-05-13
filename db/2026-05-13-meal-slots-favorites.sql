@@ -81,3 +81,8 @@ CREATE TABLE IF NOT EXISTS trainer_diet_favorites (
   created_at  timestamptz DEFAULT now()
 );
 CREATE INDEX IF NOT EXISTS trainer_diet_favorites_trainer_id_idx ON trainer_diet_favorites(trainer_id);
+
+-- 5) RLS 비활성화 (다른 테이블들과 동일하게 — Phase 5 에서 정식 정책과 함께 일괄 ON 예정)
+--    이거 안 하면 새 테이블은 Supabase 기본 RLS 가 켜져 있어 INSERT 가 막힘.
+ALTER TABLE diet_favorites         DISABLE ROW LEVEL SECURITY;
+ALTER TABLE trainer_diet_favorites DISABLE ROW LEVEL SECURITY;
