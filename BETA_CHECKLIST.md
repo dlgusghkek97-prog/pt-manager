@@ -15,6 +15,12 @@
   - Vercel: [Project Settings → Environment Variables](https://vercel.com/dashboard) → 변경 후 재배포
 - [ ] 푸시 알림·채팅 통신 테스트해서 새 키 정상 작동 확인
 
+### 자체 SMTP 연결 (필수)
+- [ ] Supabase 기본 SMTP 는 시간당 4건 정도 한도 → 사용자 늘면 가입·비번 재설정 메일이 막힘
+- [ ] 외부 메일 서비스 가입 (추천: [Resend](https://resend.com) — 무료 3000/월·100/일, 또는 SendGrid, NHN Cloud, Brevo)
+- [ ] API Key 받고 [Authentication → Email Templates → SMTP Settings](https://supabase.com/dashboard/project/mdlsbypeqmddoreeztnb/auth/templates) 의 [Set up SMTP] 에 host·port·user·password 입력
+- [ ] 자체 도메인 메일 보내려면 도메인 인증(DNS SPF/DKIM) 필요. 베타엔 onboarding 도메인으로 시작 가능
+
 ### RLS 정책 점검
 - [x] 23개 public 테이블 RLS ON 완료 (Phase 5.3)
 - [ ] `diet_favorites` / `trainer_diet_favorites` 의 임시 "allow all" 정책을 회원·트레이너 소유 패턴으로 좁히기 (다른 식단 테이블들과 동일하게)
