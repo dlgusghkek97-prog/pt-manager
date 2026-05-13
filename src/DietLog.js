@@ -1177,31 +1177,34 @@ export default function DietLog({ user, onDietUpdate, tableOverride, trainerIdFi
               {weekDates.filter(d => weekDailyTotals[d].calories > 0).length === 0 ? (
                 <p style={{ color: THEME.textSub, fontSize: '12px', textAlign: 'center', padding: '12px 0' }}>기록이 없습니다</p>
               ) : (
-                weekDates.filter(d => weekDailyTotals[d].calories > 0).map(date => {
-                  const d = weekDailyTotals[date]
-                  const isTodayLine = date === today
-                  const hasMeal = d.calories > 0
-                  const net = hasMeal ? (d.calories - d.consumption) : 0
-                  return (
-                    <div key={date} style={{ padding: '8px 11px', background: isTodayLine ? THEME.primaryLight : THEME.cardAlt, borderRadius: '8px', marginBottom: '5px', border: isTodayLine ? `0.5px solid ${THEME.primaryAccent}` : 'none' }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                        <span style={{ fontSize: '11px', color: isTodayLine ? THEME.primaryDark : THEME.text, fontWeight: '500' }}>
-                          {date.replace(/-/g, '.')} {isTodayLine && '(오늘)'}
-                        </span>
-                        {hasMeal ? (
-                          <span style={{ fontSize: '12px', fontWeight: '500', color: net >= 0 ? COLOR_SURPLUS : COLOR_DEFICIT }}>
-                            {net >= 0 ? '+' : ''}{Math.round(net)}
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: '6px' }}>
+                  {weekDates.filter(d => weekDailyTotals[d].calories > 0).map(date => {
+                    const d = weekDailyTotals[date]
+                    const isTodayLine = date === today
+                    const hasMeal = d.calories > 0
+                    const net = hasMeal ? (d.calories - d.consumption) : 0
+                    return (
+                      <div key={date} style={{ padding: '8px 10px', background: isTodayLine ? THEME.primaryLight : THEME.cardAlt, borderRadius: '8px', border: isTodayLine ? `0.5px solid ${THEME.primaryAccent}` : '0.5px solid transparent', minWidth: 0 }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: '4px' }}>
+                          <span style={{ fontSize: '11px', color: isTodayLine ? THEME.primaryDark : THEME.text, fontWeight: '500', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', minWidth: 0 }}>
+                            {date.replace(/-/g, '.').slice(5)}{isTodayLine && ' (오늘)'}
                           </span>
-                        ) : (
-                          <span style={{ fontSize: '11px', color: THEME.textHint }}>식단 없음</span>
-                        )}
+                          {hasMeal ? (
+                            <span style={{ fontSize: '11px', fontWeight: '500', color: net >= 0 ? COLOR_SURPLUS : COLOR_DEFICIT, whiteSpace: 'nowrap', flexShrink: 0 }}>
+                              {net >= 0 ? '+' : ''}{Math.round(net)}
+                            </span>
+                          ) : (
+                            <span style={{ fontSize: '10px', color: THEME.textHint, flexShrink: 0 }}>식단 없음</span>
+                          )}
+                        </div>
+                        <p style={{ fontSize: '9px', color: THEME.textSub, margin: '3px 0 0', lineHeight: 1.5 }}>
+                          섭취 {Math.round(d.calories)} · 소비 {Math.round(d.consumption)}<br/>
+                          탄 {Math.round(d.carbs)}g · 단 {Math.round(d.protein)}g · 지 {Math.round(d.fat)}g
+                        </p>
                       </div>
-                      <p style={{ fontSize: '10px', color: THEME.textSub, margin: '2px 0 0' }}>
-                        섭취 {Math.round(d.calories)} · 소비 {Math.round(d.consumption)} · 탄 {Math.round(d.carbs)}g · 단 {Math.round(d.protein)}g · 지 {Math.round(d.fat)}g
-                      </p>
-                    </div>
-                  )
-                })
+                    )
+                  })}
+                </div>
               )}
             </>
           )}
@@ -1212,31 +1215,34 @@ export default function DietLog({ user, onDietUpdate, tableOverride, trainerIdFi
               {recordedMonths === 0 ? (
                 <p style={{ color: THEME.textSub, fontSize: '12px', textAlign: 'center', padding: '12px 0' }}>기록이 없습니다</p>
               ) : (
-                Object.entries(yearMonthlyAvg).filter(([, v]) => v.days > 0).map(([month, d]) => {
-                  const m = parseInt(month)
-                  const isThisMonthLine = isThisYear && m === thisMonth
-                  const hasMeal = d.calories > 0
-                  const net = hasMeal ? (d.calories - d.consumption) : 0
-                  return (
-                    <div key={month} style={{ padding: '8px 11px', background: isThisMonthLine ? THEME.primaryLight : THEME.cardAlt, borderRadius: '8px', marginBottom: '5px', border: isThisMonthLine ? `0.5px solid ${THEME.primaryAccent}` : 'none' }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                        <span style={{ fontSize: '11px', color: isThisMonthLine ? THEME.primaryDark : THEME.text, fontWeight: '500' }}>
-                          {statValue}년 {m}월 {isThisMonthLine && '(이번달)'} · {d.days}일 기록
-                        </span>
-                        {hasMeal ? (
-                          <span style={{ fontSize: '12px', fontWeight: '500', color: net >= 0 ? COLOR_SURPLUS : COLOR_DEFICIT }}>
-                            {net >= 0 ? '+' : ''}{Math.round(net)}
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: '6px' }}>
+                  {Object.entries(yearMonthlyAvg).filter(([, v]) => v.days > 0).map(([month, d]) => {
+                    const m = parseInt(month)
+                    const isThisMonthLine = isThisYear && m === thisMonth
+                    const hasMeal = d.calories > 0
+                    const net = hasMeal ? (d.calories - d.consumption) : 0
+                    return (
+                      <div key={month} style={{ padding: '8px 10px', background: isThisMonthLine ? THEME.primaryLight : THEME.cardAlt, borderRadius: '8px', border: isThisMonthLine ? `0.5px solid ${THEME.primaryAccent}` : '0.5px solid transparent', minWidth: 0 }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: '4px' }}>
+                          <span style={{ fontSize: '11px', color: isThisMonthLine ? THEME.primaryDark : THEME.text, fontWeight: '500', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', minWidth: 0 }}>
+                            {m}월{isThisMonthLine && ' (이번달)'} · {d.days}일
                           </span>
-                        ) : (
-                          <span style={{ fontSize: '11px', color: THEME.textHint }}>식단 없음</span>
-                        )}
+                          {hasMeal ? (
+                            <span style={{ fontSize: '11px', fontWeight: '500', color: net >= 0 ? COLOR_SURPLUS : COLOR_DEFICIT, whiteSpace: 'nowrap', flexShrink: 0 }}>
+                              {net >= 0 ? '+' : ''}{Math.round(net)}
+                            </span>
+                          ) : (
+                            <span style={{ fontSize: '10px', color: THEME.textHint, flexShrink: 0 }}>식단 없음</span>
+                          )}
+                        </div>
+                        <p style={{ fontSize: '9px', color: THEME.textSub, margin: '3px 0 0', lineHeight: 1.5 }}>
+                          섭취 {Math.round(d.calories)} · 소비 {Math.round(d.consumption)}<br/>
+                          탄 {Math.round(d.carbs)}g · 단 {Math.round(d.protein)}g · 지 {Math.round(d.fat)}g
+                        </p>
                       </div>
-                      <p style={{ fontSize: '10px', color: THEME.textSub, margin: '2px 0 0' }}>
-                        섭취 {Math.round(d.calories)} · 소비 {Math.round(d.consumption)} · 탄 {Math.round(d.carbs)}g · 단 {Math.round(d.protein)}g · 지 {Math.round(d.fat)}g
-                      </p>
-                    </div>
-                  )
-                })
+                    )
+                  })}
+                </div>
               )}
             </>
           )}
