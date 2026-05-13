@@ -132,6 +132,7 @@ const MealRow = React.memo(function MealRow({ mealKey, label, meal, onUpdate, on
         autoComplete="off" autoCorrect="off" autoCapitalize="off" spellCheck="false"
         value={meal.calories}
         onChange={e => onUpdate(mealKey, 'calories', e.target.value)}
+        onBlur={() => onBlurField(mealKey)}
         title={meal.calorieManual ? '직접 입력 (수동)' : '탄단지로 자동 계산 — 비우면 자동 모드 유지'}
       />
     </div>
@@ -168,6 +169,18 @@ export default function DietLog({ user, onDietUpdate, tableOverride, trainerIdFi
     snack: { ...emptyMeal },
   })
   const [logIds, setLogIds] = useState({})
+
+  // ── 자동 저장 (저장 버튼 없음 — 입력칸을 벗어나면 자동 반영) ──
+  const [saveStatus, setSaveStatus] = useState('idle') // idle | saving | saved | error
+  const mealsRef = React.useRef(meals); mealsRef.current = meals
+  const logIdsRef = React.useRef(logIds); logIdsRef.current = logIds
+  const selectedDateRef = React.useRef(selectedDate); selectedDateRef.current = selectedDate
+  const savingRef = React.useRef(false)
+  const pendingSaveRef = React.useRef(false)
+  const dirtyRef = React.useRef(false)
+  const requestSaveRef = React.useRef()
+  const retryTimerRef = React.useRef(null)
+
   const [statsLogs, setStatsLogs] = useState([])
   const [statsWorkouts, setStatsWorkouts] = useState([])
 
@@ -209,6 +222,11 @@ export default function DietLog({ user, onDietUpdate, tableOverride, trainerIdFi
     })
     setMeals(next)
     setLogIds(ids)
+    logIdsRef.current = ids
+    dirtyRef.current = false
+    pendingSaveRef.current = false
+    if (retryTimerRef.current) { clearTimeout(retryTimerRef.current); retryTimerRef.current = null }
+    setSaveStatus('idle')
   }
 
   const loadFeedback = async (date) => {
@@ -259,6 +277,7 @@ export default function DietLog({ user, onDietUpdate, tableOverride, trainerIdFi
   }
 
   const updateField = React.useCallback((mealKey, field, value) => {
+    dirtyRef.current = true
     setMeals(prev => {
       const cur = prev[mealKey]
       const next = { ...cur, [field]: value }
@@ -284,32 +303,77 @@ export default function DietLog({ user, onDietUpdate, tableOverride, trainerIdFi
       if (newCal === cur.calories) return prev
       return { ...prev, [mealKey]: { ...cur, calories: newCal } }
     })
+    requestSaveRef.current?.()
   }, [])
 
-  const ensureMealRow = async (mealKey) => {
-    const meal = meals[mealKey]
-    if (logIds[mealKey]) return logIds[mealKey]
-    const carbs = parseFloat(meal.carbs) || 0
-    const protein = parseFloat(meal.protein) || 0
-    const fat = parseFloat(meal.fat) || 0
-    let calories = parseFloat(meal.calories) || 0
-    if (!calories && (carbs || protein || fat)) {
-      calories = computeCal(carbs, protein, fat)
+  // 모든 식사를 DB에 반영 (없으면 INSERT / 있으면 UPDATE / 다 비었으면 DELETE).
+  // 동시 실행 방지: 진행 중이면 끝난 뒤 한 번 더 실행 → 같은 식사가 두 번 INSERT 되는 일 차단.
+  const persistAll = async () => {
+    if (savingRef.current) { pendingSaveRef.current = true; return }
+    savingRef.current = true
+    pendingSaveRef.current = false
+    dirtyRef.current = false
+    if (retryTimerRef.current) { clearTimeout(retryTimerRef.current); retryTimerRef.current = null }
+    setSaveStatus('saving')
+
+    // 스냅샷 — 저장 도중 날짜가 바뀌어도 일관성 유지
+    const date = selectedDateRef.current
+    const snapMeals = mealsRef.current
+    let hadError = false
+
+    for (const m of MEALS) {
+      const meal = snapMeals[m.key]
+      const carbs = parseFloat(meal.carbs) || 0
+      const protein = parseFloat(meal.protein) || 0
+      const fat = parseFloat(meal.fat) || 0
+      let calories = parseFloat(meal.calories) || 0
+      if (!calories && (carbs || protein || fat)) calories = computeCal(carbs, protein, fat)
+      const media_url = meal.media_url || null
+      const hasContent = !!(carbs || protein || fat || calories || media_url)
+      const id = logIdsRef.current[m.key]
+
+      if (!hasContent) {
+        if (id) {
+          const { error } = await supabase.from(TABLE).delete().eq('id', id)
+          if (error) { hadError = true; console.error('[DietLog] 삭제 실패:', error) }
+          else if (selectedDateRef.current === date && logIdsRef.current[m.key] === id) {
+            const n = { ...logIdsRef.current }; delete n[m.key]
+            logIdsRef.current = n; setLogIds(n)
+          }
+        }
+        continue
+      }
+
+      const payload = { [ID_FIELD]: user.id, log_date: date, meal_type: m.key, carbs, protein, fat, calories, media_url }
+      if (id) {
+        const { error } = await supabase.from(TABLE).update(payload).eq('id', id)
+        if (error) { hadError = true; console.error('[DietLog] 업데이트 실패:', error) }
+      } else {
+        const { data, error } = await supabase.from(TABLE).insert(payload).select().single()
+        if (error) { hadError = true; console.error('[DietLog] 저장 실패:', error) }
+        else if (data && selectedDateRef.current === date) {
+          logIdsRef.current = { ...logIdsRef.current, [m.key]: data.id }
+          setLogIds(logIdsRef.current)
+        }
+      }
     }
-    const payload = {
-      [ID_FIELD]: user.id,
-      log_date: selectedDate,
-      meal_type: mealKey,
-      carbs, protein, fat, calories,
+
+    savingRef.current = false
+    if (pendingSaveRef.current) {
+      // 저장 도중 추가 변경(blur) 발생 → 한 번 더 저장
+      persistAll()
+      return
     }
-    const { data, error } = await supabase.from(TABLE).insert(payload).select().single()
-    if (error) { alert('식사 생성 실패: ' + error.message); return null }
-    if (data) {
-      setLogIds(prev => ({ ...prev, [mealKey]: data.id }))
-      return data.id
+    if (hadError) {
+      setSaveStatus('error')
+      dirtyRef.current = true
+      retryTimerRef.current = setTimeout(() => { retryTimerRef.current = null; persistAll() }, 4000)
+    } else {
+      setSaveStatus('saved')
+      if (onDietUpdate) onDietUpdate()
     }
-    return null
   }
+  requestSaveRef.current = () => { persistAll() }
 
   const uploadMealPhoto = async (mealKey, file) => {
     if (ptIsZero) {
@@ -324,13 +388,9 @@ export default function DietLog({ user, onDietUpdate, tableOverride, trainerIdFi
       const { data: urlData } = supabase.storage.from('workout-media').getPublicUrl(fileName)
       const url = urlData.publicUrl
 
-      const id = await ensureMealRow(mealKey)
-      if (!id) return
-
-      const { error: updErr } = await supabase.from(TABLE).update({ media_url: url }).eq('id', id)
-      if (updErr) { alert('사진 저장 실패: ' + updErr.message); return }
-
       setMeals(prev => ({ ...prev, [mealKey]: { ...prev[mealKey], media_url: url } }))
+      dirtyRef.current = true
+      setTimeout(() => requestSaveRef.current?.(), 0) // setMeals 반영 후 자동 저장
     } catch (e) {
       alert('업로드 중 오류: ' + e.message)
     }
@@ -338,61 +398,9 @@ export default function DietLog({ user, onDietUpdate, tableOverride, trainerIdFi
 
   const removeMealPhoto = async (mealKey) => {
     if (!window.confirm(`${MEALS.find(m => m.key === mealKey)?.label} 사진을 삭제할까요?`)) return
-    const id = logIds[mealKey]
-    if (id) {
-      const { error } = await supabase.from(TABLE).update({ media_url: null }).eq('id', id)
-      if (error) { alert('삭제 실패: ' + error.message); return }
-    }
     setMeals(prev => ({ ...prev, [mealKey]: { ...prev[mealKey], media_url: '' } }))
-  }
-
-  const saveAll = async () => {
-    let savedCount = 0
-    const errors = []
-    for (const m of MEALS) {
-      const meal = meals[m.key]
-      const carbs = parseFloat(meal.carbs) || 0
-      const protein = parseFloat(meal.protein) || 0
-      const fat = parseFloat(meal.fat) || 0
-      let calories = parseFloat(meal.calories) || 0
-      if (!calories && (carbs || protein || fat)) {
-        calories = computeCal(carbs, protein, fat)
-      }
-      const hasPhoto = !!meal.media_url
-      if (!carbs && !protein && !fat && !calories && !hasPhoto) {
-        if (logIds[m.key]) {
-          const { error } = await supabase.from(TABLE).delete().eq('id', logIds[m.key])
-          if (error) errors.push(`${m.label} 삭제 실패: ${error.message}`)
-        }
-        continue
-      }
-      const payload = {
-        [ID_FIELD]: user.id,
-        log_date: selectedDate,
-        meal_type: m.key,
-        carbs, protein, fat, calories,
-        media_url: meal.media_url || null,
-      }
-      if (logIds[m.key]) {
-        const { error } = await supabase.from(TABLE).update(payload).eq('id', logIds[m.key])
-        if (error) errors.push(`${m.label} 업데이트 실패: ${error.message}`)
-        else savedCount++
-      } else {
-        const { data, error } = await supabase.from(TABLE).insert(payload).select().single()
-        if (error) errors.push(`${m.label} 저장 실패: ${error.message}`)
-        else if (data) {
-          setLogIds(prev => ({ ...prev, [m.key]: data.id }))
-          savedCount++
-        }
-      }
-    }
-    if (errors.length > 0) {
-      alert(`일부 저장 실패\n\n${errors.join('\n')}`)
-    } else {
-      alert(`${savedCount}개 식사 저장 완료!`)
-    }
-    if (onDietUpdate) await onDietUpdate()
-    await loadLogs(selectedDate)
+    dirtyRef.current = true
+    setTimeout(() => requestSaveRef.current?.(), 0)
   }
 
   const loadStatsLogs = async () => {
@@ -788,7 +796,7 @@ export default function DietLog({ user, onDietUpdate, tableOverride, trainerIdFi
         <div style={S.card}>
           <p style={{ ...S.cardTitle, margin: '0 0 10px' }}>식단 기록</p>
           <div style={{ marginBottom: '14px' }}>
-            <DatePicker value={selectedDate} onChange={setSelectedDate} />
+            <DatePicker value={selectedDate} onChange={(d) => { if (dirtyRef.current) persistAll(); setSelectedDate(d) }} />
           </div>
 
           <div style={HEADER_ROW_STYLE}>
@@ -898,10 +906,20 @@ export default function DietLog({ user, onDietUpdate, tableOverride, trainerIdFi
             />
           </div>
 
-          <button style={{ ...S.btnPrimary, fontSize: '13px', padding: '12px' }} onClick={saveAll}>저장</button>
+          <div style={{
+            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px',
+            padding: '12px', borderRadius: '8px', fontSize: '12px', fontWeight: '500',
+            background: saveStatus === 'error' ? THEME.dangerLight : THEME.cardAlt,
+            color: saveStatus === 'error' ? THEME.dangerDark : (saveStatus === 'saving' ? THEME.textSub : THEME.primary),
+          }}>
+            {saveStatus === 'saving' ? '저장 중…'
+              : saveStatus === 'saved' ? '✓ 자동 저장됨'
+              : saveStatus === 'error' ? '저장 실패 — 잠시 후 다시 시도합니다'
+              : '입력하면 자동으로 저장됩니다'}
+          </div>
 
           <p style={{ fontSize: '10px', color: THEME.textHint, margin: '8px 0 0', textAlign: 'center' }}>
-            칼로리는 입력칸을 떠나면 자동 계산됩니다. 직접 입력 후 비우면 다시 자동 계산됩니다.
+            칼로리는 입력칸을 떠나면 자동 계산·저장됩니다. 직접 입력 후 비우면 다시 자동 계산됩니다.
           </p>
         </div>
       )}

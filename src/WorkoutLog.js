@@ -49,6 +49,26 @@ export default function WorkoutLog({ user, selectedDate, setSelectedDate, exerci
   const [favModalExIdx, setFavModalExIdx] = useState(null)
   const [favModalActivePart, setFavModalActivePart] = useState('')
 
+  // ── 자동 저장 (저장 버튼 없음 — 입력칸을 벗어나면 자동 반영) ──
+  const [saveStatus, setSaveStatus] = useState('idle') // idle | saving | saved | error
+  const exercisesRef = useRef(exercises); exercisesRef.current = exercises
+  const selectedDateRef = useRef(selectedDate); selectedDateRef.current = selectedDate
+  const setIdsRef = useRef({})        // `${slot}_${setIdx}` -> 저장된 row id (세션 중 INSERT 추적)
+  const savingRef = useRef(false)
+  const pendingSaveRef = useRef(false)
+  const dirtyRef = useRef(false)
+  const requestSaveRef = useRef()
+  const retryTimerRef = useRef(null)
+
+  const rebuildSetIds = (exs) => {
+    const ids = {}
+    ;(exs || []).forEach(ex => {
+      if (ex.exercise_type === 'cardio') return
+      ex.sets.forEach((s, i) => { if (s.id) ids[`${ex.slot}_${i}`] = s.id })
+    })
+    setIdsRef.current = ids
+  }
+
   useEffect(() => {
     if (user?.id && selectedDate) {
       loadExercises(user.id, selectedDate)
@@ -128,6 +148,7 @@ export default function WorkoutLog({ user, selectedDate, setSelectedDate, exerci
 
   const loadExercises = async (uid, date) => {
     const { data } = await supabase.from(TABLE).select('*').eq(ID_FIELD, uid).eq('log_date', date).order('slot').order('id')
+    let nextExercises
     if (data && data.length > 0) {
       const grouped = {}
       data.forEach(row => {
@@ -147,10 +168,17 @@ export default function WorkoutLog({ user, selectedDate, setSelectedDate, exerci
         }
         grouped[slotKey].sets.push({ id: row.id, weight: row.weight, reps: row.reps, volume: row.volume, media_url: row.media_url || '' })
       })
-      setExercises(Object.values(grouped))
+      nextExercises = Object.values(grouped)
     } else {
-      setExercises([{ slot: 1, exercise_type: 'weight', body_part: '', exercise_name: '', memo: '', description: '', sets: [{ id: null, weight: '', reps: '', media_url: '' }] }])
+      nextExercises = [{ slot: 1, exercise_type: 'weight', body_part: '', exercise_name: '', memo: '', description: '', sets: [{ id: null, weight: '', reps: '', media_url: '' }] }]
     }
+    setExercises(nextExercises)
+    exercisesRef.current = nextExercises
+    rebuildSetIds(nextExercises)
+    dirtyRef.current = false
+    pendingSaveRef.current = false
+    if (retryTimerRef.current) { clearTimeout(retryTimerRef.current); retryTimerRef.current = null }
+    setSaveStatus('idle')
   }
 
   const addExercise = () => {
@@ -170,6 +198,7 @@ export default function WorkoutLog({ user, selectedDate, setSelectedDate, exerci
     if (s.id) await supabase.from(TABLE).delete().eq('id', s.id)
     u[exIdx].sets.splice(setIdx, 1)
     if (u[exIdx].sets.length === 0) u.splice(exIdx, 1)
+    rebuildSetIds(u)
     setExercises(u)
     if (onUpdate) await onUpdate()
   }
@@ -183,43 +212,55 @@ export default function WorkoutLog({ user, selectedDate, setSelectedDate, exerci
     }
     const u = JSON.parse(JSON.stringify(exercises))
     u.splice(exIdx, 1)
+    rebuildSetIds(u)
     setExercises(u)
     if (onUpdate) await onUpdate()
   }
 
   const updateExField = (exIdx, field, value) => {
+    dirtyRef.current = true
     const u = JSON.parse(JSON.stringify(exercises))
     u[exIdx][field] = value
     setExercises(u)
   }
 
   const updateSetField = (exIdx, setIdx, field, value) => {
+    dirtyRef.current = true
     const u = JSON.parse(JSON.stringify(exercises))
     u[exIdx].sets[setIdx][field] = value
     setExercises(u)
   }
 
-  const saveAllSets = async () => {
+  // 모든 웨이트 세트를 DB에 반영 (부위·운동명 둘 다 있고, 무게·횟수가 채워진 세트만).
+  // 동시 실행 방지 → 같은 세트가 두 번 INSERT 되는 일 차단.
+  const persistSets = async () => {
+    if (savingRef.current) { pendingSaveRef.current = true; return }
+    savingRef.current = true
+    pendingSaveRef.current = false
+    dirtyRef.current = false
+    if (retryTimerRef.current) { clearTimeout(retryTimerRef.current); retryTimerRef.current = null }
+    setSaveStatus('saving')
+
     const uid = user.id
-    let savedCount = 0
-    const errors = []
-    const updated = JSON.parse(JSON.stringify(exercises))
+    const date = selectedDateRef.current
+    const snapshot = JSON.parse(JSON.stringify(exercisesRef.current))
+    const newIds = []   // { slot, setIdx, id } — 저장 후 exercises state에 반영
+    let hadError = false
 
-    for (let exIdx = 0; exIdx < updated.length; exIdx++) {
-      const ex = updated[exIdx]
+    for (let exIdx = 0; exIdx < snapshot.length; exIdx++) {
+      const ex = snapshot[exIdx]
       if (ex.exercise_type === 'cardio') continue
-
       if (!ex.body_part || !ex.exercise_name) continue
       for (let setIdx = 0; setIdx < ex.sets.length; setIdx++) {
         const set = ex.sets[setIdx]
-        if (set.weight === '' || set.reps === '') continue
+        if (set.weight === '' || set.reps === '' || set.weight == null || set.reps == null) continue
         const w = parseFloat(set.weight)
         const r = parseInt(set.reps)
         if (isNaN(w) || isNaN(r)) continue
 
         const payload = {
           [ID_FIELD]: uid,
-          log_date: selectedDate,
+          log_date: date,
           slot: ex.slot,
           exercise_type: 'weight',
           body_part: ex.body_part,
@@ -233,32 +274,47 @@ export default function WorkoutLog({ user, selectedDate, setSelectedDate, exerci
           media_url: ex.sets[0]?.media_url || null
         }
 
-        if (set.id) {
-          const { error: updErr } = await supabase.from(TABLE).update(payload).eq('id', set.id)
-          if (updErr) { errors.push(`UPDATE 실패: ${updErr.message}`); continue }
-          savedCount++
+        const key = `${ex.slot}_${setIdx}`
+        const existingId = set.id || setIdsRef.current[key]
+        if (existingId) {
+          const { error } = await supabase.from(TABLE).update(payload).eq('id', existingId)
+          if (error) { hadError = true; console.error('[WorkoutLog] 업데이트 실패:', error) }
         } else {
           const { data, error } = await supabase.from(TABLE).insert(payload).select().single()
-          if (error) { errors.push(`INSERT 실패: ${error.message}`); continue }
-          if (data) {
-            updated[exIdx].sets[setIdx].id = data.id
-            updated[exIdx].sets[setIdx].volume = data.volume
-            savedCount++
+          if (error) { hadError = true; console.error('[WorkoutLog] 저장 실패:', error) }
+          else if (data) {
+            setIdsRef.current[key] = data.id
+            newIds.push({ slot: ex.slot, setIdx, id: data.id })
           }
         }
       }
     }
 
-    setExercises(updated)
-    if (errors.length > 0) {
-      alert(`저장 실패\n\n${errors.join('\n')}`)
-    } else {
-      alert(`${savedCount}개 세트 저장 완료!`)
+    // 새로 발급된 id만 현재 exercises state에 머지 (저장 도중 사용자가 편집한 내용 보존)
+    if (newIds.length > 0 && selectedDateRef.current === date) {
+      setExercises(prev => {
+        const u = JSON.parse(JSON.stringify(prev))
+        newIds.forEach(({ slot, setIdx, id }) => {
+          const pe = u.find(e => e.slot === slot && e.exercise_type !== 'cardio')
+          if (pe && pe.sets[setIdx] && !pe.sets[setIdx].id) pe.sets[setIdx].id = id
+        })
+        exercisesRef.current = u
+        return u
+      })
     }
 
-    await loadExercises(uid, selectedDate)
-    if (onUpdate) await onUpdate()
+    savingRef.current = false
+    if (pendingSaveRef.current) { setTimeout(() => persistSets(), 0); return }
+    if (hadError) {
+      setSaveStatus('error')
+      dirtyRef.current = true
+      retryTimerRef.current = setTimeout(() => { retryTimerRef.current = null; persistSets() }, 4000)
+    } else {
+      setSaveStatus('saved')
+      if (onUpdate) onUpdate()
+    }
   }
+  requestSaveRef.current = () => { persistSets() }
 
   const saveCardio = async () => {
     if (!cardioCalories) { alert('소비 칼로리를 입력해주세요.'); return }
@@ -893,7 +949,7 @@ export default function WorkoutLog({ user, selectedDate, setSelectedDate, exerci
       <div style={{ ...S.card, paddingBottom: '90px' }}>
         <p style={{ ...S.cardTitle, margin: '0 0 10px' }}>운동 기록</p>
         <div style={{ marginBottom: '14px' }}>
-          <DatePicker value={selectedDate} onChange={setSelectedDate} />
+          <DatePicker value={selectedDate} onChange={(d) => { if (dirtyRef.current) persistSets(); setSelectedDate(d) }} />
         </div>
 
         {weightExercises.map((ex, exIdx) => {
@@ -916,11 +972,11 @@ export default function WorkoutLog({ user, selectedDate, setSelectedDate, exerci
           return (
             <div key={exIdx} style={{ background: THEME.cardAlt, borderRadius: '10px', padding: '10px', marginBottom: '10px' }}>
               <div style={{ display: 'grid', gridTemplateColumns: '70px 1fr 26px', gap: '6px', marginBottom: '7px' }}>
-                <select style={inputBase} value={ex.body_part} onChange={e => updateExField(realIdx, 'body_part', e.target.value)}>
+                <select style={inputBase} value={ex.body_part} onChange={e => { updateExField(realIdx, 'body_part', e.target.value); setTimeout(() => requestSaveRef.current?.(), 0) }}>
                   <option value="">부위</option>
                   {PARTS.map(p => <option key={p} value={p}>{p}</option>)}
                 </select>
-                <input style={inputBase} placeholder="운동명" value={ex.exercise_name} onChange={e => updateExField(realIdx, 'exercise_name', e.target.value)} />
+                <input style={inputBase} placeholder="운동명" value={ex.exercise_name} onChange={e => updateExField(realIdx, 'exercise_name', e.target.value)} onBlur={() => requestSaveRef.current?.()} />
                 <button
                   style={{ background: '#FBE8E8', color: '#C57878', border: 'none', borderRadius: '6px', padding: '4px 0', cursor: 'pointer', fontSize: '11px' }}
                   onClick={() => removeExercise(realIdx)}
@@ -933,6 +989,7 @@ export default function WorkoutLog({ user, selectedDate, setSelectedDate, exerci
                   placeholder="특이사항 (예: 무릎 불편)"
                   value={ex.memo}
                   onChange={e => updateExField(realIdx, 'memo', e.target.value)}
+                  onBlur={() => requestSaveRef.current?.()}
                 />
                 <button
                   onClick={() => openFavModal(realIdx)}
@@ -1019,6 +1076,7 @@ export default function WorkoutLog({ user, selectedDate, setSelectedDate, exerci
                       inputMode="decimal"
                       value={set.weight}
                       onChange={e => updateSetField(realIdx, setIdx, 'weight', e.target.value)}
+                      onBlur={() => requestSaveRef.current?.()}
                     />
                     <input
                       style={setNumInput}
@@ -1026,6 +1084,7 @@ export default function WorkoutLog({ user, selectedDate, setSelectedDate, exerci
                       inputMode="numeric"
                       value={set.reps}
                       onChange={e => updateSetField(realIdx, setIdx, 'reps', e.target.value)}
+                      onBlur={() => requestSaveRef.current?.()}
                     />
                     <span style={{ fontSize: '12px', fontWeight: '500', color: THEME.primary, textAlign: 'center' }}>{getSetVolume(set)}</span>
                     <button
@@ -1051,6 +1110,7 @@ export default function WorkoutLog({ user, selectedDate, setSelectedDate, exerci
                     placeholder="운동 설명 (예: 등 넓게 잡고 천천히)"
                     value={ex.description || ''}
                     onChange={e => updateExField(realIdx, 'description', e.target.value)}
+                    onBlur={() => requestSaveRef.current?.()}
                   />
 
                   <div
@@ -1098,7 +1158,17 @@ export default function WorkoutLog({ user, selectedDate, setSelectedDate, exerci
         })}
 
         <button style={S.addExBtn} onClick={addExercise}>＋ 종목 추가</button>
-        <button style={{ ...S.btnPrimary, marginTop: '12px', fontSize: '14px' }} onClick={saveAllSets}>전체 저장</button>
+        <div style={{
+          display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px',
+          marginTop: '12px', padding: '12px', borderRadius: '8px', fontSize: '12px', fontWeight: '500',
+          background: saveStatus === 'error' ? THEME.dangerLight : THEME.cardAlt,
+          color: saveStatus === 'error' ? THEME.dangerDark : (saveStatus === 'saving' ? THEME.textSub : THEME.primary),
+        }}>
+          {saveStatus === 'saving' ? '저장 중…'
+            : saveStatus === 'saved' ? '✓ 자동 저장됨'
+            : saveStatus === 'error' ? '저장 실패 — 잠시 후 다시 시도합니다'
+            : '부위·운동명·무게·횟수를 채우면 자동으로 저장됩니다'}
+        </div>
       </div>
     </div>
   )
