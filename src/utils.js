@@ -74,6 +74,20 @@ export function calcWeightCalories({ volume = 0, totalSets = 0, weight, muscle }
   return Math.round(metKcal + volumeKcal)
 }
 
+// 일일 소비 분해 — { bmr, neat, weight, cardio, total } 또는 null
+// 식단 통계의 '소비' 표에서 항목별 비율 표시용
+export const calcDailyBurnBreakdown = ({ muscle, occupation, weightCal = 0, cardioCal = 0 }) => {
+  const m = parseFloat(muscle) || 0
+  if (m <= 0) return null
+  const leanMass = m * 1.4
+  const bmr = Math.round(370 + 21.6 * leanMass)
+  const occMult = OCCUPATION_MULTIPLIER[occupation] || 1.0
+  const neat = Math.round(bmr * (occMult - 1.0))
+  const weight = Math.round(weightCal || 0)
+  const cardio = Math.round(cardioCal || 0)
+  return { bmr, neat, weight, cardio, total: bmr + neat + weight + cardio }
+}
+
 export const calcDailyBurn = ({ muscle, occupation, weightCal = 0, cardioCal = 0 }) => {
   const m = parseFloat(muscle) || 0
   if (m <= 0) return null

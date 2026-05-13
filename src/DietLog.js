@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react'
 import { supabase } from './supabase'
-import { S, THEME, calcWeightCalories, calcTDEE, calcDailyBurn, checkMediaSize } from './utils'
+import { S, THEME, calcWeightCalories, calcTDEE, calcDailyBurn, calcDailyBurnBreakdown, checkMediaSize } from './utils'
 import DatePicker from './DatePicker'
 import DietFavModal from './DietFavModal'
 import useModalBackButton from './useModalBackButton'
@@ -10,6 +10,7 @@ const NUTRIENTS = [
   { key: 'carbs', label: '탄수화물', unit: 'g', color: THEME.nutCarbs },
   { key: 'protein', label: '단백질', unit: 'g', color: THEME.nutProtein },
   { key: 'fat', label: '지방', unit: 'g', color: THEME.nutFat },
+  { key: 'consumption', label: '소비', unit: 'kcal', color: THEME.danger },
   { key: 'net', label: '잉여 / 적자', unit: 'kcal', color: THEME.primary },
 ]
 
@@ -699,6 +700,38 @@ export default function DietLog({ user, onDietUpdate, tableOverride, trainerIdFi
   const yearAvgConsumption = recordedMonths > 0 ? Math.round(Object.values(yearMonthlyAvg).reduce((s, v) => s + v.consumption, 0) / recordedMonths) : 0
   const yearAvgNet = yearAvgIntake - yearAvgConsumption
 
+  // 소비 분해 — 기초대사(BMR) / 생활활동(NEAT) / 웨이트 / 유산소 1일 평균
+  const consumptionBreakdown = (() => {
+    if (!(parseFloat(muscle) > 0)) return null
+    let dates = []
+    if (statMode === 'week') {
+      dates = weekDates
+    } else if (statMode === 'year') {
+      const dateSet = new Set()
+      statsWorkouts.forEach(r => dateSet.add(r.log_date))
+      statsLogs.forEach(r => { if ((r.calories || 0) > 0) dateSet.add(r.log_date) })
+      dates = Array.from(dateSet)
+    }
+    if (dates.length === 0) return null
+    let sumBmr = 0, sumNeat = 0, sumWeight = 0, sumCardio = 0, dayCount = 0
+    for (const d of dates) {
+      const { weightCal, cardioCal } = calcBurnedByDate(d)
+      const bd = calcDailyBurnBreakdown({ muscle, occupation, weightCal, cardioCal })
+      if (!bd) continue
+      sumBmr += bd.bmr
+      sumNeat += bd.neat
+      sumWeight += bd.weight
+      sumCardio += bd.cardio
+      dayCount++
+    }
+    if (dayCount === 0) return null
+    const bmr = Math.round(sumBmr / dayCount)
+    const neat = Math.round(sumNeat / dayCount)
+    const weightAvg = Math.round(sumWeight / dayCount)
+    const cardioAvg = Math.round(sumCardio / dayCount)
+    return { bmr, neat, weight: weightAvg, cardio: cardioAvg, total: bmr + neat + weightAvg + cardioAvg, days: dayCount }
+  })()
+
   const CHART_VIEWBOX = "0 0 320 170"
   const CHART_TOP = 30
   const CHART_BOTTOM = 135
@@ -759,12 +792,12 @@ export default function DietLog({ user, onDietUpdate, tableOverride, trainerIdFi
   const NutrientChart = ({ nutrientKey, color }) => {
     let data, labels
     if (statMode === 'week') {
-      data = weekDates.map(d => weekDailyTotals[d][nutrientKey])
+      data = weekDates.map(d => weekDailyTotals[d][nutrientKey] || 0)
       labels = weekDates.map(d => `${parseInt(d.split('-')[2])}일`)
     } else {
       data = []; labels = []
       for (let m = 1; m <= 12; m++) {
-        data.push(yearMonthlyAvg[m][nutrientKey])
+        data.push(yearMonthlyAvg[m][nutrientKey] || 0)
         labels.push(`${m}월`)
       }
     }
@@ -1158,7 +1191,7 @@ export default function DietLog({ user, onDietUpdate, tableOverride, trainerIdFi
               <NutrientChart nutrientKey={activeNutrient} color={currentNutrient.color} />
             )}
 
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: '4px', marginTop: '10px' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: `repeat(${NUTRIENTS.length}, 1fr)`, gap: '4px', marginTop: '10px' }}>
               {NUTRIENTS.map(n => (
                 <button
                   key={n.key}
@@ -1178,43 +1211,51 @@ export default function DietLog({ user, onDietUpdate, tableOverride, trainerIdFi
             </div>
           </div>
 
-          {statMode === 'year' && (
-            <>
-              <p style={{ fontSize: '11px', color: THEME.textSub, fontWeight: '500', margin: '0 0 7px' }}>월별 평균</p>
-              {recordedMonths === 0 ? (
-                <p style={{ color: THEME.textSub, fontSize: '12px', textAlign: 'center', padding: '12px 0' }}>기록이 없습니다</p>
-              ) : (
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px' }}>
-                  {Object.entries(yearMonthlyAvg).filter(([, v]) => v.days > 0).map(([month, d]) => {
-                    const m = parseInt(month)
-                    const isThisMonthLine = isThisYear && m === thisMonth
-                    const hasMeal = d.calories > 0
-                    const net = hasMeal ? (d.calories - d.consumption) : 0
-                    return (
-                      <div key={month} style={{ padding: '8px 10px', background: isThisMonthLine ? THEME.primaryLight : THEME.cardAlt, borderRadius: '8px', border: isThisMonthLine ? `0.5px solid ${THEME.primaryAccent}` : '0.5px solid transparent', minWidth: 0 }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: '4px' }}>
-                          <span style={{ fontSize: '11px', color: isThisMonthLine ? THEME.primaryDark : THEME.text, fontWeight: '500', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', minWidth: 0 }}>
-                            {m}월{isThisMonthLine && ' (이번달)'} · {d.days}일
-                          </span>
-                          {hasMeal ? (
-                            <span style={{ fontSize: '11px', fontWeight: '500', color: net >= 0 ? COLOR_SURPLUS : COLOR_DEFICIT, whiteSpace: 'nowrap', flexShrink: 0 }}>
-                              {net >= 0 ? '+' : ''}{Math.round(net)}
-                            </span>
-                          ) : (
-                            <span style={{ fontSize: '10px', color: THEME.textHint, flexShrink: 0 }}>식단 없음</span>
-                          )}
-                        </div>
-                        <p style={{ fontSize: '9px', color: THEME.textSub, margin: '3px 0 0', lineHeight: 1.5 }}>
-                          섭취 {Math.round(d.calories)} · 소비 {Math.round(d.consumption)}<br/>
-                          탄 {Math.round(d.carbs)}g · 단 {Math.round(d.protein)}g · 지 {Math.round(d.fat)}g
-                        </p>
-                      </div>
-                    )
-                  })}
+          {/* 소비 분해 표 — 활성 탭이 '소비'일 때만 노출 */}
+          {activeNutrient === 'consumption' && (
+            consumptionBreakdown ? (
+              <div style={{ background: THEME.cardAlt, borderRadius: '12px', padding: '14px 12px', marginBottom: '10px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: '12px' }}>
+                  <p style={{ fontSize: '12px', color: THEME.primaryDark, fontWeight: '500', margin: 0 }}>소비 분해</p>
+                  <p style={{ fontSize: '10px', color: THEME.textHint, margin: 0 }}>
+                    1일 평균 · 합계 {consumptionBreakdown.total} kcal
+                  </p>
                 </div>
-              )}
-            </>
+                {[
+                  { key: 'bmr', label: '기초대사', color: THEME.primary },
+                  { key: 'neat', label: '생활활동', color: THEME.primaryAccent },
+                  { key: 'weight', label: '웨이트', color: THEME.nutProtein },
+                  { key: 'cardio', label: '유산소', color: THEME.danger },
+                ].map(({ key, label, color }) => {
+                  const val = consumptionBreakdown[key] || 0
+                  const pct = consumptionBreakdown.total > 0
+                    ? Math.round(val / consumptionBreakdown.total * 100)
+                    : 0
+                  return (
+                    <div key={key} style={{ marginBottom: '8px' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
+                        <span style={{ fontSize: '11px', color: THEME.text, fontWeight: '500' }}>{label}</span>
+                        <span style={{ fontSize: '11px', color: THEME.textSub }}>
+                          {val} kcal · {pct}%
+                        </span>
+                      </div>
+                      <div style={{ background: '#FFF', borderRadius: '4px', height: '8px', overflow: 'hidden', border: `0.5px solid ${THEME.borderLight}` }}>
+                        <div style={{ width: `${pct}%`, height: '100%', background: color, borderRadius: '4px' }} />
+                      </div>
+                    </div>
+                  )
+                })}
+                <p style={{ fontSize: '9px', color: THEME.textHint, margin: '4px 0 0', textAlign: 'right' }}>
+                  기록 {consumptionBreakdown.days}일 기준
+                </p>
+              </div>
+            ) : (
+              <div style={{ background: THEME.cardAlt, borderRadius: '12px', padding: '14px 12px', marginBottom: '10px', fontSize: '11px', color: THEME.textSub, textAlign: 'center' }}>
+                골격근량을 입력하면 기초대사·생활활동을 포함한 소비 분해가 표시됩니다.
+              </div>
+            )
           )}
+
         </div>
       )}
     </div>
