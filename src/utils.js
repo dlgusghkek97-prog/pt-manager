@@ -466,8 +466,8 @@ export const loadInbodyMerged = async (memberId) => {
 }
 
 export const addInbody = async (userId, record, table = 'member_inbody', idField = 'member_id', extra = {}) => {
-  const { measured_date, weight, muscle_mass, body_fat_percent } = record
-  if (!measured_date || !weight || !muscle_mass || !body_fat_percent) {
+  const { measured_date, weight, muscle_mass, body_fat_mass, body_fat_percent } = record
+  if (!measured_date || !weight || !muscle_mass || !body_fat_mass || !body_fat_percent) {
     return { success: false, error: '모든 항목을 입력해주세요' }
   }
   const payload = {
@@ -475,6 +475,7 @@ export const addInbody = async (userId, record, table = 'member_inbody', idField
     measured_date,
     weight: parseFloat(weight),
     muscle_mass: parseFloat(muscle_mass),
+    body_fat_mass: parseFloat(body_fat_mass),
     body_fat_percent: parseFloat(body_fat_percent),
     ...extra,
   }
@@ -491,11 +492,12 @@ export const addInbody = async (userId, record, table = 'member_inbody', idField
 }
 
 export const updateInbody = async (recordId, record, table = 'member_inbody') => {
-  const { measured_date, weight, muscle_mass, body_fat_percent } = record
+  const { measured_date, weight, muscle_mass, body_fat_mass, body_fat_percent } = record
   const payload = {
     measured_date,
     weight: parseFloat(weight),
     muscle_mass: parseFloat(muscle_mass),
+    body_fat_mass: parseFloat(body_fat_mass),
     body_fat_percent: parseFloat(body_fat_percent),
     updated_at: new Date().toISOString(),
   }

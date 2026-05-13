@@ -363,6 +363,12 @@ export default function TrainerDashboard({ user, onLogout }) {
   // 푸시 알림 안내 모달
   const [showPushPrompt, setShowPushPrompt] = useState(false)
 
+  // 핸드폰 뒤로가기 → 회원 상세에서 회원 목록으로 (앱 종료 방지)
+  useModalBackButton(view === 'memberDetail', () => {
+    setView('members')
+    setSelectedMember(null)
+  })
+
   // 핸드폰 뒤로가기 → 인라인 모달 닫힘 (TrainerDashboard 자체 모달들)
   useModalBackButton(showAddMember, () => setShowAddMember(false))
   useModalBackButton(showCalcModal, () => setShowCalcModal(false))

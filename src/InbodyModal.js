@@ -79,6 +79,7 @@ const sourceBadge = (source) => ({
 const METRICS = {
   weight:           { key: 'weight',           label: '체중',     unit: 'kg', color: THEME.inbodyWeight },
   muscle_mass:      { key: 'muscle_mass',      label: '골격근량', unit: 'kg', color: THEME.inbodyMuscle },
+  body_fat_mass:    { key: 'body_fat_mass',    label: '체지방량', unit: 'kg', color: THEME.inbodyFat },
   body_fat_percent: { key: 'body_fat_percent', label: '체지방률', unit: '%',  color: THEME.inbodyFat },
 }
 
@@ -246,25 +247,25 @@ function MiniMetricChart({ data, metric, isLast }) {
   return (
     <div style={{
       background: THEME.cardAlt,
-      borderRadius: '10px',
-      padding: '10px 10px 8px',
-      marginBottom: isLast ? 0 : '8px',
+      borderRadius: '8px',
+      padding: '7px 8px 5px',
+      marginBottom: isLast ? 0 : '5px',
     }}>
       <div style={{
         display: 'flex',
         justifyContent: 'space-between',
         alignItems: 'center',
-        marginBottom: '6px',
+        marginBottom: '3px',
       }}>
-        <span style={{ fontSize: '12px', color: metric.color, fontWeight: '600' }}>
+        <span style={{ fontSize: '11px', color: metric.color, fontWeight: '600' }}>
           {metric.label}
         </span>
-        <span style={{ fontSize: '12px', color: THEME.text }}>
+        <span style={{ fontSize: '11px', color: THEME.text }}>
           <span style={{ fontWeight: '600' }}>{stat.current.toFixed(1)}</span>
-          <span style={{ color: THEME.textSub, fontSize: '10px', marginLeft: '2px' }}>{metric.unit}</span>
+          <span style={{ color: THEME.textSub, fontSize: '9px', marginLeft: '2px' }}>{metric.unit}</span>
         </span>
       </div>
-      <LineChart data={data} metric={metric} height={140} showXLabels={isLast} />
+      <LineChart data={data} metric={metric} height={75} showXLabels={isLast} />
     </div>
   )
 }
@@ -296,6 +297,7 @@ export default function InbodyModal({
     measured_date: today(),
     weight: '',
     muscle_mass: '',
+    body_fat_mass: '',
     body_fat_percent: '',
   })
 
@@ -334,6 +336,7 @@ export default function InbodyModal({
           measured_date: today(),
           weight: '',
           muscle_mass: '',
+          body_fat_mass: '',
           body_fat_percent: '',
         })
       }
@@ -349,7 +352,7 @@ export default function InbodyModal({
   }
 
   const handleSubmit = async () => {
-    if (!form.measured_date || !form.weight || !form.muscle_mass || !form.body_fat_percent) {
+    if (!form.measured_date || !form.weight || !form.muscle_mass || !form.body_fat_mass || !form.body_fat_percent) {
       alert('모든 항목을 입력해주세요')
       return
     }
@@ -400,6 +403,7 @@ export default function InbodyModal({
       measured_date: record.measured_date,
       weight: String(record.weight),
       muscle_mass: String(record.muscle_mass),
+      body_fat_mass: record.body_fat_mass != null ? String(record.body_fat_mass) : '',
       body_fat_percent: String(record.body_fat_percent),
     })
   }
@@ -439,6 +443,7 @@ export default function InbodyModal({
   const stats = useMemo(() => ({
     weight: getInbodyStats(records, 'weight'),
     muscle_mass: getInbodyStats(records, 'muscle_mass'),
+    body_fat_mass: getInbodyStats(records, 'body_fat_mass'),
     body_fat_percent: getInbodyStats(records, 'body_fat_percent'),
   }), [records])
 
@@ -491,6 +496,20 @@ export default function InbodyModal({
               value={form.muscle_mass}
               onChange={e => handleChange('muscle_mass', e.target.value)}
               placeholder="예: 28.3"
+            />
+          </div>
+
+          <div style={{ marginBottom: '12px' }}>
+            <label style={labelStyle}>
+              체지방량 (kg)
+              <span style={{ color: THEME.inbodyFat, marginLeft: '6px' }}>●</span>
+            </label>
+            <input
+              type="number" step="0.1" inputMode="decimal"
+              style={inputStyle}
+              value={form.body_fat_mass}
+              onChange={e => handleChange('body_fat_mass', e.target.value)}
+              placeholder="예: 12.4"
             />
           </div>
 
@@ -559,9 +578,12 @@ export default function InbodyModal({
                     <span style={{ color: THEME.textSub, fontWeight: '500' }}>
                       {r.measured_date}
                     </span>
-                    <span style={{ display: 'flex', gap: '10px' }}>
+                    <span style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
                       <span style={{ color: THEME.inbodyWeight }}>{parseFloat(r.weight).toFixed(1)}kg</span>
                       <span style={{ color: THEME.inbodyMuscle }}>{parseFloat(r.muscle_mass).toFixed(1)}kg</span>
+                      {r.body_fat_mass != null && (
+                        <span style={{ color: THEME.inbodyFat }}>{parseFloat(r.body_fat_mass).toFixed(1)}kg</span>
+                      )}
                       <span style={{ color: THEME.inbodyFat }}>{parseFloat(r.body_fat_percent).toFixed(1)}%</span>
                     </span>
                   </div>
@@ -583,43 +605,40 @@ export default function InbodyModal({
           <button style={closeBtn} onClick={onClose}>×</button>
         </div>
 
-        <div style={{ display: 'flex', gap: '6px', marginBottom: '14px' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: '4px', marginBottom: '10px' }}>
           <button
             style={tabBtn(activeTab === 'all', THEME.primary)}
             onClick={() => setActiveTab('all')}
-          >
-            전체
-          </button>
+          >전체</button>
           <button
             style={tabBtn(activeTab === 'weight', THEME.inbodyWeight)}
             onClick={() => setActiveTab('weight')}
-          >
-            체중
-          </button>
+          >체중</button>
           <button
             style={tabBtn(activeTab === 'muscle_mass', THEME.inbodyMuscle)}
             onClick={() => setActiveTab('muscle_mass')}
-          >
-            골격근량
-          </button>
+          >골격근량</button>
+          <button
+            style={tabBtn(activeTab === 'body_fat_mass', THEME.inbodyFat)}
+            onClick={() => setActiveTab('body_fat_mass')}
+          >체지방량</button>
           <button
             style={tabBtn(activeTab === 'body_fat_percent', THEME.inbodyFat)}
             onClick={() => setActiveTab('body_fat_percent')}
-          >
-            체지방률
-          </button>
+          >체지방률</button>
         </div>
 
-        {/* 차트 영역 - 전체 탭이면 3분할, 아니면 단일 차트 */}
+        {/* 차트 영역 - 전체 탭이면 4분할 미니, 아니면 단일 차트 */}
         {activeTab === 'all' ? (
-          <div style={{ marginBottom: '14px' }}>
+          <div style={{ marginBottom: '10px' }}>
             <MiniMetricChart data={records} metric={METRICS.weight} isLast={false} />
             <MiniMetricChart data={records} metric={METRICS.muscle_mass} isLast={false} />
+            <MiniMetricChart data={records} metric={METRICS.body_fat_mass} isLast={false} />
             <MiniMetricChart data={records} metric={METRICS.body_fat_percent} isLast={true} />
 
             <div style={{
               display: 'flex', justifyContent: 'center', gap: '14px',
-              marginTop: '8px', fontSize: '10px', flexWrap: 'wrap',
+              marginTop: '6px', fontSize: '10px', flexWrap: 'wrap',
             }}>
               <span style={{ color: THEME.textHint, fontSize: '10px' }}>
                 ● 회원입력 ■ 트레이너측정
@@ -629,9 +648,9 @@ export default function InbodyModal({
         ) : (
           <div style={{
             background: THEME.cardAlt, borderRadius: '12px',
-            padding: '12px', marginBottom: '14px',
+            padding: '10px', marginBottom: '10px',
           }}>
-            <LineChart data={records} metric={METRICS[activeTab]} height={220} />
+            <LineChart data={records} metric={METRICS[activeTab]} height={150} />
 
             <div style={{
               display: 'flex', justifyContent: 'center', gap: '14px',
@@ -649,12 +668,13 @@ export default function InbodyModal({
 
         {records.length > 0 && (
           <div style={{
-            display: 'grid', gridTemplateColumns: '1fr 1fr 1fr',
-            gap: '8px', marginBottom: '14px',
+            display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr',
+            gap: '6px', marginBottom: '10px',
           }}>
             {[
               { ...METRICS.weight, stat: stats.weight },
               { ...METRICS.muscle_mass, stat: stats.muscle_mass },
+              { ...METRICS.body_fat_mass, stat: stats.body_fat_mass },
               { ...METRICS.body_fat_percent, stat: stats.body_fat_percent },
             ].map(m => {
               const isPositive = m.stat.diff > 0
@@ -664,29 +684,29 @@ export default function InbodyModal({
                 <div key={m.key} style={{
                   background: THEME.card,
                   border: `1px solid ${m.color}`,
-                  borderRadius: '10px', padding: '10px 8px',
-                  textAlign: 'center',
+                  borderRadius: '8px', padding: '7px 4px',
+                  textAlign: 'center', minWidth: 0,
                 }}>
                   <div style={{
-                    fontSize: '11px', color: m.color,
-                    fontWeight: '600', marginBottom: '4px',
+                    fontSize: '10px', color: m.color,
+                    fontWeight: '600', marginBottom: '2px',
                   }}>
                     {m.label}
                   </div>
                   <div style={{
-                    fontSize: '18px', fontWeight: '700',
+                    fontSize: '14px', fontWeight: '700',
                     color: THEME.text,
                   }}>
                     {m.stat.current.toFixed(1)}
-                    <span style={{ fontSize: '11px', color: THEME.textSub, marginLeft: '2px' }}>
+                    <span style={{ fontSize: '9px', color: THEME.textSub, marginLeft: '1px' }}>
                       {m.unit}
                     </span>
                   </div>
                   {m.stat.count > 1 && (
                     <div style={{
-                      fontSize: '10px',
+                      fontSize: '9px',
                       color: isPositive ? THEME.danger : isNegative ? THEME.primary : THEME.textSub,
-                      marginTop: '2px', fontWeight: '600',
+                      marginTop: '1px', fontWeight: '600',
                     }}>
                       {diffSign}{m.stat.diff}{m.unit}
                     </div>
@@ -729,9 +749,12 @@ export default function InbodyModal({
                       {r.measured_date}
                     </span>
                   </span>
-                  <span style={{ display: 'flex', gap: '10px' }}>
+                  <span style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
                     <span style={{ color: THEME.inbodyWeight }}>{parseFloat(r.weight).toFixed(1)}kg</span>
                     <span style={{ color: THEME.inbodyMuscle }}>{parseFloat(r.muscle_mass).toFixed(1)}kg</span>
+                    {r.body_fat_mass != null && (
+                      <span style={{ color: THEME.inbodyFat }}>{parseFloat(r.body_fat_mass).toFixed(1)}kg</span>
+                    )}
                     <span style={{ color: THEME.inbodyFat }}>{parseFloat(r.body_fat_percent).toFixed(1)}%</span>
                   </span>
                 </div>
