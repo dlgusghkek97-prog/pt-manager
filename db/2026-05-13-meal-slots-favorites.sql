@@ -82,13 +82,20 @@ CREATE TABLE IF NOT EXISTS trainer_diet_favorites (
 );
 CREATE INDEX IF NOT EXISTS trainer_diet_favorites_trainer_id_idx ON trainer_diet_favorites(trainer_id);
 
--- 5) RLS 비활성화 (다른 테이블들과 동일하게 — Phase 5 에서 정식 정책과 함께 일괄 ON 예정)
---    이거 안 하면 새 테이블은 Supabase 기본 RLS 가 켜져 있어 INSERT 가 막힘.
-ALTER TABLE diet_favorites         DISABLE ROW LEVEL SECURITY;
-ALTER TABLE trainer_diet_favorites DISABLE ROW LEVEL SECURITY;
+-- 5) RLS — 이 프로젝트는 새 테이블에 RLS 가 자동으로 켜지므로 끄는 대신 임시로 "전부 허용"
+--    정책을 박는다. Phase 5 에서 정식 (member_id = auth.uid() 등) 정책으로 교체.
+ALTER TABLE public.diet_favorites         ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.trainer_diet_favorites ENABLE ROW LEVEL SECURITY;
 
--- 6) PostgREST 가 사용하는 anon / authenticated 역할에 권한 부여 + 스키마 캐시 리로드
---    빠뜨리면 "new row violates row-level security policy" 또는 "permission denied" 가 계속 뜸.
+DROP POLICY IF EXISTS "allow all" ON public.diet_favorites;
+DROP POLICY IF EXISTS "allow all" ON public.trainer_diet_favorites;
+
+CREATE POLICY "allow all" ON public.diet_favorites
+  FOR ALL TO public USING (true) WITH CHECK (true);
+CREATE POLICY "allow all" ON public.trainer_diet_favorites
+  FOR ALL TO public USING (true) WITH CHECK (true);
+
+-- 6) 권한 부여 + PostgREST 스키마 캐시 리로드
 GRANT ALL ON public.diet_favorites         TO anon, authenticated, service_role;
 GRANT ALL ON public.trainer_diet_favorites TO anon, authenticated, service_role;
 NOTIFY pgrst, 'reload schema';
