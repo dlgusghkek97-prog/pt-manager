@@ -286,14 +286,6 @@ export default function WorkoutStats({
                           }}
                         />
                       ))}
-                      <span style={{
-                        fontSize: '8px',
-                        color: volColor,
-                        fontWeight: '500',
-                        lineHeight: 1,
-                        marginLeft: 'auto',
-                        whiteSpace: 'nowrap',
-                      }}>{formatVol(data.total)}</span>
                     </div>
                   )}
                 </div>
@@ -411,6 +403,8 @@ export default function WorkoutStats({
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
               {weekLabels.map((label, wk) => {
                 if (weeklyTotals[wk] === 0) return null
+                // 카드 내 가장 큰 부위 값 기준으로 막대 비례
+                const cardMax = Math.max(...PARTS.map(p => weeklyByPart[wk][p] || 0), 1)
                 return (
                   <div key={wk} style={{ background: THEME.cardAlt, borderRadius: '12px', padding: '10px', minWidth: 0 }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: '8px', gap: '4px' }}>
@@ -421,7 +415,7 @@ export default function WorkoutStats({
                       <div key={part} style={{ display: 'flex', alignItems: 'center', gap: '5px', marginBottom: '5px', minWidth: 0 }}>
                         <span style={{ fontSize: '10px', color: THEME.text, width: '26px', flexShrink: 0 }}>{part}</span>
                         <div style={{ flex: 1, background: THEME.borderLight, borderRadius: '4px', height: '7px', minWidth: 0 }}>
-                          <div style={{ height: '7px', borderRadius: '4px', width: `${weeklyByPart[wk][part] / maxWeekVol * 100}%`, background: PART_COLORS[part] }} />
+                          <div style={{ height: '7px', borderRadius: '4px', width: `${weeklyByPart[wk][part] / cardMax * 100}%`, background: PART_COLORS[part] }} />
                         </div>
                         <span style={{ fontSize: '9px', color: THEME.textSub, flexShrink: 0, whiteSpace: 'nowrap' }}>{formatVol(weeklyByPart[wk][part])}</span>
                       </div>
@@ -444,23 +438,27 @@ export default function WorkoutStats({
             <p style={{ color: THEME.textSub, fontSize: '12px', textAlign: 'center', padding: '16px 0' }}>운동 기록이 없습니다</p>
           ) : (
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
-              {Object.entries(monthlyByMonth).filter(([, d]) => d.total > 0).map(([mStr, d]) => (
-                <div key={mStr} style={{ background: THEME.cardAlt, borderRadius: '12px', padding: '10px', minWidth: 0 }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: '8px', gap: '4px' }}>
-                    <span style={{ fontSize: '11px', fontWeight: '500', color: THEME.text, whiteSpace: 'nowrap' }}>{parseInt(mStr)}월</span>
-                    <span style={{ fontSize: '11px', fontWeight: '500', color: THEME.nutCarbsDark, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', minWidth: 0 }}>{formatVol(d.total)}</span>
-                  </div>
-                  {PARTS.filter(p => d.parts[p] > 0).map(part => (
-                    <div key={part} style={{ display: 'flex', alignItems: 'center', gap: '5px', marginBottom: '5px', minWidth: 0 }}>
-                      <span style={{ fontSize: '10px', color: THEME.text, width: '26px', flexShrink: 0 }}>{part}</span>
-                      <div style={{ flex: 1, background: THEME.borderLight, borderRadius: '4px', height: '7px', minWidth: 0 }}>
-                        <div style={{ height: '7px', borderRadius: '4px', width: `${d.parts[part] / maxMonthVol * 100}%`, background: PART_COLORS[part] }} />
-                      </div>
-                      <span style={{ fontSize: '9px', color: THEME.textSub, flexShrink: 0, whiteSpace: 'nowrap' }}>{formatVol(d.parts[part])}</span>
+              {Object.entries(monthlyByMonth).filter(([, d]) => d.total > 0).map(([mStr, d]) => {
+                // 카드 내 가장 큰 부위 값 기준
+                const cardMax = Math.max(...PARTS.map(p => d.parts[p] || 0), 1)
+                return (
+                  <div key={mStr} style={{ background: THEME.cardAlt, borderRadius: '12px', padding: '10px', minWidth: 0 }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: '8px', gap: '4px' }}>
+                      <span style={{ fontSize: '11px', fontWeight: '500', color: THEME.text, whiteSpace: 'nowrap' }}>{parseInt(mStr)}월</span>
+                      <span style={{ fontSize: '11px', fontWeight: '500', color: THEME.nutCarbsDark, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', minWidth: 0 }}>{formatVol(d.total)}</span>
                     </div>
-                  ))}
-                </div>
-              ))}
+                    {PARTS.filter(p => d.parts[p] > 0).map(part => (
+                      <div key={part} style={{ display: 'flex', alignItems: 'center', gap: '5px', marginBottom: '5px', minWidth: 0 }}>
+                        <span style={{ fontSize: '10px', color: THEME.text, width: '26px', flexShrink: 0 }}>{part}</span>
+                        <div style={{ flex: 1, background: THEME.borderLight, borderRadius: '4px', height: '7px', minWidth: 0 }}>
+                          <div style={{ height: '7px', borderRadius: '4px', width: `${d.parts[part] / cardMax * 100}%`, background: PART_COLORS[part] }} />
+                        </div>
+                        <span style={{ fontSize: '9px', color: THEME.textSub, flexShrink: 0, whiteSpace: 'nowrap' }}>{formatVol(d.parts[part])}</span>
+                      </div>
+                    ))}
+                  </div>
+                )
+              })}
             </div>
           )}
         </div>
