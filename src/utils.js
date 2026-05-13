@@ -70,7 +70,7 @@ export function calcWeightCalories({ volume = 0, totalSets = 0, weight, muscle }
   const w = parseFloat(weight) || 70
   const hours = (totalSets * 2.0) / 60
   const metKcal = 4.0 * w * hours
-  const volumeKcal = volume * 0.025
+  const volumeKcal = volume * 0.017
   return Math.round(metKcal + volumeKcal)
 }
 
