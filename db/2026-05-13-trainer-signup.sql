@@ -15,13 +15,14 @@ BEGIN
     RETURN NEW;
   END IF;
 
-  -- 트레이너 row 생성. signUp options.data 의 name 이 있으면 사용, 없으면 이메일을 임시 이름으로.
-  -- trainers.email 이 NOT NULL 이므로 함께 채움.
-  INSERT INTO public.trainers (id, name, email)
+  -- 트레이너 row 생성. signUp options.data 의 name/phone 사용.
+  -- trainers.email 이 NOT NULL 이므로 함께 채움. phone 은 nullable.
+  INSERT INTO public.trainers (id, name, email, phone)
   VALUES (
     NEW.id,
     COALESCE(NULLIF(trim(NEW.raw_user_meta_data->>'name'), ''), split_part(NEW.email, '@', 1)),
-    NEW.email
+    NEW.email,
+    NULLIF(trim(NEW.raw_user_meta_data->>'phone'), '')
   )
   ON CONFLICT (id) DO NOTHING;
 

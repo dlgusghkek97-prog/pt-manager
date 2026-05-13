@@ -19,16 +19,22 @@ const PTLogo = ({ size = 48 }) => (
 )
 
 export default function App() {
-  const [mode, setMode] = useState('select')   // select | trainer | member | signup
+  // mode: select | trainer | member | signup | forgot-password | forgot-email | reset-password
+  const [mode, setMode] = useState('select')
   const [user, setUser] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
-  const [info, setInfo] = useState('')         // 성공/안내 메시지 (가입 후 등)
+  const [info, setInfo] = useState('')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
+  const [passwordConfirm, setPasswordConfirm] = useState('')
   const [signupName, setSignupName] = useState('')
+  const [signupPhone, setSignupPhone] = useState('')
   const [memberCode, setMemberCode] = useState('')
   const [memberName, setMemberName] = useState('')
+  const [findName, setFindName] = useState('')
+  const [findPhone, setFindPhone] = useState('')
+  const [foundEmail, setFoundEmail] = useState('')
 
   // 약관 동의 (localStorage 에 pt_agreed_{TERMS_VERSION}='1' 저장)
   const agreedKey = `pt_agreed_${TERMS_VERSION}`
@@ -77,6 +83,21 @@ export default function App() {
     restoreSession()
   }, [])
 
+  // ─── 비밀번호 재설정 메일 링크 진입 감지 ───
+  // Supabase 가 #access_token=... 처리 후 onAuthStateChange 로 PASSWORD_RECOVERY 발생
+  useEffect(() => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
+      if (event === 'PASSWORD_RECOVERY') {
+        // dashboard 진입 차단하고 새 비번 설정 모드로
+        try { localStorage.removeItem('pt_user') } catch {}
+        setUser(null)
+        setMode('reset-password')
+        setError(''); setInfo('')
+      }
+    })
+    return () => subscription.unsubscribe()
+  }, [])
+
   // ─── 푸시 알림 URL 쿼리 처리 ───
   // SW가 앱 닫힌 상태에서 푸시 클릭 시 ?notif_link=... 로 새 창 열어줌
   // user 로그인 완료 후 1번만 dispatch (3번 시도 X)
@@ -110,12 +131,18 @@ export default function App() {
     if (password.length < 6) {
       setError('비밀번호는 6자 이상이어야 합니다.'); setLoading(false); return
     }
+    if (password !== passwordConfirm) {
+      setError('비밀번호 확인이 일치하지 않습니다.'); setLoading(false); return
+    }
 
     const { data, error: signupError } = await supabase.auth.signUp({
       email: email.trim(),
       password,
       options: {
-        data: { name: signupName.trim() },
+        data: {
+          name: signupName.trim(),
+          phone: signupPhone.trim(),
+        },
       },
     })
 
@@ -141,8 +168,74 @@ export default function App() {
     } else {
       setInfo('가입 신청 완료. 입력한 이메일로 확인 메일이 발송됐어요. 메일에서 인증 후 로그인해주세요.')
       setMode('trainer')
-      setPassword('')
+      setPassword(''); setPasswordConfirm('')
     }
+  }
+
+  // ─── 비밀번호 찾기 (재설정 메일 발송) ───
+  const sendPasswordReset = async () => {
+    setLoading(true); setError(''); setInfo('')
+    if (!email.trim()) {
+      setError('이메일을 입력해주세요.'); setLoading(false); return
+    }
+    const { error: resetError } = await supabase.auth.resetPasswordForEmail(email.trim(), {
+      redirectTo: window.location.origin,
+    })
+    setLoading(false)
+    if (resetError) {
+      setError('재설정 메일 발송 실패: ' + resetError.message)
+      return
+    }
+    setInfo('비밀번호 재설정 메일을 보냈어요. 메일에서 링크를 누르면 새 비밀번호를 설정할 수 있어요.')
+  }
+
+  // ─── 이메일 찾기 (이름 + 휴대폰 → trainers 매칭 → 마스킹된 이메일) ───
+  const findEmail = async () => {
+    setLoading(true); setError(''); setInfo(''); setFoundEmail('')
+    if (!findName.trim() || !findPhone.trim()) {
+      setError('이름과 휴대폰 번호를 입력해주세요.'); setLoading(false); return
+    }
+    // 휴대폰 정규화 (공백·하이픈 제거)
+    const phoneNorm = findPhone.replace(/[\s-]/g, '')
+    const { data, error: findError } = await supabase
+      .from('trainers')
+      .select('email')
+      .eq('name', findName.trim())
+      .eq('phone', phoneNorm)
+      .maybeSingle()
+    setLoading(false)
+    if (findError) {
+      setError('조회 실패: ' + findError.message); return
+    }
+    if (!data) {
+      setError('일치하는 트레이너 정보를 찾지 못했어요. 이름·휴대폰을 다시 확인해주세요.')
+      return
+    }
+    // 이메일 마스킹: a***@gmail.com
+    const e = data.email
+    const [local, domain] = e.split('@')
+    const masked = (local[0] || '') + '*'.repeat(Math.max(local.length - 1, 2)) + '@' + (domain || '')
+    setFoundEmail(masked)
+  }
+
+  // ─── 비밀번호 재설정 (메일 링크 클릭 후) ───
+  const updatePassword = async () => {
+    setLoading(true); setError(''); setInfo('')
+    if (!password || password.length < 6) {
+      setError('비밀번호는 6자 이상이어야 합니다.'); setLoading(false); return
+    }
+    if (password !== passwordConfirm) {
+      setError('비밀번호 확인이 일치하지 않습니다.'); setLoading(false); return
+    }
+    const { error: updError } = await supabase.auth.updateUser({ password })
+    setLoading(false)
+    if (updError) {
+      setError('비밀번호 변경 실패: ' + updError.message); return
+    }
+    setInfo('비밀번호가 변경됐어요. 새 비밀번호로 다시 로그인해주세요.')
+    await supabase.auth.signOut()
+    setMode('trainer')
+    setPassword(''); setPasswordConfirm('')
   }
 
   // ─── 트레이너 로그인 ───
@@ -243,6 +336,28 @@ export default function App() {
     </div>
   )
 
+  // 비밀번호 재설정 모드 — recovery session 으로 들어왔을 때 dashboard 진입 차단
+  if (mode === 'reset-password') {
+    return (
+      <div style={{ ...S.container, alignItems: 'center', justifyContent: 'center' }}>
+        <div style={S.loginCard}>
+          <div style={{ textAlign: 'center', marginBottom: '14px', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+            <div style={{ marginBottom: '10px' }}>
+              <PTLogo size={42} />
+            </div>
+            <h2 style={{ fontSize: '17px', fontWeight: '500', color: THEME.text, margin: '0 0 4px', letterSpacing: '-0.3px' }}>새 비밀번호 설정</h2>
+            <p style={{ fontSize: '12px', color: THEME.textSub, margin: 0 }}>새로 사용할 비밀번호를 입력해주세요</p>
+          </div>
+          {error && <p style={{ color: THEME.danger, fontSize: '12px', textAlign: 'center', margin: '0 0 8px' }}>{error}</p>}
+          {info && <p style={{ color: THEME.primary, fontSize: '12px', textAlign: 'center', margin: '0 0 8px', lineHeight: 1.5 }}>{info}</p>}
+          <input style={S.input} type="password" placeholder="새 비밀번호 (6자 이상)" value={password} onChange={e => setPassword(e.target.value)} />
+          <input style={S.input} type="password" placeholder="비밀번호 확인" value={passwordConfirm} onChange={e => setPasswordConfirm(e.target.value)} onKeyDown={e => e.key === 'Enter' && updatePassword()} />
+          <button style={S.btnPrimary} onClick={updatePassword} disabled={loading}>{loading ? '변경 중...' : '비밀번호 변경'}</button>
+        </div>
+      </div>
+    )
+  }
+
   if (user?.type === 'trainer') return <TrainerDashboard user={user} onLogout={logout} />
   if (user?.type === 'member') return <MemberDashboard user={user} onLogout={logout} />
 
@@ -278,11 +393,16 @@ export default function App() {
           {error && <p style={{ color: THEME.danger, fontSize: '12px', textAlign: 'center', margin: '0 0 8px' }}>{error}</p>}
           {info && <p style={{ color: THEME.primary, fontSize: '12px', textAlign: 'center', margin: '0 0 8px', lineHeight: 1.5 }}>{info}</p>}
           <input style={S.input} type="text" placeholder="이름" value={signupName} onChange={e => setSignupName(e.target.value)} />
+          <input style={S.input} type="tel" placeholder="휴대폰 (예: 01012345678)" value={signupPhone} onChange={e => setSignupPhone(e.target.value.replace(/[^0-9]/g, ''))} maxLength={11} />
           <input style={S.input} type="email" placeholder="이메일" value={email} onChange={e => setEmail(e.target.value)} />
-          <input style={S.input} type="password" placeholder="비밀번호 (6자 이상)" value={password} onChange={e => setPassword(e.target.value)} onKeyDown={e => e.key === 'Enter' && agreed && trainerSignup()} />
+          <input style={S.input} type="password" placeholder="비밀번호 (6자 이상)" value={password} onChange={e => setPassword(e.target.value)} />
+          <input style={S.input} type="password" placeholder="비밀번호 확인" value={passwordConfirm} onChange={e => setPasswordConfirm(e.target.value)} onKeyDown={e => e.key === 'Enter' && agreed && trainerSignup()} />
           <ConsentRow agreed={agreed} setAgreed={markAgreed} onOpen={setLegalOpen} />
           <button style={S.btnPrimary} onClick={trainerSignup} disabled={loading || !agreed}>{loading ? '가입 중...' : '가입하기'}</button>
           <button style={S.btnSecondary} onClick={() => { setMode('select'); setError(''); setInfo('') }}>← 뒤로가기</button>
+          <p style={{ fontSize: '10px', color: THEME.textHint, textAlign: 'center', margin: '8px 0 0', lineHeight: 1.5 }}>
+            가입 후 입력한 이메일로 확인 메일이 발송될 수 있어요.<br/>메일에서 인증 링크를 누르면 로그인 가능합니다.
+          </p>
         </div>
       )}
 
@@ -300,7 +420,51 @@ export default function App() {
           <input style={S.input} type="password" placeholder="비밀번호" value={password} onChange={e => setPassword(e.target.value)} onKeyDown={e => e.key === 'Enter' && agreed && trainerLogin()} />
           <ConsentRow agreed={agreed} setAgreed={markAgreed} onOpen={setLegalOpen} />
           <button style={S.btnPrimary} onClick={trainerLogin} disabled={loading || !agreed}>{loading ? '로그인 중...' : '로그인'}</button>
+          <div style={{ display: 'flex', justifyContent: 'center', gap: '10px', margin: '6px 0 4px' }}>
+            <button onClick={() => { setMode('forgot-email'); setError(''); setInfo(''); setFoundEmail('') }} style={{ background: 'none', border: 'none', color: THEME.textSub, padding: '4px', fontSize: '11px', cursor: 'pointer', textDecoration: 'underline', fontFamily: 'inherit' }}>이메일 찾기</button>
+            <span style={{ color: THEME.textHint, fontSize: '11px' }}>·</span>
+            <button onClick={() => { setMode('forgot-password'); setError(''); setInfo('') }} style={{ background: 'none', border: 'none', color: THEME.textSub, padding: '4px', fontSize: '11px', cursor: 'pointer', textDecoration: 'underline', fontFamily: 'inherit' }}>비밀번호 찾기</button>
+          </div>
           <button style={S.btnSecondary} onClick={() => setMode('select')}>← 뒤로가기</button>
+        </div>
+      )}
+
+      {mode === 'forgot-password' && (
+        <div style={S.loginCard}>
+          <div style={{ textAlign: 'center', marginBottom: '14px', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+            <div style={{ marginBottom: '10px' }}>
+              <PTLogo size={42} />
+            </div>
+            <h2 style={{ fontSize: '17px', fontWeight: '500', color: THEME.text, margin: '0 0 4px', letterSpacing: '-0.3px' }}>비밀번호 찾기</h2>
+            <p style={{ fontSize: '12px', color: THEME.textSub, margin: 0 }}>가입한 이메일로 재설정 링크를 보내드려요</p>
+          </div>
+          {error && <p style={{ color: THEME.danger, fontSize: '12px', textAlign: 'center', margin: '0 0 8px' }}>{error}</p>}
+          {info && <p style={{ color: THEME.primary, fontSize: '12px', textAlign: 'center', margin: '0 0 8px', lineHeight: 1.5 }}>{info}</p>}
+          <input style={S.input} type="email" placeholder="이메일" value={email} onChange={e => setEmail(e.target.value)} onKeyDown={e => e.key === 'Enter' && sendPasswordReset()} />
+          <button style={S.btnPrimary} onClick={sendPasswordReset} disabled={loading}>{loading ? '발송 중...' : '재설정 메일 보내기'}</button>
+          <button style={S.btnSecondary} onClick={() => { setMode('trainer'); setError(''); setInfo('') }}>← 뒤로가기</button>
+        </div>
+      )}
+
+      {mode === 'forgot-email' && (
+        <div style={S.loginCard}>
+          <div style={{ textAlign: 'center', marginBottom: '14px', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+            <div style={{ marginBottom: '10px' }}>
+              <PTLogo size={42} />
+            </div>
+            <h2 style={{ fontSize: '17px', fontWeight: '500', color: THEME.text, margin: '0 0 4px', letterSpacing: '-0.3px' }}>이메일 찾기</h2>
+            <p style={{ fontSize: '12px', color: THEME.textSub, margin: 0 }}>가입 시 입력한 이름과 휴대폰 번호</p>
+          </div>
+          {error && <p style={{ color: THEME.danger, fontSize: '12px', textAlign: 'center', margin: '0 0 8px' }}>{error}</p>}
+          {foundEmail && (
+            <p style={{ color: THEME.primary, fontSize: '13px', textAlign: 'center', margin: '0 0 10px', padding: '10px', background: THEME.primaryLight, borderRadius: '8px', fontWeight: '500' }}>
+              가입 이메일: {foundEmail}
+            </p>
+          )}
+          <input style={S.input} type="text" placeholder="이름" value={findName} onChange={e => setFindName(e.target.value)} />
+          <input style={S.input} type="tel" placeholder="휴대폰 (숫자만)" value={findPhone} onChange={e => setFindPhone(e.target.value.replace(/[^0-9]/g, ''))} maxLength={11} onKeyDown={e => e.key === 'Enter' && findEmail()} />
+          <button style={S.btnPrimary} onClick={findEmail} disabled={loading}>{loading ? '조회 중...' : '이메일 찾기'}</button>
+          <button style={S.btnSecondary} onClick={() => { setMode('trainer'); setError(''); setInfo(''); setFoundEmail('') }}>← 뒤로가기</button>
         </div>
       )}
 
