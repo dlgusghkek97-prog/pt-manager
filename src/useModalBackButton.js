@@ -19,10 +19,13 @@ export default function useModalBackButton(isOpen, onClose) {
     if (!isOpen) return
 
     let closedByBack = false
-    const marker = { __modalBack: Date.now() }
-    window.history.pushState(marker, '')
+    const myMarker = Date.now() + Math.random()
+    window.history.pushState({ __modalBack: myMarker }, '')
 
-    const handlePopState = () => {
+    const handlePopState = (e) => {
+      // 본인이 push 한 state 가 아직 history 에 남아 있으면 (= 다른 모달/화면의
+      // history.back() 으로 인한 popstate) 무시. 본인 state 가 빠졌을 때만 닫힘.
+      if (e.state && e.state.__modalBack === myMarker) return
       closedByBack = true
       onCloseRef.current?.()
     }
