@@ -401,12 +401,12 @@ export default function MemberDashboard({ user, onLogout }) {
 
   const PTLogo = () => (
     <div style={{
-      width: '32px', height: '32px', background: THEME.primaryAccent, borderRadius: '10px',
+      width: '42px', height: '42px', background: THEME.primaryAccent, borderRadius: '12px',
       display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', flexShrink: 0
     }}>
-      <span style={{ color: THEME.primaryDark, fontSize: '11px', fontWeight: '500', lineHeight: 1, letterSpacing: '-0.3px' }}>PT</span>
-      <div style={{ width: '14px', height: '0.5px', background: THEME.primaryDark, margin: '1px 0' }} />
-      <span style={{ color: THEME.primaryDark, fontSize: '4px', letterSpacing: '0.5px' }}>MANAGER</span>
+      <span style={{ color: THEME.primaryDark, fontSize: '14px', fontWeight: '500', lineHeight: 1, letterSpacing: '-0.3px' }}>PT</span>
+      <div style={{ width: '18px', height: '0.5px', background: THEME.primaryDark, margin: '2px 0' }} />
+      <span style={{ color: THEME.primaryDark, fontSize: '5px', letterSpacing: '0.5px' }}>MANAGER</span>
     </div>
   )
 
@@ -513,17 +513,17 @@ export default function MemberDashboard({ user, onLogout }) {
     <div style={S.container}>
       <div style={S.wrap}>
         <div style={S.header}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0, flex: 1 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', minWidth: 0, flex: 1 }}>
             <PTLogo />
-            <span style={{ fontSize: '13px', color: THEME.text, fontWeight: '500', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', minWidth: 0 }}>{user.name}님</span>
+            <span style={{ fontSize: '16px', color: THEME.text, fontWeight: '500', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', minWidth: 0 }}>{user.name}님</span>
             <div
               style={{
                 background: ptBadgeBg,
                 border: `0.5px solid ${ptBadgeBorder}`,
                 color: ptBadgeColor,
-                padding: '3px 8px',
-                borderRadius: '10px',
-                fontSize: '10px',
+                padding: '5px 12px',
+                borderRadius: '14px',
+                fontSize: '12px',
                 fontWeight: '500',
                 whiteSpace: 'nowrap',
                 flexShrink: 0,
