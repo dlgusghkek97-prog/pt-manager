@@ -15,8 +15,6 @@ SET search_path = public
 AS $$
 DECLARE
   v_email text;
-  v_local text;
-  v_domain text;
 BEGIN
   IF name_input IS NULL OR phone_input IS NULL
      OR length(trim(name_input)) = 0 OR length(trim(phone_input)) = 0 THEN
@@ -29,17 +27,7 @@ BEGIN
      AND phone = trim(phone_input)
    LIMIT 1;
 
-  IF v_email IS NULL THEN
-    RETURN NULL;
-  END IF;
-
-  v_local := split_part(v_email, '@', 1);
-  v_domain := split_part(v_email, '@', 2);
-
-  RETURN substr(v_local, 1, 1)
-       || repeat('*', greatest(length(v_local) - 1, 2))
-       || '@'
-       || v_domain;
+  RETURN v_email;  -- 마스킹 없이 전체 반환
 END $$;
 
 GRANT EXECUTE ON FUNCTION public.find_trainer_email(text, text) TO anon, authenticated;
