@@ -513,9 +513,9 @@ export default function MemberDashboard({ user, onLogout }) {
     <div style={S.container}>
       <div style={S.wrap}>
         <div style={S.header}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flex: 1, minWidth: 0 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0, flex: 1 }}>
             <PTLogo />
-            <span style={{ fontSize: '13px', color: THEME.text, fontWeight: '500', flexShrink: 0 }}>{user.name}님</span>
+            <span style={{ fontSize: '13px', color: THEME.text, fontWeight: '500', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', minWidth: 0 }}>{user.name}님</span>
             <div
               style={{
                 background: ptBadgeBg,
@@ -531,10 +531,6 @@ export default function MemberDashboard({ user, onLogout }) {
               title={hasNoPt ? 'PT 미등록' : `잔여 ${ptRemaining}회 / 총 ${ptTotal}회`}
             >
               {ptBadgeText}
-            </div>
-            <div style={{ display: 'flex', gap: '3px' }}>
-              <button style={inbodyBtnStyle} onClick={() => setInbodyOpen(true)}>인바디</button>
-              <button style={inbodyBtnStyle} onClick={() => setInbodyChartOpen(true)}>추이</button>
             </div>
           </div>
           <div style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
@@ -556,6 +552,12 @@ export default function MemberDashboard({ user, onLogout }) {
               식단 설정
             </button>
           </div>
+        </div>
+
+        {/* 인바디/추이 — 좁은 화면에서 헤더와 겹치지 않게 별도 줄 */}
+        <div style={{ display: 'flex', gap: '6px', marginBottom: '10px' }}>
+          <button style={{ ...inbodyBtnStyle, flex: 1 }} onClick={() => setInbodyOpen(true)}>인바디</button>
+          <button style={{ ...inbodyBtnStyle, flex: 1 }} onClick={() => setInbodyChartOpen(true)}>추이</button>
         </div>
 
         <button
