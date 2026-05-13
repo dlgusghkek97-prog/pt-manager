@@ -10,6 +10,7 @@ import NotificationBell from './NotificationBell'
 import ChatRoom from './ChatRoom'
 import ChatUnreadBadge from './ChatUnreadBadge'
 import useModalBackButton from './useModalBackButton'
+import useTabHistory from './useTabHistory'
 import PushPromptModal from './PushPromptModal'
 
 const MACRO_INPUT_STYLE = {
@@ -121,6 +122,13 @@ export default function MemberDashboard({ user, onLogout }) {
   const [mainTab, setMainTab] = useState('workout')
   const [workoutSubTab, setWorkoutSubTab] = useState('log')
   const [dietSubTab, setDietSubTab] = useState('log')
+
+  // 핸드폰 뒤로가기 → 직전 탭으로 복귀 (운동 ↔ 식단, 기록 ↔ 통계)
+  useTabHistory({
+    mainTab: [mainTab, setMainTab],
+    workoutSubTab: [workoutSubTab, setWorkoutSubTab],
+    dietSubTab: [dietSubTab, setDietSubTab],
+  })
 
   const [exercises, setExercises] = useState([{ slot: 1, exercise_type: 'weight', body_part: '', exercise_name: '', memo: '', description: '', sets: [{ id: null, weight: '', reps: '', media_url: '' }] }])
   const [allLogs, setAllLogs] = useState([])

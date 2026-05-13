@@ -273,19 +273,35 @@ export default function WorkoutStats({
                   }}>{day}</span>
 
                   {hasWorkout && (
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '2px', marginTop: 'auto' }}>
-                      {activeParts.slice(0, 3).map(([part]) => (
-                        <span
-                          key={part}
-                          style={{
-                            width: '5px',
-                            height: '5px',
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '1px', marginTop: 'auto', minWidth: 0, alignSelf: 'stretch' }}>
+                      {activeParts.slice(0, 2).map(([part]) => (
+                        <div key={part} style={{ display: 'flex', alignItems: 'center', gap: '2px', minWidth: 0 }}>
+                          <span style={{
+                            width: '4px',
+                            height: '4px',
                             borderRadius: '50%',
                             background: isSelected ? '#FFF' : PART_COLORS[part],
                             flexShrink: 0,
-                          }}
-                        />
+                          }} />
+                          <span style={{
+                            fontSize: '8px',
+                            color: isSelected ? '#FFF' : volColor,
+                            fontWeight: '500',
+                            lineHeight: 1,
+                            overflow: 'hidden',
+                            textOverflow: 'ellipsis',
+                            whiteSpace: 'nowrap',
+                            minWidth: 0,
+                          }}>{part}</span>
+                        </div>
                       ))}
+                      {activeParts.length > 2 && (
+                        <span style={{
+                          fontSize: '7px',
+                          color: isSelected ? '#FFF' : THEME.textHint,
+                          lineHeight: 1,
+                        }}>+{activeParts.length - 2}</span>
+                      )}
                     </div>
                   )}
                 </div>

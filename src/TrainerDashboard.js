@@ -15,6 +15,7 @@ import ChatUnreadBadge from './ChatUnreadBadge'
 import PushPromptModal from './PushPromptModal'
 import SubscriptionModal from './SubscriptionModal'
 import useModalBackButton from './useModalBackButton'
+import useTabHistory from './useTabHistory'
 import { loadSubscription, summarizeSubscription, canAddMember } from './utils'
 
 const NOTE_COLOR_POOL = [
@@ -382,6 +383,15 @@ export default function TrainerDashboard({ user, onLogout }) {
   useModalBackButton(view === 'memberDetail', () => {
     setView('members')
     setSelectedMember(null)
+  })
+
+  // 핸드폰 뒤로가기 → 직전 탭으로 복귀 (회원관리 ↔ 내기록, 운동 ↔ 식단, 기록 ↔ 통계)
+  useTabHistory({
+    topTab: [topTab, setTopTab],
+    memberMainTab: [memberMainTab, setMemberMainTab],
+    memberSubTab: [memberSubTab, setMemberSubTab],
+    trainerMainTab: [trainerMainTab, setTrainerMainTab],
+    trainerSubTab: [trainerSubTab, setTrainerSubTab],
   })
 
   // 핸드폰 뒤로가기 → 구독 모달 닫힘
