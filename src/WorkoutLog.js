@@ -195,8 +195,14 @@ export default function WorkoutLog({ user, selectedDate, setSelectedDate, exerci
 
   const addSet = (exIdx) => {
     const u = JSON.parse(JSON.stringify(exercises))
-    u[exIdx].sets.push({ id: null, weight: '', reps: '', media_url: '' })
+    // 직전 세트의 무게·횟수 복사 (둘 다 채워져 있을 때만). 그 외엔 빈 칸.
+    const sets = u[exIdx].sets
+    const last = sets.length > 0 ? sets[sets.length - 1] : null
+    const carryWeight = (last && last.weight !== '' && last.weight != null) ? last.weight : ''
+    const carryReps   = (last && last.reps   !== '' && last.reps   != null) ? last.reps   : ''
+    sets.push({ id: null, weight: carryWeight, reps: carryReps, media_url: '' })
     setExercises(u)
+    dirtyRef.current = true
   }
 
   const removeSet = async (exIdx, setIdx) => {
