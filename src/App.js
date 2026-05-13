@@ -162,6 +162,16 @@ export default function App() {
     // - session 있음 (즉시 로그인 가능): 자동 로그인 처리
     // - session 없음 (이메일 확인 필요): 안내 메시지
     if (data?.session) {
+      // 본인 trainers row 보장 (없으면 INSERT, 있으면 skip)
+      await supabase.from('trainers').upsert(
+        {
+          id: data.user.id,
+          name: signupName.trim(),
+          email: data.user.email,
+          phone: signupPhone.trim() || null,
+        },
+        { onConflict: 'id', ignoreDuplicates: true }
+      )
       const u = { type: 'trainer', ...data.user }
       setUser(u)
       localStorage.setItem('pt_user', JSON.stringify(u))
@@ -242,10 +252,22 @@ export default function App() {
   const trainerLogin = async () => {
     setLoading(true); setError(''); setInfo('')
     const { data, error } = await supabase.auth.signInWithPassword({ email, password })
-    if (error) { 
+    if (error) {
       setError('이메일 또는 비밀번호가 올바르지 않습니다.')
       setLoading(false)
       return
+    }
+    // 본인 trainers row 보장 (메일 인증 후 첫 로그인 시 자동 생성)
+    if (data?.user) {
+      await supabase.from('trainers').upsert(
+        {
+          id: data.user.id,
+          name: data.user.user_metadata?.name || data.user.email.split('@')[0],
+          email: data.user.email,
+          phone: data.user.user_metadata?.phone || null,
+        },
+        { onConflict: 'id', ignoreDuplicates: true }
+      )
     }
     const u = { type: 'trainer', ...data.user }
     setUser(u)
