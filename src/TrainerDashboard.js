@@ -11,6 +11,7 @@ import InbodyModal from './InbodyModal'
 import NotificationBell from './NotificationBell'
 import ChatList from './ChatList'
 import ChatRoom from './ChatRoom'
+import ChatUnreadBadge from './ChatUnreadBadge'
 import PushPromptModal from './PushPromptModal'
 
 const NOTE_COLOR_POOL = [
@@ -1230,10 +1231,11 @@ export default function TrainerDashboard({ user, onLogout }) {
             <NotificationBell userId={user.id} userType="trainer" onNavigate={handleNavigate} />
             <button
               onClick={() => setChatListOpen(true)}
-              style={{ background: '#FFF', border: `0.5px solid ${THEME.border}`, color: THEME.textSub, width: '30px', height: '30px', borderRadius: '50%', cursor: 'pointer', padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}
+              style={{ position: 'relative', background: '#FFF', border: `0.5px solid ${THEME.border}`, color: THEME.textSub, width: '30px', height: '30px', borderRadius: '50%', cursor: 'pointer', padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}
               title="채팅 목록"
             >
               <ChatBubbleIcon color={THEME.textSub} size={14} />
+              <ChatUnreadBadge userId={user.id} userType="trainer" />
             </button>
             <button
               onClick={() => setShowHelp(true)}

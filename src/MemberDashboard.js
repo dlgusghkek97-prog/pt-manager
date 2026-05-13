@@ -8,6 +8,7 @@ import HelpModal from './HelpModal'
 import InbodyModal from './InbodyModal'
 import NotificationBell from './NotificationBell'
 import ChatRoom from './ChatRoom'
+import ChatUnreadBadge from './ChatUnreadBadge'
 import PushPromptModal from './PushPromptModal'
 
 const MACRO_INPUT_STYLE = {
@@ -540,10 +541,11 @@ export default function MemberDashboard({ user, onLogout }) {
             <NotificationBell userId={user.id} userType="member" onNavigate={handleNavigate} />
             <button
               onClick={() => setChatOpen(true)}
-              style={{ background: '#FFF', border: `0.5px solid ${THEME.border}`, color: THEME.textSub, width: '30px', height: '30px', borderRadius: '50%', cursor: 'pointer', padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}
+              style={{ position: 'relative', background: '#FFF', border: `0.5px solid ${THEME.border}`, color: THEME.textSub, width: '30px', height: '30px', borderRadius: '50%', cursor: 'pointer', padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}
               title="트레이너와 채팅"
             >
               <ChatBubbleIcon color={THEME.textSub} size={14} />
+              <ChatUnreadBadge userId={user.id} userType="member" />
             </button>
             <button
               onClick={() => setShowHelp(true)}
