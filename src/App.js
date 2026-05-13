@@ -19,12 +19,14 @@ const PTLogo = ({ size = 48 }) => (
 )
 
 export default function App() {
-  const [mode, setMode] = useState('select')
+  const [mode, setMode] = useState('select')   // select | trainer | member | signup
   const [user, setUser] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  const [info, setInfo] = useState('')         // 성공/안내 메시지 (가입 후 등)
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
+  const [signupName, setSignupName] = useState('')
   const [memberCode, setMemberCode] = useState('')
   const [memberName, setMemberName] = useState('')
 
@@ -98,9 +100,54 @@ export default function App() {
     return () => clearTimeout(timer)
   }, [user?.id])  // user 객체 전체 아닌 id만 — 불필요한 재실행 방지
 
+  // ─── 트레이너 회원가입 ───
+  const trainerSignup = async () => {
+    setLoading(true); setError(''); setInfo('')
+
+    if (!email.trim() || !password || !signupName.trim()) {
+      setError('이름·이메일·비밀번호를 모두 입력해주세요.'); setLoading(false); return
+    }
+    if (password.length < 6) {
+      setError('비밀번호는 6자 이상이어야 합니다.'); setLoading(false); return
+    }
+
+    const { data, error: signupError } = await supabase.auth.signUp({
+      email: email.trim(),
+      password,
+      options: {
+        data: { name: signupName.trim() },
+      },
+    })
+
+    setLoading(false)
+
+    if (signupError) {
+      const msg = signupError.message || ''
+      if (msg.toLowerCase().includes('already')) {
+        setError('이미 가입된 이메일입니다. 로그인을 시도해주세요.')
+      } else {
+        setError('가입 실패: ' + msg)
+      }
+      return
+    }
+
+    // 이메일 확인 활성화 여부에 따라 분기
+    // - session 있음 (즉시 로그인 가능): 자동 로그인 처리
+    // - session 없음 (이메일 확인 필요): 안내 메시지
+    if (data?.session) {
+      const u = { type: 'trainer', ...data.user }
+      setUser(u)
+      localStorage.setItem('pt_user', JSON.stringify(u))
+    } else {
+      setInfo('가입 신청 완료. 입력한 이메일로 확인 메일이 발송됐어요. 메일에서 인증 후 로그인해주세요.')
+      setMode('trainer')
+      setPassword('')
+    }
+  }
+
   // ─── 트레이너 로그인 ───
   const trainerLogin = async () => {
-    setLoading(true); setError('')
+    setLoading(true); setError(''); setInfo('')
     const { data, error } = await supabase.auth.signInWithPassword({ email, password })
     if (error) { 
       setError('이메일 또는 비밀번호가 올바르지 않습니다.')
@@ -212,6 +259,30 @@ export default function App() {
           </div>
           <button style={S.btnPrimary} onClick={() => setMode('trainer')}>트레이너 로그인</button>
           <button style={S.btnSecondary} onClick={() => setMode('member')}>회원 접속</button>
+          <button
+            onClick={() => { setMode('signup'); setError(''); setInfo('') }}
+            style={{ background: 'none', border: 'none', color: THEME.textSub, padding: '8px 0', fontSize: '12px', cursor: 'pointer', textDecoration: 'underline', fontFamily: 'inherit', marginTop: '4px' }}
+          >트레이너 회원가입</button>
+        </div>
+      )}
+
+      {mode === 'signup' && (
+        <div style={S.loginCard}>
+          <div style={{ textAlign: 'center', marginBottom: '14px', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+            <div style={{ marginBottom: '10px' }}>
+              <PTLogo size={42} />
+            </div>
+            <h2 style={{ fontSize: '17px', fontWeight: '500', color: THEME.text, margin: '0 0 4px', letterSpacing: '-0.3px' }}>트레이너 회원가입</h2>
+            <p style={{ fontSize: '12px', color: THEME.textSub, margin: 0 }}>이메일로 가입하면 본인 계정에서 회원을 관리할 수 있어요</p>
+          </div>
+          {error && <p style={{ color: THEME.danger, fontSize: '12px', textAlign: 'center', margin: '0 0 8px' }}>{error}</p>}
+          {info && <p style={{ color: THEME.primary, fontSize: '12px', textAlign: 'center', margin: '0 0 8px', lineHeight: 1.5 }}>{info}</p>}
+          <input style={S.input} type="text" placeholder="이름" value={signupName} onChange={e => setSignupName(e.target.value)} />
+          <input style={S.input} type="email" placeholder="이메일" value={email} onChange={e => setEmail(e.target.value)} />
+          <input style={S.input} type="password" placeholder="비밀번호 (6자 이상)" value={password} onChange={e => setPassword(e.target.value)} onKeyDown={e => e.key === 'Enter' && agreed && trainerSignup()} />
+          <ConsentRow agreed={agreed} setAgreed={markAgreed} onOpen={setLegalOpen} />
+          <button style={S.btnPrimary} onClick={trainerSignup} disabled={loading || !agreed}>{loading ? '가입 중...' : '가입하기'}</button>
+          <button style={S.btnSecondary} onClick={() => { setMode('select'); setError(''); setInfo('') }}>← 뒤로가기</button>
         </div>
       )}
 
@@ -224,6 +295,7 @@ export default function App() {
             <h2 style={{ fontSize: '17px', fontWeight: '500', color: THEME.text, margin: 0, letterSpacing: '-0.3px' }}>트레이너 로그인</h2>
           </div>
           {error && <p style={{ color: THEME.danger, fontSize: '12px', textAlign: 'center', margin: '0 0 8px' }}>{error}</p>}
+          {info && <p style={{ color: THEME.primary, fontSize: '12px', textAlign: 'center', margin: '0 0 8px', lineHeight: 1.5 }}>{info}</p>}
           <input style={S.input} type="email" placeholder="이메일" value={email} onChange={e => setEmail(e.target.value)} />
           <input style={S.input} type="password" placeholder="비밀번호" value={password} onChange={e => setPassword(e.target.value)} onKeyDown={e => e.key === 'Enter' && agreed && trainerLogin()} />
           <ConsentRow agreed={agreed} setAgreed={markAgreed} onOpen={setLegalOpen} />
