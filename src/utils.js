@@ -858,7 +858,7 @@ export const calcPtRemaining = (member) => {
 // ─── 오늘 기록 완료 ───
 
 // 회원이 "오늘 기록 완료" 누름. 트레이너에게 알림.
-// 같은 날 중복 누르면 false 반환.
+// 하루 여러 번 눌러도 매번 알림 전송됨 (중복 체크 없음).
 export const markTodayComplete = async (memberId) => {
   if (!memberId) return { success: false, error: 'memberId 누락' }
 
@@ -866,7 +866,7 @@ export const markTodayComplete = async (memberId) => {
 
   const { data: member, error: memErr } = await supabase
     .from('members')
-    .select('id, name, trainer_id, daily_complete_date')
+    .select('id, name, trainer_id')
     .eq('id', memberId)
     .single()
 
@@ -874,18 +874,11 @@ export const markTodayComplete = async (memberId) => {
     return { success: false, error: '회원 조회 실패' }
   }
 
-  if (member.daily_complete_date === today) {
-    return { success: false, error: '이미 오늘 완료됨', alreadyDone: true }
-  }
-
-  const { error: updErr } = await supabase
+  // 마지막 완료 일자만 기록 (UI 표시용. 알림 전송 자체는 제한 없음)
+  await supabase
     .from('members')
     .update({ daily_complete_date: today })
     .eq('id', memberId)
-
-  if (updErr) {
-    return { success: false, error: updErr.message }
-  }
 
   // 트레이너에게 알림
   await sendNotification({

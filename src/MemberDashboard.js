@@ -331,19 +331,14 @@ export default function MemberDashboard({ user, onLogout }) {
 
   const handleTodayComplete = async () => {
     if (completingToday) return
-    if (!window.confirm('오늘 운동과 식단 기록을 모두 완료했습니까?\n트레이너에게 알림이 전송됩니다.')) return
     setCompletingToday(true)
     const result = await markTodayComplete(user.id)
     setCompletingToday(false)
     if (!result.success) {
-      if (result.alreadyDone) {
-        alert('오늘은 이미 완료를 누르셨어요!')
-      } else {
-        alert(result.error || '처리 실패')
-      }
+      alert(result.error || '처리 실패')
       return
     }
-    alert('오늘 기록 완료! 트레이너에게 알림이 전송되었습니다.')
+    alert('트레이너에게 알림을 보냈습니다.')
     await refreshMemberInfo()
   }
 
@@ -533,9 +528,29 @@ export default function MemberDashboard({ user, onLogout }) {
               {ptBadgeText}
             </div>
           </div>
-          <button onClick={() => setShowCalcModal(true)} style={{ background: '#FFF', border: `0.5px solid ${THEME.border}`, color: THEME.primary, padding: '0 12px', borderRadius: '18px', cursor: 'pointer', fontSize: '12px', fontWeight: '500', height: '36px', display: 'flex', alignItems: 'center', flexShrink: 0 }}>
-            식단 설정
-          </button>
+          <div style={{ display: 'flex', gap: '6px', alignItems: 'center', flexShrink: 0 }}>
+            <button
+              onClick={handleTodayComplete}
+              disabled={completingToday}
+              style={{
+                background: THEME.primary, color: '#FFF', border: 'none',
+                padding: '0 12px', borderRadius: '18px',
+                cursor: completingToday ? 'default' : 'pointer',
+                fontSize: '12px', fontWeight: '500',
+                height: '36px',
+                display: 'flex', alignItems: 'center', gap: '4px',
+                fontFamily: 'inherit',
+                opacity: completingToday ? 0.7 : 1,
+                whiteSpace: 'nowrap',
+              }}
+              title="트레이너에게 오늘 기록 알림 (여러 번 가능)"
+            >
+              {completingToday ? '전송 중…' : '✓ 오늘 완료'}
+            </button>
+            <button onClick={() => setShowCalcModal(true)} style={{ background: '#FFF', border: `0.5px solid ${THEME.border}`, color: THEME.primary, padding: '0 12px', borderRadius: '18px', cursor: 'pointer', fontSize: '12px', fontWeight: '500', height: '36px', display: 'flex', alignItems: 'center', flexShrink: 0 }}>
+              식단 설정
+            </button>
+          </div>
         </div>
 
         {/* 헤더 다음 줄: [인바디] [추이] [🔔] [💬] [?] 5칸 균등 캡슐 */}
@@ -563,41 +578,6 @@ export default function MemberDashboard({ user, onLogout }) {
             title="도움말"
           >?</button>
         </div>
-
-        <button
-          onClick={handleTodayComplete}
-          disabled={todayDone || completingToday}
-          style={{
-            width: '100%',
-            background: todayDone ? THEME.primaryAccent : THEME.primary,
-            color: todayDone ? THEME.primaryDark : '#FFF',
-            border: 'none',
-            padding: '11px',
-            borderRadius: '12px',
-            fontSize: '13px',
-            fontWeight: '500',
-            cursor: (todayDone || completingToday) ? 'default' : 'pointer',
-            fontFamily: 'inherit',
-            marginBottom: '12px',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            gap: '6px',
-            opacity: completingToday ? 0.7 : 1,
-          }}
-        >
-          {todayDone ? (
-            <>
-              <span style={{ fontSize: '14px' }}>✓</span>
-              오늘 완료됨
-            </>
-          ) : (
-            <>
-              <span style={{ fontSize: '14px' }}>📝</span>
-              {completingToday ? '처리 중...' : '오늘 기록 완료 (트레이너에게 알림)'}
-            </>
-          )}
-        </button>
 
         {showHelp && <HelpModal type="member" onClose={() => setShowHelp(false)} />}
 
