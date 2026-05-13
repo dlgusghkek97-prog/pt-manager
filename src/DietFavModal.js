@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react'
 import { THEME, loadDietFavorites, addDietFavorite, removeDietFavorite } from './utils'
+import useModalBackButton from './useModalBackButton'
 
 // 식단 즐겨찾기 모달.
 // - 상단: 현재 식사 입력값을 즐겨찾기로 저장
@@ -16,6 +17,9 @@ export default function DietFavModal({
   const [loading, setLoading] = useState(true)
   const [newName, setNewName] = useState(currentMeal?.name || '')
   const [saving, setSaving] = useState(false)
+
+  // 핸드폰 뒤로가기 → 모달 닫힘
+  useModalBackButton(true, onClose)
 
   useEffect(() => {
     let alive = true
@@ -49,7 +53,8 @@ export default function DietFavModal({
     )
     setSaving(false)
     if (!result.success) { alert('저장 실패: ' + result.error); return }
-    if (result.data) setFavs(prev => [result.data, ...prev])
+    // 저장 성공 시 모달 자동 닫힘 (목록 갱신 대신 닫음 — 다시 열면 보임)
+    onClose?.()
   }
 
   const handleDelete = async (id) => {
@@ -73,11 +78,9 @@ export default function DietFavModal({
   return (
     <div
       style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.5)', zIndex: 1100, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '16px' }}
-      onClick={onClose}
     >
       <div
         style={{ background: '#FFF', borderRadius: '14px', padding: '18px', width: '100%', maxWidth: '340px', maxHeight: '80vh', overflowY: 'auto', boxSizing: 'border-box' }}
-        onClick={e => e.stopPropagation()}
       >
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
           <p style={{ fontSize: '14px', fontWeight: '500', color: THEME.primary, margin: 0 }}>★ 식단 즐겨찾기</p>

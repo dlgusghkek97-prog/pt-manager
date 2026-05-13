@@ -3,6 +3,7 @@ import { supabase } from './supabase'
 import { S, THEME, calcWeightCalories, calcTDEE, calcDailyBurn } from './utils'
 import DatePicker from './DatePicker'
 import DietFavModal from './DietFavModal'
+import useModalBackButton from './useModalBackButton'
 
 const NUTRIENTS = [
   { key: 'calories', label: '칼로리', unit: 'kcal', color: THEME.nutCalories },
@@ -199,6 +200,10 @@ export default function DietLog({ user, onDietUpdate, tableOverride, trainerIdFi
   const [savingFeedback, setSavingFeedback] = useState(false)
 
   const [previewUrl, setPreviewUrl] = useState(null)
+
+  // 핸드폰 뒤로가기 → 사진 미리보기 닫힘
+  // (DietFavModal 은 컴포넌트 내부에서 자체 hook 호출)
+  useModalBackButton(!!previewUrl, () => setPreviewUrl(null))
 
   useEffect(() => { loadLogs(selectedDate); loadFeedback(selectedDate) }, [selectedDate, user.id])
   useEffect(() => { if (tab === 'stats') loadStatsLogs() }, [tab, statMode, statValue])

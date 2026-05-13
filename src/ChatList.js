@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react'
 import { supabase } from './supabase'
 import { THEME, loadConversationsForTrainer } from './utils'
+import useModalBackButton from './useModalBackButton'
 
 const ChatIcon = ({ color = THEME.text, size = 16 }) => (
   <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
@@ -43,6 +44,7 @@ const formatRelativeTime = (timestamp) => {
 }
 
 export default function ChatList({ trainerId, isOpen, onClose, onSelectConversation }) {
+  useModalBackButton(isOpen, onClose)
   const [conversations, setConversations] = useState([])
   const [loading, setLoading] = useState(false)
   const channelRef = useRef(null)

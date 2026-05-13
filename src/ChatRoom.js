@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react'
 import { supabase } from './supabase'
 import { THEME, loadMessages, sendMessage, markMessagesRead, uploadChatImage, getOrCreateConversation } from './utils'
+import useModalBackButton from './useModalBackButton'
 
 const PhotoIcon = ({ color = THEME.primary, size = 16 }) => (
   <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="1.8" strokeLinecap="round">
@@ -60,6 +61,7 @@ export default function ChatRoom({
   onClose,
   ptIsZero = false,     // 회원/트레이너가 회원 상세에서 본 경우 — 사진 차단 여부
 }) {
+  useModalBackButton(true, onClose)
   const [conversationId, setConversationId] = useState(null)
   const [messages, setMessages] = useState([])
   const [inputText, setInputText] = useState('')

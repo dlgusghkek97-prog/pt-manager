@@ -1,8 +1,10 @@
 import React, { useState } from 'react'
 import { THEME } from './utils'
 import { subscribeToPush, dismissPushPrompt } from './utils'
+import useModalBackButton from './useModalBackButton'
 
 export default function PushPromptModal({ userId, userType, onClose }) {
+  useModalBackButton(true, onClose)
   const [loading, setLoading] = useState(false)
 
   const handleEnable = async () => {

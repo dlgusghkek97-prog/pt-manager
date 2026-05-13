@@ -1,7 +1,9 @@
 import React from 'react'
 import { THEME } from './utils'
+import useModalBackButton from './useModalBackButton'
 
 export default function HelpModal({ type, onClose }) {
+  useModalBackButton(true, onClose)
   const isTrainer = type === 'trainer'
 
   const trainerSections = [

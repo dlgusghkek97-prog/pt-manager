@@ -4,6 +4,7 @@ import {
   loadInbody, loadInbodyMerged,
   addInbody, updateInbody, deleteInbody, getInbodyStats,
 } from './utils'
+import useModalBackButton from './useModalBackButton'
 
 // ─── 공통 스타일 ───
 const overlay = {
@@ -283,6 +284,9 @@ export default function InbodyModal({
   user, memberId, isOpen, mode = 'input', onClose,
   table = 'member_inbody', idField = 'member_id',
 }) {
+  // 핸드폰 뒤로가기 → 모달 닫힘
+  useModalBackButton(isOpen, onClose)
+
   const [records, setRecords] = useState([])
   const [loading, setLoading] = useState(false)
 
@@ -443,8 +447,8 @@ export default function InbodyModal({
   // ─── 입력 모달 ───
   if (mode === 'input') {
     return (
-      <div style={overlay} onClick={onClose}>
-        <div style={modal} onClick={e => e.stopPropagation()}>
+      <div style={overlay}>
+        <div style={modal}>
           <div style={headerStyle}>
             <h3 style={titleStyle}>
               {editId ? '인바디 수정' : '인바디 입력'}
@@ -572,8 +576,8 @@ export default function InbodyModal({
 
   // ─── 추이 모달 ───
   return (
-    <div style={overlay} onClick={onClose}>
-      <div style={modal} onClick={e => e.stopPropagation()}>
+    <div style={overlay}>
+      <div style={modal}>
         <div style={headerStyle}>
           <h3 style={titleStyle}>인바디 추이</h3>
           <button style={closeBtn} onClick={onClose}>×</button>

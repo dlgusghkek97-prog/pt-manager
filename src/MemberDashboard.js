@@ -9,6 +9,7 @@ import InbodyModal from './InbodyModal'
 import NotificationBell from './NotificationBell'
 import ChatRoom from './ChatRoom'
 import ChatUnreadBadge from './ChatUnreadBadge'
+import useModalBackButton from './useModalBackButton'
 import PushPromptModal from './PushPromptModal'
 
 const MACRO_INPUT_STYLE = {
@@ -126,6 +127,9 @@ export default function MemberDashboard({ user, onLogout }) {
   const [favorites, setFavorites] = useState([])
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0])
   const [showCalcModal, setShowCalcModal] = useState(false)
+
+  // 핸드폰 뒤로가기 → 식단 설정 모달 닫힘
+  useModalBackButton(showCalcModal, () => setShowCalcModal(false))
   const [todayDiet, setTodayDiet] = useState([])
   const [showHelp, setShowHelp] = useState(false)
 

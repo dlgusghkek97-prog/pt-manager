@@ -13,6 +13,7 @@ import ChatList from './ChatList'
 import ChatRoom from './ChatRoom'
 import ChatUnreadBadge from './ChatUnreadBadge'
 import PushPromptModal from './PushPromptModal'
+import useModalBackButton from './useModalBackButton'
 
 const NOTE_COLOR_POOL = [
   { name: '코랄', bg: '#FCE4E0', text: '#8E3D2E' },
@@ -361,6 +362,16 @@ export default function TrainerDashboard({ user, onLogout }) {
 
   // 푸시 알림 안내 모달
   const [showPushPrompt, setShowPushPrompt] = useState(false)
+
+  // 핸드폰 뒤로가기 → 인라인 모달 닫힘 (TrainerDashboard 자체 모달들)
+  useModalBackButton(showAddMember, () => setShowAddMember(false))
+  useModalBackButton(showCalcModal, () => setShowCalcModal(false))
+  useModalBackButton(showMemberCalcModal, () => setShowMemberCalcModal(false))
+  useModalBackButton(!!deleteTarget, () => setDeleteTarget(null))
+  useModalBackButton(!!editStartDateMember, () => setEditStartDateMember(null))
+  useModalBackButton(!!ptConfirmTarget, () => setPtConfirmTarget(null))
+  useModalBackButton(!!ptChargeTarget, () => setPtChargeTarget(null))
+  useModalBackButton(!!showNotesMember, () => setShowNotesMember(null))
 
   const [goal, setGoal] = useState(() => localStorage.getItem(`tmacro_goal_${user.id}`) || '벌크업')
   const [gender, setGender] = useState(() => localStorage.getItem(`tmacro_gender_${user.id}`) || '남성')

@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react'
 import { supabase } from './supabase'
 import { PARTS, PART_COLORS, S, THEME, calcWeightCalories, checkNewPRs, getLatestRecord, addFavorite, removeFavorite } from './utils'
 import DatePicker from './DatePicker'
+import useModalBackButton from './useModalBackButton'
 
 const CameraIcon = ({ color = '#A8C8B5', size = 20 }) => (
   <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="1.8" strokeLinecap="round">
@@ -48,6 +49,12 @@ export default function WorkoutLog({ user, selectedDate, setSelectedDate, exerci
   const [showFavModal, setShowFavModal] = useState(false)
   const [favModalExIdx, setFavModalExIdx] = useState(null)
   const [favModalActivePart, setFavModalActivePart] = useState('')
+
+  // 핸드폰 뒤로가기 → 인라인 모달 닫힘
+  useModalBackButton(showCardioModal, () => { setShowCardioModal(false); setCardioName(''); setCardioCalories('') })
+  useModalBackButton(showTimerSetup, () => setShowTimerSetup(false))
+  useModalBackButton(showFavModal, () => { setShowFavModal(false); setFavModalExIdx(null) })
+  useModalBackButton(previewIdx !== null, () => setPreviewIdx(null))
 
   // ── 자동 저장 (저장 버튼 없음 — 입력칸을 벗어나면 자동 반영) ──
   const [saveStatus, setSaveStatus] = useState('idle') // idle | saving | saved | error
