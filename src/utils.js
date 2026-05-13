@@ -330,6 +330,46 @@ export const removeFavorite = async (favoriteId, table = 'member_favorite_exerci
   return { success: true }
 }
 
+// ── 구독 (SaaS 사용료) ──
+// 상태: trial / active / expired / cancelled
+// 트라이얼은 가입 후 30일 자동. 정식 결제는 토스페이먼츠 연동 후 활성화.
+export const loadSubscription = async (trainerId) => {
+  if (!trainerId) return null
+  const { data, error } = await supabase
+    .from('trainer_subscriptions')
+    .select('*')
+    .eq('trainer_id', trainerId)
+    .maybeSingle()
+  if (error) {
+    console.error('[loadSubscription] error:', error)
+    return null
+  }
+  return data
+}
+
+// 구독 요약 — UI 표시용
+// 반환: { state: 'trial'|'active'|'expired', daysLeft: number, expiresAt: Date|null, label: string }
+export const summarizeSubscription = (sub) => {
+  if (!sub) {
+    return { state: 'expired', daysLeft: 0, expiresAt: null, label: '구독 정보 없음' }
+  }
+  const now = new Date()
+  const trialEnd = sub.trial_expires_at ? new Date(sub.trial_expires_at) : null
+  const paidEnd = sub.paid_expires_at ? new Date(sub.paid_expires_at) : null
+
+  // 유료가 살아있으면 active
+  if (paidEnd && paidEnd > now) {
+    const days = Math.ceil((paidEnd - now) / (1000 * 60 * 60 * 24))
+    return { state: 'active', daysLeft: days, expiresAt: paidEnd, label: `구독 ${days}일 남음` }
+  }
+  // 트라이얼이 살아있으면 trial
+  if (trialEnd && trialEnd > now) {
+    const days = Math.ceil((trialEnd - now) / (1000 * 60 * 60 * 24))
+    return { state: 'trial', daysLeft: days, expiresAt: trialEnd, label: `무료 체험 ${days}일 남음` }
+  }
+  return { state: 'expired', daysLeft: 0, expiresAt: paidEnd || trialEnd, label: '구독 만료' }
+}
+
 // ── 미디어 업로드 공통 ──
 export const MAX_MEDIA_BYTES = 100 * 1024 * 1024 // 100MB
 

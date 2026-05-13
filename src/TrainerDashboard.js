@@ -13,7 +13,9 @@ import ChatList from './ChatList'
 import ChatRoom from './ChatRoom'
 import ChatUnreadBadge from './ChatUnreadBadge'
 import PushPromptModal from './PushPromptModal'
+import SubscriptionModal from './SubscriptionModal'
 import useModalBackButton from './useModalBackButton'
+import { loadSubscription, summarizeSubscription } from './utils'
 
 const NOTE_COLOR_POOL = [
   { name: '코랄', bg: '#FCE4E0', text: '#8E3D2E' },
@@ -363,11 +365,27 @@ export default function TrainerDashboard({ user, onLogout }) {
   // 푸시 알림 안내 모달
   const [showPushPrompt, setShowPushPrompt] = useState(false)
 
+  // 구독 (SaaS 사용료) — 트라이얼/활성/만료
+  const [showSubscription, setShowSubscription] = useState(false)
+  const [subSummary, setSubSummary] = useState(null)
+
+  useEffect(() => {
+    if (!user?.id) return
+    let alive = true
+    loadSubscription(user.id).then(sub => {
+      if (alive) setSubSummary(summarizeSubscription(sub))
+    })
+    return () => { alive = false }
+  }, [user?.id, showSubscription])  // 모달 닫힐 때 갱신
+
   // 핸드폰 뒤로가기 → 회원 상세에서 회원 목록으로 (앱 종료 방지)
   useModalBackButton(view === 'memberDetail', () => {
     setView('members')
     setSelectedMember(null)
   })
+
+  // 핸드폰 뒤로가기 → 구독 모달 닫힘
+  useModalBackButton(showSubscription, () => setShowSubscription(false))
 
   // 핸드폰 뒤로가기 → 인라인 모달 닫힘 (TrainerDashboard 자체 모달들)
   useModalBackButton(showAddMember, () => setShowAddMember(false))
@@ -1250,6 +1268,20 @@ export default function TrainerDashboard({ user, onLogout }) {
                 {user.name}님
               </span>
             )}
+            {subSummary && (
+              <button
+                onClick={() => setShowSubscription(true)}
+                style={{
+                  background: subSummary.state === 'expired' ? THEME.dangerLight : THEME.primaryLight,
+                  border: `0.5px solid ${subSummary.state === 'expired' ? THEME.danger : THEME.primaryAccent}`,
+                  color: subSummary.state === 'expired' ? THEME.dangerDark : THEME.primaryDark,
+                  padding: '3px 9px', borderRadius: '10px',
+                  fontSize: '10px', fontWeight: '500', cursor: 'pointer',
+                  whiteSpace: 'nowrap', flexShrink: 0, fontFamily: 'inherit',
+                }}
+                title="구독 관리"
+              >{subSummary.label}</button>
+            )}
           </div>
           <div style={{ display: 'flex', gap: '5px', alignItems: 'center' }}>
             <NotificationBell userId={user.id} userType="trainer" onNavigate={handleNavigate} />
@@ -1290,6 +1322,13 @@ export default function TrainerDashboard({ user, onLogout }) {
             userId={user.id}
             userType="trainer"
             onClose={() => setShowPushPrompt(false)}
+          />
+        )}
+
+        {showSubscription && (
+          <SubscriptionModal
+            trainerId={user.id}
+            onClose={() => setShowSubscription(false)}
           />
         )}
 
