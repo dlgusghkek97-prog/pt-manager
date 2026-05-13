@@ -266,7 +266,11 @@ ALTER TABLE public.feedbacks          ENABLE ROW LEVEL SECURITY;
 
 NOTIFY pgrst, 'reload schema';
 
--- 5.3c) members / trainers 는 위 21개 테스트 OK 후 별도 단계에서 ON 예정.
+-- 5.3c) members / trainers 도 ON — Phase 5 의 마지막 RLS 활성화 단계
+--    트레이너 회원 목록 / 회원 본인 정보 / PT 차감 등 모든 시나리오 정책 통과 확인됨.
+ALTER TABLE public.members  ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.trainers ENABLE ROW LEVEL SECURITY;
+NOTIFY pgrst, 'reload schema';
 
 -- =========================================
 -- 6) 확인 쿼리 (참고용 — 정책 개수가 표시되면 성공)
