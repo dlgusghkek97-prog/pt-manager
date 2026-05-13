@@ -330,6 +330,47 @@ export const removeFavorite = async (favoriteId, table = 'member_favorite_exerci
   return { success: true }
 }
 
+// ── 식단 즐겨찾기 ──
+export const loadDietFavorites = async (userId, table = 'diet_favorites', idField = 'member_id') => {
+  const { data, error } = await supabase
+    .from(table)
+    .select('*')
+    .eq(idField, userId)
+    .order('created_at', { ascending: false })
+  if (error) {
+    console.error('[loadDietFavorites] error:', error)
+    return []
+  }
+  return data || []
+}
+
+export const addDietFavorite = async (userId, fav, table = 'diet_favorites', idField = 'member_id') => {
+  if (!fav?.name || !fav.name.trim()) return { success: false, error: '이름이 필요합니다' }
+  const payload = {
+    [idField]: userId,
+    name: fav.name.trim(),
+    carbs: parseFloat(fav.carbs) || 0,
+    protein: parseFloat(fav.protein) || 0,
+    fat: parseFloat(fav.fat) || 0,
+    calories: parseInt(fav.calories) || 0,
+  }
+  const { data, error } = await supabase.from(table).insert(payload).select().single()
+  if (error) {
+    console.error('[addDietFavorite] error:', error)
+    return { success: false, error: error.message }
+  }
+  return { success: true, data }
+}
+
+export const removeDietFavorite = async (favId, table = 'diet_favorites') => {
+  const { error } = await supabase.from(table).delete().eq('id', favId)
+  if (error) {
+    console.error('[removeDietFavorite] error:', error)
+    return { success: false, error: error.message }
+  }
+  return { success: true }
+}
+
 export const getLatestRecord = (allLogs, bodyPart, exerciseName) => {
   if (!allLogs || !bodyPart || !exerciseName) return null
   const matched = allLogs.filter(l =>

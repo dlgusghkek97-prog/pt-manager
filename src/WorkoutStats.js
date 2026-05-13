@@ -407,26 +407,30 @@ export default function WorkoutStats({
           </div>
           {weeklyTotals.every(v => v === 0) ? (
             <p style={{ color: THEME.textSub, fontSize: '12px', textAlign: 'center', padding: '16px 0' }}>운동 기록이 없습니다</p>
-          ) : weekLabels.map((label, wk) => {
-            if (weeklyTotals[wk] === 0) return null
-            return (
-              <div key={wk} style={{ marginBottom: '12px', background: THEME.cardAlt, borderRadius: '12px', padding: '11px' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '9px' }}>
-                  <span style={{ fontSize: '12px', fontWeight: '500', color: THEME.text }}>{label}</span>
-                  <span style={{ fontSize: '12px', fontWeight: '500', color: THEME.nutFatText }}>{weeklyTotals[wk].toLocaleString()}kg</span>
-                </div>
-                {PARTS.filter(p => weeklyByPart[wk][p] > 0).map(part => (
-                  <div key={part} style={S.barRow}>
-                    <span style={S.barLabel}>{part}</span>
-                    <div style={S.barBg}>
-                      <div style={{ ...S.barFill, width: `${weeklyByPart[wk][part] / maxWeekVol * 100}%`, background: PART_COLORS[part] }} />
+          ) : (
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: '8px' }}>
+              {weekLabels.map((label, wk) => {
+                if (weeklyTotals[wk] === 0) return null
+                return (
+                  <div key={wk} style={{ background: THEME.cardAlt, borderRadius: '12px', padding: '10px', minWidth: 0 }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: '8px', gap: '4px' }}>
+                      <span style={{ fontSize: '11px', fontWeight: '500', color: THEME.text, whiteSpace: 'nowrap' }}>{label}</span>
+                      <span style={{ fontSize: '11px', fontWeight: '500', color: THEME.nutFatText, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', minWidth: 0 }}>{formatVol(weeklyTotals[wk])}</span>
                     </div>
-                    <span style={S.barVal}>{weeklyByPart[wk][part].toLocaleString()}kg</span>
+                    {PARTS.filter(p => weeklyByPart[wk][p] > 0).map(part => (
+                      <div key={part} style={{ display: 'flex', alignItems: 'center', gap: '5px', marginBottom: '5px', minWidth: 0 }}>
+                        <span style={{ fontSize: '10px', color: THEME.text, width: '26px', flexShrink: 0 }}>{part}</span>
+                        <div style={{ flex: 1, background: THEME.borderLight, borderRadius: '4px', height: '7px', minWidth: 0 }}>
+                          <div style={{ height: '7px', borderRadius: '4px', width: `${weeklyByPart[wk][part] / maxWeekVol * 100}%`, background: PART_COLORS[part] }} />
+                        </div>
+                        <span style={{ fontSize: '9px', color: THEME.textSub, flexShrink: 0, whiteSpace: 'nowrap' }}>{formatVol(weeklyByPart[wk][part])}</span>
+                      </div>
+                    ))}
                   </div>
-                ))}
-              </div>
-            )
-          })}
+                )
+              })}
+            </div>
+          )}
         </div>
       )}
 
@@ -438,23 +442,27 @@ export default function WorkoutStats({
           </div>
           {Object.values(monthlyByMonth).every(d => d.total === 0) ? (
             <p style={{ color: THEME.textSub, fontSize: '12px', textAlign: 'center', padding: '16px 0' }}>운동 기록이 없습니다</p>
-          ) : Object.entries(monthlyByMonth).filter(([, d]) => d.total > 0).map(([mStr, d]) => (
-            <div key={mStr} style={{ marginBottom: '12px', background: THEME.cardAlt, borderRadius: '12px', padding: '11px' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '9px' }}>
-                <span style={{ fontSize: '12px', fontWeight: '500', color: THEME.text }}>{parseInt(mStr)}월</span>
-                <span style={{ fontSize: '12px', fontWeight: '500', color: THEME.nutCarbsDark }}>{d.total.toLocaleString()}kg</span>
-              </div>
-              {PARTS.filter(p => d.parts[p] > 0).map(part => (
-                <div key={part} style={S.barRow}>
-                  <span style={S.barLabel}>{part}</span>
-                  <div style={S.barBg}>
-                    <div style={{ ...S.barFill, width: `${d.parts[part] / maxMonthVol * 100}%`, background: PART_COLORS[part] }} />
+          ) : (
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: '8px' }}>
+              {Object.entries(monthlyByMonth).filter(([, d]) => d.total > 0).map(([mStr, d]) => (
+                <div key={mStr} style={{ background: THEME.cardAlt, borderRadius: '12px', padding: '10px', minWidth: 0 }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: '8px', gap: '4px' }}>
+                    <span style={{ fontSize: '11px', fontWeight: '500', color: THEME.text, whiteSpace: 'nowrap' }}>{parseInt(mStr)}월</span>
+                    <span style={{ fontSize: '11px', fontWeight: '500', color: THEME.nutCarbsDark, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', minWidth: 0 }}>{formatVol(d.total)}</span>
                   </div>
-                  <span style={S.barVal}>{d.parts[part].toLocaleString()}kg</span>
+                  {PARTS.filter(p => d.parts[p] > 0).map(part => (
+                    <div key={part} style={{ display: 'flex', alignItems: 'center', gap: '5px', marginBottom: '5px', minWidth: 0 }}>
+                      <span style={{ fontSize: '10px', color: THEME.text, width: '26px', flexShrink: 0 }}>{part}</span>
+                      <div style={{ flex: 1, background: THEME.borderLight, borderRadius: '4px', height: '7px', minWidth: 0 }}>
+                        <div style={{ height: '7px', borderRadius: '4px', width: `${d.parts[part] / maxMonthVol * 100}%`, background: PART_COLORS[part] }} />
+                      </div>
+                      <span style={{ fontSize: '9px', color: THEME.textSub, flexShrink: 0, whiteSpace: 'nowrap' }}>{formatVol(d.parts[part])}</span>
+                    </div>
+                  ))}
                 </div>
               ))}
             </div>
-          ))}
+          )}
         </div>
       )}
 

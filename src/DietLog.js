@@ -2,13 +2,7 @@ import React, { useState, useEffect } from 'react'
 import { supabase } from './supabase'
 import { S, THEME, calcWeightCalories, calcTDEE, calcDailyBurn } from './utils'
 import DatePicker from './DatePicker'
-
-const MEALS = [
-  { key: 'breakfast', label: '아침' },
-  { key: 'lunch', label: '점심' },
-  { key: 'dinner', label: '저녁' },
-  { key: 'snack', label: '간식' },
-]
+import DietFavModal from './DietFavModal'
 
 const NUTRIENTS = [
   { key: 'calories', label: '칼로리', unit: 'kcal', color: THEME.nutCalories },
@@ -21,39 +15,6 @@ const NUTRIENTS = [
 const COLOR_SURPLUS = THEME.surplus
 const COLOR_DEFICIT = THEME.deficit
 
-const ROW_STYLE = {
-  display: 'grid',
-  gridTemplateColumns: '42px 1fr 1fr 1fr 1fr',
-  gap: '4px',
-  marginBottom: '4px',
-  alignItems: 'center',
-}
-
-const HEADER_ROW_STYLE = {
-  display: 'grid',
-  gridTemplateColumns: '42px 1fr 1fr 1fr 1fr',
-  gap: '4px',
-  marginBottom: '4px',
-  padding: '0 2px',
-}
-
-const TOTAL_ROW_STYLE = {
-  display: 'grid',
-  gridTemplateColumns: '42px 1fr 1fr 1fr 1fr',
-  gap: '4px',
-  marginTop: '8px',
-  alignItems: 'center',
-  background: THEME.primary,
-  padding: '8px 2px',
-  borderRadius: '8px',
-}
-
-const MEAL_LABEL_STYLE = {
-  fontSize: '11px',
-  color: THEME.text,
-  fontWeight: '500',
-}
-
 const CELL_STYLE = {
   width: '100%',
   padding: '6px 2px',
@@ -61,7 +22,7 @@ const CELL_STYLE = {
   borderRadius: '5px',
   fontSize: '12px',
   textAlign: 'center',
-  background: THEME.cardAlt,
+  background: '#FFF',
   boxSizing: 'border-box',
   fontFamily: 'inherit',
   color: THEME.text,
@@ -73,6 +34,20 @@ const CELL_STYLE_AUTO = {
   ...CELL_STYLE,
   background: '#F5FBF7',
   color: THEME.primary,
+}
+
+const NAME_INPUT_STYLE = {
+  width: '100%',
+  padding: '7px 9px',
+  border: `0.5px solid ${THEME.border}`,
+  borderRadius: '6px',
+  fontSize: '12px',
+  background: '#FFF',
+  boxSizing: 'border-box',
+  fontFamily: 'inherit',
+  color: THEME.text,
+  fontWeight: '500',
+  outline: 'none',
 }
 
 const CameraIcon = () => (
@@ -97,44 +72,75 @@ const computeCal = (carbs, protein, fat) => {
   return Math.round(c * 4 + p * 4 + f * 9)
 }
 
-const MealRow = React.memo(function MealRow({ mealKey, label, meal, onUpdate, onBlurField }) {
+const MealRow = React.memo(function MealRow({ meal, onUpdate, onBlur, onRemove, onStar, canRemove }) {
   const kcalStyle = meal.calorieManual ? CELL_STYLE : CELL_STYLE_AUTO
   return (
-    <div style={ROW_STYLE}>
-      <span style={MEAL_LABEL_STYLE}>{label}</span>
-      <input
-        style={CELL_STYLE}
-        type="text" inputMode="decimal" placeholder="0"
-        autoComplete="off" autoCorrect="off" autoCapitalize="off" spellCheck="false"
-        value={meal.carbs}
-        onChange={e => onUpdate(mealKey, 'carbs', e.target.value)}
-        onBlur={() => onBlurField(mealKey)}
-      />
-      <input
-        style={CELL_STYLE}
-        type="text" inputMode="decimal" placeholder="0"
-        autoComplete="off" autoCorrect="off" autoCapitalize="off" spellCheck="false"
-        value={meal.protein}
-        onChange={e => onUpdate(mealKey, 'protein', e.target.value)}
-        onBlur={() => onBlurField(mealKey)}
-      />
-      <input
-        style={CELL_STYLE}
-        type="text" inputMode="decimal" placeholder="0"
-        autoComplete="off" autoCorrect="off" autoCapitalize="off" spellCheck="false"
-        value={meal.fat}
-        onChange={e => onUpdate(mealKey, 'fat', e.target.value)}
-        onBlur={() => onBlurField(mealKey)}
-      />
-      <input
-        style={kcalStyle}
-        type="text" inputMode="numeric" placeholder="0"
-        autoComplete="off" autoCorrect="off" autoCapitalize="off" spellCheck="false"
-        value={meal.calories}
-        onChange={e => onUpdate(mealKey, 'calories', e.target.value)}
-        onBlur={() => onBlurField(mealKey)}
-        title={meal.calorieManual ? '직접 입력 (수동)' : '탄단지로 자동 계산 — 비우면 자동 모드 유지'}
-      />
+    <div style={{ background: THEME.cardAlt, borderRadius: '10px', padding: '10px', marginBottom: '8px' }}>
+      {/* 식사 이름 + ★ 즐겨찾기 + ✕ 삭제 */}
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 34px 28px', gap: '6px', marginBottom: '8px' }}>
+        <input
+          type="text"
+          value={meal.name}
+          onChange={e => onUpdate(meal.slot, 'name', e.target.value)}
+          onBlur={() => onBlur(meal.slot)}
+          placeholder={`식사 ${meal.slot}`}
+          style={NAME_INPUT_STYLE}
+        />
+        <button
+          onClick={() => onStar(meal.slot)}
+          style={{ background: THEME.warningLight, border: `0.5px solid ${THEME.warningBorder}`, color: THEME.warning, padding: '6px 0', borderRadius: '6px', fontSize: '14px', fontWeight: '500', cursor: 'pointer', fontFamily: 'inherit', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+          title="즐겨찾기 (현재 값 저장 / 저장된 즐겨찾기 적용)"
+        >★</button>
+        <button
+          onClick={() => onRemove(meal.slot)}
+          disabled={!canRemove}
+          style={{ background: canRemove ? '#FBE8E8' : '#F5F5F0', color: canRemove ? '#C57878' : THEME.textHint, border: 'none', borderRadius: '6px', padding: '4px 0', cursor: canRemove ? 'pointer' : 'not-allowed', fontSize: '11px' }}
+          title="이 식사 삭제"
+        >✕</button>
+      </div>
+      {/* 영양소 라벨 */}
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: '4px', marginBottom: '3px' }}>
+        <span style={{ fontSize: '10px', color: THEME.nutCarbsText, textAlign: 'center', fontWeight: '500' }}>탄수</span>
+        <span style={{ fontSize: '10px', color: THEME.nutProteinText, textAlign: 'center', fontWeight: '500' }}>단백</span>
+        <span style={{ fontSize: '10px', color: THEME.nutFatText, textAlign: 'center', fontWeight: '500' }}>지방</span>
+        <span style={{ fontSize: '10px', color: THEME.textSub, textAlign: 'center' }}>kcal</span>
+      </div>
+      {/* 값 입력 */}
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: '4px' }}>
+        <input
+          style={CELL_STYLE}
+          type="text" inputMode="decimal" placeholder="0"
+          autoComplete="off" autoCorrect="off" autoCapitalize="off" spellCheck="false"
+          value={meal.carbs}
+          onChange={e => onUpdate(meal.slot, 'carbs', e.target.value)}
+          onBlur={() => onBlur(meal.slot)}
+        />
+        <input
+          style={CELL_STYLE}
+          type="text" inputMode="decimal" placeholder="0"
+          autoComplete="off" autoCorrect="off" autoCapitalize="off" spellCheck="false"
+          value={meal.protein}
+          onChange={e => onUpdate(meal.slot, 'protein', e.target.value)}
+          onBlur={() => onBlur(meal.slot)}
+        />
+        <input
+          style={CELL_STYLE}
+          type="text" inputMode="decimal" placeholder="0"
+          autoComplete="off" autoCorrect="off" autoCapitalize="off" spellCheck="false"
+          value={meal.fat}
+          onChange={e => onUpdate(meal.slot, 'fat', e.target.value)}
+          onBlur={() => onBlur(meal.slot)}
+        />
+        <input
+          style={kcalStyle}
+          type="text" inputMode="numeric" placeholder="0"
+          autoComplete="off" autoCorrect="off" autoCapitalize="off" spellCheck="false"
+          value={meal.calories}
+          onChange={e => onUpdate(meal.slot, 'calories', e.target.value)}
+          onBlur={() => onBlur(meal.slot)}
+          title={meal.calorieManual ? '직접 입력 (수동)' : '탄단지로 자동 계산 — 비우면 자동 모드 유지'}
+        />
+      </div>
     </div>
   )
 })
@@ -161,19 +167,23 @@ export default function DietLog({ user, onDietUpdate, tableOverride, trainerIdFi
   })
   const [activeNutrient, setActiveNutrient] = useState('calories')
 
-  const emptyMeal = { carbs: '', protein: '', fat: '', calories: '', media_url: '', calorieManual: false }
-  const [meals, setMeals] = useState({
-    breakfast: { ...emptyMeal },
-    lunch: { ...emptyMeal },
-    dinner: { ...emptyMeal },
-    snack: { ...emptyMeal },
+  // 식사: 가변 배열. 각 항목에 slot(순서) / name(자유 라벨) / id(DB row id) 포함.
+  const emptyMealAt = (slot) => ({
+    slot,
+    name: `식사 ${slot}`,
+    carbs: '', protein: '', fat: '', calories: '',
+    media_url: '',
+    calorieManual: false,
+    id: null,
   })
-  const [logIds, setLogIds] = useState({})
+  const [meals, setMeals] = useState(() => [emptyMealAt(1)])
+
+  // 즐겨찾기 모달: 어느 슬롯에서 열렸는지
+  const [favModalSlot, setFavModalSlot] = useState(null)
 
   // ── 자동 저장 (저장 버튼 없음 — 입력칸을 벗어나면 자동 반영) ──
   const [saveStatus, setSaveStatus] = useState('idle') // idle | saving | saved | error
   const mealsRef = React.useRef(meals); mealsRef.current = meals
-  const logIdsRef = React.useRef(logIds); logIdsRef.current = logIds
   const selectedDateRef = React.useRef(selectedDate); selectedDateRef.current = selectedDate
   const savingRef = React.useRef(false)
   const pendingSaveRef = React.useRef(false)
@@ -194,17 +204,24 @@ export default function DietLog({ user, onDietUpdate, tableOverride, trainerIdFi
   useEffect(() => { if (tab === 'stats') loadStatsLogs() }, [tab, statMode, statValue])
 
   const loadLogs = async (date) => {
-    const { data, error } = await supabase.from(TABLE).select('*').eq(ID_FIELD, user.id).eq('log_date', date)
+    const { data, error } = await supabase
+      .from(TABLE)
+      .select('*')
+      .eq(ID_FIELD, user.id)
+      .eq('log_date', date)
+      .order('slot', { ascending: true, nullsFirst: false })
+      .order('id', { ascending: true })
     if (error) { console.error('[DietLog] load error:', error); return }
-    const next = {
-      breakfast: { ...emptyMeal },
-      lunch: { ...emptyMeal },
-      dinner: { ...emptyMeal },
-      snack: { ...emptyMeal },
-    }
-    const ids = {}
-    ;(data || []).forEach(row => {
-      if (next[row.meal_type]) {
+
+    let next
+    if (data && data.length > 0) {
+      const usedSlots = new Set()
+      next = data.map((row, i) => {
+        // slot 누락 보정 (마이그레이션 안 된 옛날 행 대비)
+        let slot = row.slot
+        if (slot == null) slot = i + 1
+        while (usedSlots.has(slot)) slot++
+        usedSlots.add(slot)
         const carbs = row.carbs != null ? String(row.carbs) : ''
         const protein = row.protein != null ? String(row.protein) : ''
         const fat = row.fat != null ? String(row.fat) : ''
@@ -212,17 +229,21 @@ export default function DietLog({ user, onDietUpdate, tableOverride, trainerIdFi
         const autoCalc = computeCal(carbs, protein, fat)
         const savedCal = parseFloat(calories) || 0
         const isManual = savedCal > 0 && autoCalc > 0 && Math.abs(savedCal - autoCalc) > 1
-        next[row.meal_type] = {
+        return {
+          slot,
+          name: row.meal_type || `식사 ${slot}`,
           carbs, protein, fat, calories,
           media_url: row.media_url ?? '',
           calorieManual: isManual,
+          id: row.id,
         }
-        ids[row.meal_type] = row.id
-      }
-    })
+      }).sort((a, b) => a.slot - b.slot)
+    } else {
+      next = [emptyMealAt(1)]
+    }
+
     setMeals(next)
-    setLogIds(ids)
-    logIdsRef.current = ids
+    mealsRef.current = next
     dirtyRef.current = false
     pendingSaveRef.current = false
     if (retryTimerRef.current) { clearTimeout(retryTimerRef.current); retryTimerRef.current = null }
@@ -276,35 +297,88 @@ export default function DietLog({ user, onDietUpdate, tableOverride, trainerIdFi
     alert('피드백이 저장되었습니다.')
   }
 
-  const updateField = React.useCallback((mealKey, field, value) => {
+  const updateField = React.useCallback((slot, field, value) => {
     dirtyRef.current = true
     setMeals(prev => {
-      const cur = prev[mealKey]
-      const next = { ...cur, [field]: value }
-
-      if (field === 'calories') {
-        if (value === '' || value === null) {
-          next.calorieManual = false
-        } else {
-          next.calorieManual = true
+      const u = prev.map(m => {
+        if (m.slot !== slot) return m
+        const next = { ...m, [field]: value }
+        if (field === 'calories') {
+          if (value === '' || value === null) next.calorieManual = false
+          else next.calorieManual = true
         }
-      }
-
-      return { ...prev, [mealKey]: next }
+        return next
+      })
+      mealsRef.current = u
+      return u
     })
   }, [])
 
-  const onBlurField = React.useCallback((mealKey) => {
+  const onBlurField = React.useCallback((slot) => {
     setMeals(prev => {
-      const cur = prev[mealKey]
+      const cur = prev.find(m => m.slot === slot)
+      if (!cur) return prev
       if (cur.calorieManual) return prev
       const auto = computeCal(cur.carbs, cur.protein, cur.fat)
       const newCal = auto > 0 ? String(auto) : ''
       if (newCal === cur.calories) return prev
-      return { ...prev, [mealKey]: { ...cur, calories: newCal } }
+      const u = prev.map(m => m.slot === slot ? { ...m, calories: newCal } : m)
+      mealsRef.current = u
+      return u
     })
     requestSaveRef.current?.()
   }, [])
+
+  // 식사 추가/삭제
+  const addMeal = () => {
+    setMeals(prev => {
+      const nextSlot = prev.length > 0 ? Math.max(...prev.map(m => m.slot)) + 1 : 1
+      const u = [...prev, emptyMealAt(nextSlot)]
+      mealsRef.current = u
+      return u
+    })
+    dirtyRef.current = true
+  }
+
+  const removeMeal = async (slot) => {
+    const target = mealsRef.current.find(m => m.slot === slot)
+    if (!target) return
+    if (!window.confirm(`"${target.name || `식사 ${slot}`}" 을(를) 삭제할까요?`)) return
+    if (target.id) {
+      const { error } = await supabase.from(TABLE).delete().eq('id', target.id)
+      if (error) { alert('삭제 실패: ' + error.message); return }
+    }
+    setMeals(prev => {
+      const u = prev.filter(m => m.slot !== slot)
+      const final = u.length > 0 ? u : [emptyMealAt(1)]
+      mealsRef.current = final
+      return final
+    })
+    if (onDietUpdate) onDietUpdate()
+  }
+
+  // 즐겨찾기 적용 — 해당 슬롯의 name + 영양소를 fav 값으로 교체 후 저장
+  const applyFavorite = (slot, applied) => {
+    dirtyRef.current = true
+    setMeals(prev => {
+      const u = prev.map(m => {
+        if (m.slot !== slot) return m
+        const calNum = parseFloat(applied.calories) || 0
+        return {
+          ...m,
+          name: applied.name || m.name,
+          carbs: applied.carbs,
+          protein: applied.protein,
+          fat: applied.fat,
+          calories: applied.calories,
+          calorieManual: calNum > 0,
+        }
+      })
+      mealsRef.current = u
+      return u
+    })
+    setTimeout(() => requestSaveRef.current?.(), 0)
+  }
 
   // 모든 식사를 DB에 반영 (없으면 INSERT / 있으면 UPDATE / 다 비었으면 DELETE).
   // 동시 실행 방지: 진행 중이면 끝난 뒤 한 번 더 실행 → 같은 식사가 두 번 INSERT 되는 일 차단.
@@ -318,11 +392,11 @@ export default function DietLog({ user, onDietUpdate, tableOverride, trainerIdFi
 
     // 스냅샷 — 저장 도중 날짜가 바뀌어도 일관성 유지
     const date = selectedDateRef.current
-    const snapMeals = mealsRef.current
+    const snap = mealsRef.current
+    const updates = []   // { slot, id: id|null }
     let hadError = false
 
-    for (const m of MEALS) {
-      const meal = snapMeals[m.key]
+    for (const meal of snap) {
       const carbs = parseFloat(meal.carbs) || 0
       const protein = parseFloat(meal.protein) || 0
       const fat = parseFloat(meal.fat) || 0
@@ -330,38 +404,51 @@ export default function DietLog({ user, onDietUpdate, tableOverride, trainerIdFi
       if (!calories && (carbs || protein || fat)) calories = computeCal(carbs, protein, fat)
       const media_url = meal.media_url || null
       const hasContent = !!(carbs || protein || fat || calories || media_url)
-      const id = logIdsRef.current[m.key]
 
       if (!hasContent) {
-        if (id) {
-          const { error } = await supabase.from(TABLE).delete().eq('id', id)
+        if (meal.id) {
+          const { error } = await supabase.from(TABLE).delete().eq('id', meal.id)
           if (error) { hadError = true; console.error('[DietLog] 삭제 실패:', error) }
-          else if (selectedDateRef.current === date && logIdsRef.current[m.key] === id) {
-            const n = { ...logIdsRef.current }; delete n[m.key]
-            logIdsRef.current = n; setLogIds(n)
-          }
+          else updates.push({ slot: meal.slot, id: null })
         }
         continue
       }
 
-      const payload = { [ID_FIELD]: user.id, log_date: date, meal_type: m.key, carbs, protein, fat, calories, media_url }
-      if (id) {
-        const { error } = await supabase.from(TABLE).update(payload).eq('id', id)
+      const payload = {
+        [ID_FIELD]: user.id,
+        log_date: date,
+        slot: meal.slot,
+        meal_type: meal.name || `식사 ${meal.slot}`,
+        carbs, protein, fat, calories,
+        media_url,
+      }
+      if (meal.id) {
+        const { error } = await supabase.from(TABLE).update(payload).eq('id', meal.id)
         if (error) { hadError = true; console.error('[DietLog] 업데이트 실패:', error) }
       } else {
         const { data, error } = await supabase.from(TABLE).insert(payload).select().single()
         if (error) { hadError = true; console.error('[DietLog] 저장 실패:', error) }
-        else if (data && selectedDateRef.current === date) {
-          logIdsRef.current = { ...logIdsRef.current, [m.key]: data.id }
-          setLogIds(logIdsRef.current)
-        }
+        else if (data) updates.push({ slot: meal.slot, id: data.id })
       }
+    }
+
+    // 새 id / 삭제된 id 머지 — 날짜 그대로일 때만
+    if (updates.length > 0 && selectedDateRef.current === date) {
+      setMeals(prev => {
+        const u = prev.map(m => {
+          const upd = updates.find(x => x.slot === m.slot)
+          if (!upd) return m
+          return { ...m, id: upd.id }
+        })
+        mealsRef.current = u
+        return u
+      })
     }
 
     savingRef.current = false
     if (pendingSaveRef.current) {
-      // 저장 도중 추가 변경(blur) 발생 → 한 번 더 저장
-      persistAll()
+      // 저장 도중 추가 변경 발생 → setMeals 반영 후 한 번 더
+      setTimeout(() => persistAll(), 0)
       return
     }
     if (hadError) {
@@ -375,30 +462,38 @@ export default function DietLog({ user, onDietUpdate, tableOverride, trainerIdFi
   }
   requestSaveRef.current = () => { persistAll() }
 
-  const uploadMealPhoto = async (mealKey, file) => {
+  const uploadMealPhoto = async (slot, file) => {
     if (ptIsZero) {
       alert('PT 잔여 횟수가 없어 사진 업로드가 제한됩니다.\n트레이너에게 추가 결제를 문의해주세요.')
       return
     }
     try {
       const ext = file.name.split('.').pop().toLowerCase()
-      const fileName = `diet/${user.id}/${selectedDate}_${mealKey}_${Date.now()}.${ext}`
+      const fileName = `diet/${user.id}/${selectedDate}_slot${slot}_${Date.now()}.${ext}`
       const { error: uploadError } = await supabase.storage.from('workout-media').upload(fileName, file, { upsert: true })
       if (uploadError) { alert('업로드 실패: ' + uploadError.message); return }
       const { data: urlData } = supabase.storage.from('workout-media').getPublicUrl(fileName)
       const url = urlData.publicUrl
 
-      setMeals(prev => ({ ...prev, [mealKey]: { ...prev[mealKey], media_url: url } }))
+      setMeals(prev => {
+        const u = prev.map(m => m.slot === slot ? { ...m, media_url: url } : m)
+        mealsRef.current = u
+        return u
+      })
       dirtyRef.current = true
-      setTimeout(() => requestSaveRef.current?.(), 0) // setMeals 반영 후 자동 저장
+      setTimeout(() => requestSaveRef.current?.(), 0)
     } catch (e) {
       alert('업로드 중 오류: ' + e.message)
     }
   }
 
-  const removeMealPhoto = async (mealKey) => {
-    if (!window.confirm(`${MEALS.find(m => m.key === mealKey)?.label} 사진을 삭제할까요?`)) return
-    setMeals(prev => ({ ...prev, [mealKey]: { ...prev[mealKey], media_url: '' } }))
+  const removeMealPhoto = async (slot) => {
+    if (!window.confirm('사진을 삭제할까요?')) return
+    setMeals(prev => {
+      const u = prev.map(m => m.slot === slot ? { ...m, media_url: '' } : m)
+      mealsRef.current = u
+      return u
+    })
     dirtyRef.current = true
     setTimeout(() => requestSaveRef.current?.(), 0)
   }
@@ -434,10 +529,10 @@ export default function DietLog({ user, onDietUpdate, tableOverride, trainerIdFi
   }
 
   const totals = {
-    carbs: Object.values(meals).reduce((s, m) => s + (parseFloat(m.carbs) || 0), 0),
-    protein: Object.values(meals).reduce((s, m) => s + (parseFloat(m.protein) || 0), 0),
-    fat: Object.values(meals).reduce((s, m) => s + (parseFloat(m.fat) || 0), 0),
-    calories: Object.values(meals).reduce((s, m) => {
+    carbs: meals.reduce((s, m) => s + (parseFloat(m.carbs) || 0), 0),
+    protein: meals.reduce((s, m) => s + (parseFloat(m.protein) || 0), 0),
+    fat: meals.reduce((s, m) => s + (parseFloat(m.fat) || 0), 0),
+    calories: meals.reduce((s, m) => {
       const c = parseFloat(m.calories) || 0
       if (c) return s + c
       return s + computeCal(m.carbs, m.protein, m.fat)
@@ -781,6 +876,17 @@ export default function DietLog({ user, onDietUpdate, tableOverride, trainerIdFi
         </div>
       )}
 
+      {favModalSlot != null && (
+        <DietFavModal
+          userId={user.id}
+          currentMeal={meals.find(m => m.slot === favModalSlot)}
+          onApply={(applied) => applyFavorite(favModalSlot, applied)}
+          onClose={() => setFavModalSlot(null)}
+          favTable={trainerIdField ? 'trainer_diet_favorites' : 'diet_favorites'}
+          favIdField={trainerIdField ? 'trainer_id' : 'member_id'}
+        />
+      )}
+
       {!forcedTab && (
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px', marginBottom: '12px' }}>
           <button onClick={() => setTab('log')} style={{ background: tab === 'log' ? THEME.primaryAccent : '#FFF', color: tab === 'log' ? THEME.primaryDark : THEME.textSub, border: 'none', borderRadius: '12px', padding: '10px', fontSize: '12px', fontWeight: tab === 'log' ? '500' : '400', cursor: 'pointer' }}>
@@ -799,27 +905,34 @@ export default function DietLog({ user, onDietUpdate, tableOverride, trainerIdFi
             <DatePicker value={selectedDate} onChange={(d) => { if (dirtyRef.current) persistAll(); setSelectedDate(d) }} />
           </div>
 
-          <div style={HEADER_ROW_STYLE}>
-            <span style={{ fontSize: '10px', color: THEME.textSub }}>식사</span>
-            <span style={{ fontSize: '10px', color: THEME.nutCarbsText, textAlign: 'center', fontWeight: '500' }}>탄수</span>
-            <span style={{ fontSize: '10px', color: THEME.nutProteinText, textAlign: 'center', fontWeight: '500' }}>단백</span>
-            <span style={{ fontSize: '10px', color: THEME.nutFatText, textAlign: 'center', fontWeight: '500' }}>지방</span>
-            <span style={{ fontSize: '10px', color: THEME.textSub, textAlign: 'center' }}>kcal</span>
-          </div>
-
-          {MEALS.map(m => (
+          {meals.map(m => (
             <MealRow
-              key={m.key}
-              mealKey={m.key}
-              label={m.label}
-              meal={meals[m.key]}
+              key={m.slot}
+              meal={m}
               onUpdate={updateField}
-              onBlurField={onBlurField}
+              onBlur={onBlurField}
+              onRemove={removeMeal}
+              onStar={(slot) => setFavModalSlot(slot)}
+              canRemove={meals.length > 1}
             />
           ))}
 
-          <div style={TOTAL_ROW_STYLE}>
-            <span style={{ fontSize: '11px', color: '#FFF', fontWeight: '500', paddingLeft: '4px' }}>합계</span>
+          <button
+            onClick={addMeal}
+            style={{
+              background: 'transparent', border: `0.5px dashed ${THEME.primaryAccent}`, color: THEME.primary,
+              borderRadius: '8px', padding: '10px', fontSize: '12px', fontWeight: '500',
+              cursor: 'pointer', width: '100%', marginBottom: '10px', fontFamily: 'inherit'
+            }}
+          >＋ 식사 추가</button>
+
+          {/* 합계 */}
+          <div style={{
+            display: 'grid', gridTemplateColumns: '52px 1fr 1fr 1fr 1fr', gap: '4px',
+            alignItems: 'center', background: THEME.primary, padding: '10px 8px',
+            borderRadius: '10px', marginTop: '8px',
+          }}>
+            <span style={{ fontSize: '11px', color: '#FFF', fontWeight: '500' }}>합계</span>
             <span style={{ fontSize: '12px', color: '#B8E0D2', textAlign: 'center', fontWeight: '500' }}>{Math.round(totals.carbs)}g</span>
             <span style={{ fontSize: '12px', color: '#F4C8D5', textAlign: 'center', fontWeight: '500' }}>{Math.round(totals.protein)}g</span>
             <span style={{ fontSize: '12px', color: '#F2D5B5', textAlign: 'center', fontWeight: '500' }}>{Math.round(totals.fat)}g</span>
@@ -836,16 +949,17 @@ export default function DietLog({ user, onDietUpdate, tableOverride, trainerIdFi
             </div>
           )}
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', marginBottom: '12px' }}>
-            {MEALS.map(m => {
-              const url = meals[m.key].media_url
+            {meals.map(m => {
+              const url = m.media_url
+              const label = m.name || `식사 ${m.slot}`
               return (
-                <div key={m.key}>
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '4px' }}>
-                    <span style={{ fontSize: '11px', color: THEME.text, fontWeight: '500' }}>{m.label}</span>
+                <div key={m.slot}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '4px', gap: '4px' }}>
+                    <span style={{ fontSize: '11px', color: THEME.text, fontWeight: '500', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', minWidth: 0, flex: 1 }}>{label}</span>
                     {url && (
                       <button
-                        onClick={() => removeMealPhoto(m.key)}
-                        style={{ background: 'none', border: 'none', color: THEME.danger, fontSize: '10px', cursor: 'pointer', padding: 0 }}
+                        onClick={() => removeMealPhoto(m.slot)}
+                        style={{ background: 'none', border: 'none', color: THEME.danger, fontSize: '10px', cursor: 'pointer', padding: 0, flexShrink: 0 }}
                       >삭제</button>
                     )}
                   </div>
@@ -854,7 +968,7 @@ export default function DietLog({ user, onDietUpdate, tableOverride, trainerIdFi
                       onClick={() => setPreviewUrl(url)}
                       style={{ width: '100%', height: '90px', borderRadius: '8px', overflow: 'hidden', cursor: 'pointer', background: THEME.cardAlt }}
                     >
-                      <img src={url} alt={m.label} style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
+                      <img src={url} alt={label} style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
                     </div>
                   ) : ptIsZero ? (
                     <div
@@ -881,7 +995,7 @@ export default function DietLog({ user, onDietUpdate, tableOverride, trainerIdFi
                     <label style={{ cursor: 'pointer', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '4px', background: THEME.cardAlt, border: `0.5px dashed ${THEME.primaryAccent}`, borderRadius: '8px', height: '90px', color: THEME.textSub }}>
                       <CameraIcon />
                       <span style={{ fontSize: '10px' }}>사진 추가</span>
-                      <input type="file" accept="image/*" style={{ display: 'none' }} onChange={e => e.target.files[0] && uploadMealPhoto(m.key, e.target.files[0])} />
+                      <input type="file" accept="image/*" style={{ display: 'none' }} onChange={e => e.target.files[0] && uploadMealPhoto(m.slot, e.target.files[0])} />
                     </label>
                   )}
                 </div>
