@@ -3,6 +3,8 @@ import { supabase } from './supabase'
 import { S, THEME } from './utils'
 import TrainerDashboard from './TrainerDashboard'
 import MemberDashboard from './MemberDashboard'
+import LegalModal from './LegalModal'
+import { TERMS_VERSION } from './legal'
 
 const PTLogo = ({ size = 48 }) => (
   <div style={{
@@ -25,6 +27,21 @@ export default function App() {
   const [password, setPassword] = useState('')
   const [memberCode, setMemberCode] = useState('')
   const [memberName, setMemberName] = useState('')
+
+  // 약관 동의 (localStorage 에 pt_agreed_{TERMS_VERSION}='1' 저장)
+  const agreedKey = `pt_agreed_${TERMS_VERSION}`
+  const [agreed, setAgreed] = useState(() => {
+    try { return localStorage.getItem(agreedKey) === '1' } catch { return false }
+  })
+  const [legalOpen, setLegalOpen] = useState(null) // 'terms' | 'privacy' | null
+
+  const markAgreed = (v) => {
+    setAgreed(v)
+    try {
+      if (v) localStorage.setItem(agreedKey, '1')
+      else localStorage.removeItem(agreedKey)
+    } catch {}
+  }
 
   // ─── 자동 로그인 ───
   // 1. localStorage에서 user 정보 복원
@@ -208,8 +225,9 @@ export default function App() {
           </div>
           {error && <p style={{ color: THEME.danger, fontSize: '12px', textAlign: 'center', margin: '0 0 8px' }}>{error}</p>}
           <input style={S.input} type="email" placeholder="이메일" value={email} onChange={e => setEmail(e.target.value)} />
-          <input style={S.input} type="password" placeholder="비밀번호" value={password} onChange={e => setPassword(e.target.value)} onKeyDown={e => e.key === 'Enter' && trainerLogin()} />
-          <button style={S.btnPrimary} onClick={trainerLogin} disabled={loading}>{loading ? '로그인 중...' : '로그인'}</button>
+          <input style={S.input} type="password" placeholder="비밀번호" value={password} onChange={e => setPassword(e.target.value)} onKeyDown={e => e.key === 'Enter' && agreed && trainerLogin()} />
+          <ConsentRow agreed={agreed} setAgreed={markAgreed} onOpen={setLegalOpen} />
+          <button style={S.btnPrimary} onClick={trainerLogin} disabled={loading || !agreed}>{loading ? '로그인 중...' : '로그인'}</button>
           <button style={S.btnSecondary} onClick={() => setMode('select')}>← 뒤로가기</button>
         </div>
       )}
@@ -226,10 +244,44 @@ export default function App() {
           {error && <p style={{ color: THEME.danger, fontSize: '12px', textAlign: 'center', margin: '0 0 8px' }}>{error}</p>}
           <input style={S.input} type="text" placeholder="이름" value={memberName} onChange={e => setMemberName(e.target.value)} />
           <input style={S.input} type="text" placeholder="접속 코드 (예: AB1234)" value={memberCode} onChange={e => setMemberCode(e.target.value.toUpperCase())} maxLength={6} />
-          <button style={S.btnPrimary} onClick={memberLogin} disabled={loading}>{loading ? '확인 중...' : '접속하기'}</button>
+          <ConsentRow agreed={agreed} setAgreed={markAgreed} onOpen={setLegalOpen} />
+          <button style={S.btnPrimary} onClick={memberLogin} disabled={loading || !agreed}>{loading ? '확인 중...' : '접속하기'}</button>
           <button style={S.btnSecondary} onClick={() => setMode('select')}>← 뒤로가기</button>
         </div>
       )}
+
+      {legalOpen && (
+        <LegalModal kind={legalOpen} onClose={() => setLegalOpen(null)} />
+      )}
+    </div>
+  )
+}
+
+// 약관 동의 체크박스 + 약관/개인정보 링크
+function ConsentRow({ agreed, setAgreed, onOpen }) {
+  return (
+    <div style={{
+      display: 'flex',
+      alignItems: 'center',
+      gap: '8px',
+      padding: '8px 4px',
+      marginBottom: '4px',
+      flexWrap: 'wrap',
+    }}>
+      <label style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer', flexShrink: 0 }}>
+        <input
+          type="checkbox"
+          checked={agreed}
+          onChange={e => setAgreed(e.target.checked)}
+          style={{ width: '15px', height: '15px', cursor: 'pointer', accentColor: THEME.primary }}
+        />
+        <span style={{ fontSize: '11px', color: THEME.text }}>아래에 동의합니다</span>
+      </label>
+      <span style={{ fontSize: '11px', color: THEME.textSub, display: 'flex', gap: '4px', flexWrap: 'wrap' }}>
+        <button type="button" onClick={() => onOpen('terms')} style={{ background: 'none', border: 'none', color: THEME.primary, textDecoration: 'underline', cursor: 'pointer', padding: 0, fontSize: '11px', fontFamily: 'inherit' }}>이용약관</button>
+        <span>·</span>
+        <button type="button" onClick={() => onOpen('privacy')} style={{ background: 'none', border: 'none', color: THEME.primary, textDecoration: 'underline', cursor: 'pointer', padding: 0, fontSize: '11px', fontFamily: 'inherit' }}>개인정보 처리방침</button>
+      </span>
     </div>
   )
 }
