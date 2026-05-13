@@ -1268,20 +1268,6 @@ export default function TrainerDashboard({ user, onLogout }) {
                 {user.name}님
               </span>
             )}
-            {subSummary && (
-              <button
-                onClick={() => setShowSubscription(true)}
-                style={{
-                  background: subSummary.state === 'expired' ? THEME.dangerLight : THEME.primaryLight,
-                  border: `0.5px solid ${subSummary.state === 'expired' ? THEME.danger : THEME.primaryAccent}`,
-                  color: subSummary.state === 'expired' ? THEME.dangerDark : THEME.primaryDark,
-                  padding: '3px 9px', borderRadius: '10px',
-                  fontSize: '10px', fontWeight: '500', cursor: 'pointer',
-                  whiteSpace: 'nowrap', flexShrink: 0, fontFamily: 'inherit',
-                }}
-                title="구독 관리"
-              >{subSummary.label}</button>
-            )}
           </div>
           <div style={{ display: 'flex', gap: '5px', alignItems: 'center' }}>
             <NotificationBell userId={user.id} userType="trainer" onNavigate={handleNavigate} />
@@ -1696,6 +1682,40 @@ export default function TrainerDashboard({ user, onLogout }) {
             </div>
           </div>
         )}
+
+        {/* 구독 상태 배너 — 회원 목록 탭에서만 표시 (회원 상세·내 기록 진입 시 숨김) */}
+        {view === 'members' && topTab === 'members' && subSummary && (() => {
+          const bColor = subSummary.state === 'expired'
+            ? { bg: THEME.dangerLight, border: THEME.danger, text: THEME.dangerDark }
+            : subSummary.state === 'active'
+            ? { bg: '#E6F4EB', border: THEME.primary, text: THEME.primaryDark }
+            : { bg: '#FFF7E6', border: THEME.warning, text: '#8B6F2A' }
+          return (
+            <button
+              onClick={() => setShowSubscription(true)}
+              style={{
+                display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                width: '100%', background: bColor.bg,
+                border: `0.5px solid ${bColor.border}`,
+                borderRadius: '12px', padding: '14px 16px',
+                marginBottom: '12px', cursor: 'pointer',
+                fontFamily: 'inherit', textAlign: 'left', boxSizing: 'border-box',
+              }}
+            >
+              <div style={{ minWidth: 0, flex: 1 }}>
+                <p style={{ fontSize: '15px', fontWeight: '500', color: bColor.text, margin: '0 0 3px' }}>
+                  {subSummary.label}
+                </p>
+                {subSummary.expiresAt && (
+                  <p style={{ fontSize: '11px', color: bColor.text, opacity: 0.75, margin: 0 }}>
+                    만료일 {subSummary.expiresAt.toISOString().slice(0, 10).replace(/-/g, '.')}
+                  </p>
+                )}
+              </div>
+              <span style={{ fontSize: '12px', color: bColor.text, fontWeight: '500', flexShrink: 0, marginLeft: '8px' }}>관리 ›</span>
+            </button>
+          )
+        })()}
 
         {view === 'members' && (
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px', marginBottom: '12px' }}>
