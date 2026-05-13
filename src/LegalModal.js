@@ -1,16 +1,21 @@
 import React from 'react'
 import { THEME } from './utils'
-import { TERMS_OF_SERVICE, PRIVACY_POLICY, TERMS_VERSION } from './legal'
+import { TERMS_OF_SERVICE, PRIVACY_POLICY, REFUND_POLICY, TERMS_VERSION } from './legal'
 import useModalBackButton from './useModalBackButton'
 
-// 약관 / 개인정보 처리방침 텍스트 표시용 모달.
-// kind: 'terms' | 'privacy'
+// 약관 / 개인정보 처리방침 / 환불 정책 텍스트 표시용 모달.
+// kind: 'terms' | 'privacy' | 'refund'
 export default function LegalModal({ kind, onClose }) {
   useModalBackButton(true, onClose)
 
-  const isTerms = kind === 'terms'
-  const title = isTerms ? '서비스 이용약관' : '개인정보 처리방침'
-  const body = isTerms ? TERMS_OF_SERVICE : PRIVACY_POLICY
+  const title = kind === 'terms' ? '서비스 이용약관'
+              : kind === 'privacy' ? '개인정보 처리방침'
+              : kind === 'refund' ? '환불 정책'
+              : '안내'
+  const body = kind === 'terms' ? TERMS_OF_SERVICE
+             : kind === 'privacy' ? PRIVACY_POLICY
+             : kind === 'refund' ? REFUND_POLICY
+             : ''
 
   return (
     <div

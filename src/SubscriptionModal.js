@@ -1,123 +1,226 @@
 import React, { useEffect, useState } from 'react'
-import { THEME, loadSubscription, summarizeSubscription } from './utils'
+import { supabase } from './supabase'
+import {
+  THEME,
+  loadSubscription, summarizeSubscription,
+  SUBSCRIPTION_PLANS, getPlanByCode,
+  ADMIN_EMAIL,
+} from './utils'
 import useModalBackButton from './useModalBackButton'
+import LegalModal from './LegalModal'
 
-// 구독 상태 + 플랜 안내 모달.
-// - 현재 상태(trial / active / expired) 표시
-// - 플랜 안내 (월 ₩9,900)
-// - [지금 구독하기] 버튼 — 실제 결제 연동은 추후 (토스페이먼츠)
-//   사업자 등록 + 토스 가맹점 가입 끝나면 onSubscribe 핸들러에 결제 위젯 연결.
+// 구독 관리 모달
+// - 현재 상태(trial / active / expired) + 사용 중인 플랜
+// - 3개 플랜 비교 카드 (Starter / Standard / Pro) + 플랜 선택·변경
+// - 환불 정책 보기
+// - 환불 신청 (이메일 mailto, 운영자 수동 처리)
+// - 구독 취소 (다음 결제 차단, status=cancelled)
 export default function SubscriptionModal({ trainerId, onClose }) {
   useModalBackButton(true, onClose)
 
   const [sub, setSub] = useState(null)
   const [loading, setLoading] = useState(true)
+  const [working, setWorking] = useState(false)
+  const [legalOpen, setLegalOpen] = useState(false)
+  const [memberCount, setMemberCount] = useState(null)
 
-  useEffect(() => {
-    let alive = true
-    loadSubscription(trainerId).then(data => {
-      if (alive) { setSub(data); setLoading(false) }
-    })
-    return () => { alive = false }
-  }, [trainerId])
+  const reload = async () => {
+    setLoading(true)
+    const [s, { count }] = await Promise.all([
+      loadSubscription(trainerId),
+      supabase.from('members').select('id', { count: 'exact', head: true }).eq('trainer_id', trainerId),
+    ])
+    setSub(s)
+    setMemberCount(count || 0)
+    setLoading(false)
+  }
+  useEffect(() => { reload() /* eslint-disable-next-line */ }, [trainerId])
 
   const info = summarizeSubscription(sub)
+  const currentPlanCode = sub?.plan_code || 'starter_10'
 
   const stateConfig = {
-    trial: { bg: THEME.primaryLight, color: THEME.primaryDark, icon: '⏳' },
-    active: { bg: '#E8F4ED', color: '#1F6B3A', icon: '✓' },
-    expired: { bg: THEME.dangerLight, color: THEME.dangerDark, icon: '!' },
+    trial:    { bg: '#FFF7E6', color: '#8B6F2A', icon: '⏳' },
+    active:   { bg: '#E6F4EB', color: THEME.primaryDark, icon: '✓' },
+    expired:  { bg: THEME.dangerLight, color: THEME.dangerDark, icon: '!' },
+    cancelled:{ bg: THEME.borderLight, color: THEME.textSub, icon: '×' },
   }
   const cfg = stateConfig[info.state] || stateConfig.expired
 
-  const handleSubscribe = () => {
-    // TODO: 토스페이먼츠 가맹점 가입 후 결제 위젯 연동
-    alert('정식 결제 시스템은 곧 오픈됩니다.\n베타 기간 동안은 무료 체험이 유지됩니다.')
+  // 플랜 변경 (실제 결제는 추후 토스 연동, 지금은 plan_code 만 변경 — UI 검증용)
+  const handleSelectPlan = async (plan) => {
+    if (plan.code === currentPlanCode) return
+    if (!window.confirm(`${plan.label} 플랜으로 변경할까요? (₩${plan.amount.toLocaleString()}/월)\n\n정식 결제 연동 전이라 plan_code 만 변경됩니다.`)) return
+    setWorking(true)
+    const { error } = await supabase
+      .from('trainer_subscriptions')
+      .update({
+        plan_code: plan.code,
+        plan_amount: plan.amount,
+        member_limit: plan.memberLimit,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('trainer_id', trainerId)
+    setWorking(false)
+    if (error) { alert('플랜 변경 실패: ' + error.message); return }
+    await reload()
+  }
+
+  // 환불 신청 → 운영자 이메일 (mailto)
+  const handleRefund = () => {
+    const body = encodeURIComponent(
+      `안녕하세요.\n\n환불 신청합니다.\n\n` +
+      `· 트레이너 ID: ${trainerId}\n` +
+      `· 현재 플랜: ${info.plan.label} (₩${info.plan.amount.toLocaleString()})\n` +
+      `· 상태: ${info.label}\n\n` +
+      `환불 사유:\n(자유롭게 작성)\n\n감사합니다.`
+    )
+    window.location.href = `mailto:${ADMIN_EMAIL}?subject=PT Manager 환불 신청&body=${body}`
+  }
+
+  // 구독 취소 — 다음 결제 막음 (status=cancelled). 현재 만료일까지는 사용 가능.
+  const handleCancel = async () => {
+    if (!window.confirm('정말 구독을 취소하시겠습니까?\n\n· 현재 만료일까지는 그대로 사용 가능합니다.\n· 다음 결제가 자동으로 발생하지 않습니다.\n· 환불을 원하시면 [환불 신청] 을 이용해주세요.')) return
+    setWorking(true)
+    const { error } = await supabase
+      .from('trainer_subscriptions')
+      .update({ status: 'cancelled', cancelled_at: new Date().toISOString() })
+      .eq('trainer_id', trainerId)
+    setWorking(false)
+    if (error) { alert('취소 실패: ' + error.message); return }
+    alert('구독이 취소됐습니다. 현재 만료일까지는 정상 사용 가능합니다.')
+    await reload()
   }
 
   return (
-    <div style={{
-      position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
-      background: 'rgba(0,0,0,0.5)', zIndex: 1100,
-      display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '16px',
-    }}>
+    <>
       <div style={{
-        background: '#FFF', borderRadius: '14px',
-        width: '100%', maxWidth: '360px', maxHeight: '85vh',
-        display: 'flex', flexDirection: 'column', overflow: 'hidden', boxSizing: 'border-box',
+        position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+        background: 'rgba(0,0,0,0.5)', zIndex: 1100,
+        display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '16px',
       }}>
         <div style={{
-          display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-          padding: '14px 16px', borderBottom: `0.5px solid ${THEME.border}`,
+          background: '#FFF', borderRadius: '14px',
+          width: '100%', maxWidth: '420px', maxHeight: '85vh',
+          display: 'flex', flexDirection: 'column', overflow: 'hidden', boxSizing: 'border-box',
         }}>
-          <p style={{ fontSize: '14px', fontWeight: '500', color: THEME.primary, margin: 0 }}>구독 관리</p>
-          <button onClick={onClose} style={{
-            background: 'none', border: 'none', fontSize: '20px', cursor: 'pointer',
-            color: THEME.textSub, padding: '0 4px', lineHeight: 1,
-          }}>✕</button>
-        </div>
+          <div style={{
+            display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+            padding: '14px 16px', borderBottom: `0.5px solid ${THEME.border}`, flexShrink: 0,
+          }}>
+            <p style={{ fontSize: '14px', fontWeight: '500', color: THEME.primary, margin: 0 }}>구독 관리</p>
+            <button onClick={onClose} style={{
+              background: 'none', border: 'none', fontSize: '20px', cursor: 'pointer',
+              color: THEME.textSub, padding: '0 4px', lineHeight: 1,
+            }}>✕</button>
+          </div>
 
-        <div style={{ padding: '16px', overflowY: 'auto', flex: 1 }}>
-          {loading ? (
-            <p style={{ fontSize: '12px', color: THEME.textHint, textAlign: 'center', padding: '20px 0' }}>로딩 중…</p>
-          ) : (
-            <>
-              {/* 현재 상태 */}
-              <div style={{
-                background: cfg.bg, borderRadius: '12px', padding: '14px',
-                textAlign: 'center', marginBottom: '14px',
-              }}>
-                <div style={{ fontSize: '22px', marginBottom: '4px' }}>{cfg.icon}</div>
-                <p style={{ fontSize: '14px', fontWeight: '500', color: cfg.color, margin: '0 0 4px' }}>
-                  {info.label}
-                </p>
-                {info.expiresAt && (
-                  <p style={{ fontSize: '11px', color: cfg.color, opacity: 0.8, margin: 0 }}>
-                    만료일: {info.expiresAt.toISOString().slice(0, 10).replace(/-/g, '.')}
+          <div style={{ padding: '14px 16px', overflowY: 'auto', flex: 1 }}>
+            {loading ? (
+              <p style={{ fontSize: '12px', color: THEME.textHint, textAlign: 'center', padding: '20px 0' }}>로딩 중…</p>
+            ) : (
+              <>
+                {/* 현재 상태 */}
+                <div style={{
+                  background: cfg.bg, borderRadius: '12px', padding: '12px',
+                  textAlign: 'center', marginBottom: '12px',
+                }}>
+                  <div style={{ fontSize: '20px', marginBottom: '4px' }}>{cfg.icon}</div>
+                  <p style={{ fontSize: '14px', fontWeight: '500', color: cfg.color, margin: '0 0 3px' }}>
+                    {info.state === 'cancelled' ? `취소됨 · ${info.plan.label}` : info.label}
                   </p>
-                )}
-              </div>
-
-              {/* 플랜 안내 */}
-              <div style={{
-                border: `0.5px solid ${THEME.primaryAccent}`, borderRadius: '12px',
-                padding: '14px', marginBottom: '14px',
-              }}>
-                <p style={{ fontSize: '11px', color: THEME.textSub, fontWeight: '500', margin: '0 0 4px' }}>월 구독 플랜</p>
-                <div style={{ display: 'flex', alignItems: 'baseline', gap: '4px', marginBottom: '8px' }}>
-                  <span style={{ fontSize: '24px', fontWeight: '500', color: THEME.primary, letterSpacing: '-0.5px' }}>
-                    9,900
-                  </span>
-                  <span style={{ fontSize: '12px', color: THEME.textSub }}>원 / 월</span>
+                  {info.expiresAt && (
+                    <p style={{ fontSize: '11px', color: cfg.color, opacity: 0.8, margin: '0 0 3px' }}>
+                      만료일: {info.expiresAt.toISOString().slice(0, 10).replace(/-/g, '.')}
+                    </p>
+                  )}
+                  {memberCount != null && (
+                    <p style={{ fontSize: '11px', color: cfg.color, opacity: 0.75, margin: 0 }}>
+                      회원 {memberCount}명{info.plan.memberLimit != null ? ` / ${info.plan.memberLimit}명` : ' / 무제한'}
+                    </p>
+                  )}
                 </div>
-                <ul style={{ margin: 0, padding: '0 0 0 16px', fontSize: '11px', color: THEME.text, lineHeight: 1.7 }}>
-                  <li>무제한 회원 등록</li>
-                  <li>운동·식단·인바디 기록 무제한</li>
-                  <li>채팅·푸시 알림</li>
-                  <li>30일 무료 체험 포함</li>
-                </ul>
-              </div>
 
-              {/* CTA */}
-              {info.state !== 'active' && (
-                <button
-                  onClick={handleSubscribe}
-                  style={{
-                    width: '100%', background: THEME.primary, color: '#FFF', border: 'none',
-                    padding: '12px', borderRadius: '10px', fontSize: '13px', fontWeight: '500',
-                    cursor: 'pointer', fontFamily: 'inherit', marginBottom: '8px',
-                  }}
-                >지금 구독하기</button>
-              )}
+                {/* 플랜 3개 카드 */}
+                <p style={{ fontSize: '11px', color: THEME.textSub, fontWeight: '500', margin: '0 0 6px' }}>플랜 선택</p>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '14px' }}>
+                  {SUBSCRIPTION_PLANS.map(plan => {
+                    const isCurrent = plan.code === currentPlanCode
+                    return (
+                      <button
+                        key={plan.code}
+                        onClick={() => handleSelectPlan(plan)}
+                        disabled={working}
+                        style={{
+                          background: isCurrent ? '#E6F4EB' : '#FFF',
+                          border: `0.5px solid ${isCurrent ? THEME.primary : THEME.primaryAccent}`,
+                          borderRadius: '10px', padding: '12px 14px',
+                          cursor: working || isCurrent ? 'default' : 'pointer',
+                          textAlign: 'left', fontFamily: 'inherit',
+                          opacity: working ? 0.7 : 1,
+                        }}
+                      >
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: '3px' }}>
+                          <span style={{ fontSize: '13px', fontWeight: '500', color: isCurrent ? THEME.primaryDark : THEME.text }}>
+                            {plan.label}{isCurrent && ' · 사용 중'}
+                          </span>
+                          <span style={{ fontSize: '14px', fontWeight: '500', color: THEME.primary }}>
+                            ₩{plan.amount.toLocaleString()}<span style={{ fontSize: '10px', color: THEME.textSub, fontWeight: '400' }}>/월</span>
+                          </span>
+                        </div>
+                        <p style={{ fontSize: '11px', color: THEME.textSub, margin: 0 }}>{plan.desc}</p>
+                      </button>
+                    )
+                  })}
+                </div>
 
-              <p style={{ fontSize: '10px', color: THEME.textHint, textAlign: 'center', margin: '8px 0 0', lineHeight: 1.5 }}>
-                정식 결제 시스템은 곧 오픈 예정.<br/>
-                베타 기간 동안 무료 체험이 유지됩니다.
-              </p>
-            </>
-          )}
+                {/* 관리 버튼들 */}
+                <div style={{ display: 'flex', gap: '6px', marginBottom: '10px', flexWrap: 'wrap' }}>
+                  <button
+                    onClick={() => setLegalOpen(true)}
+                    style={{
+                      flex: 1, minWidth: '100px',
+                      background: '#FFF', border: `0.5px solid ${THEME.border}`,
+                      color: THEME.text, padding: '9px', borderRadius: '8px',
+                      fontSize: '11px', cursor: 'pointer', fontFamily: 'inherit',
+                    }}
+                  >환불 정책</button>
+                  {(info.state === 'active' || info.state === 'trial') && (
+                    <button
+                      onClick={handleRefund}
+                      style={{
+                        flex: 1, minWidth: '100px',
+                        background: THEME.warningLight, border: `0.5px solid ${THEME.warning}`,
+                        color: THEME.warningDark, padding: '9px', borderRadius: '8px',
+                        fontSize: '11px', cursor: 'pointer', fontFamily: 'inherit', fontWeight: '500',
+                      }}
+                    >환불 신청</button>
+                  )}
+                  {info.state === 'active' && (
+                    <button
+                      onClick={handleCancel}
+                      disabled={working}
+                      style={{
+                        flex: 1, minWidth: '100px',
+                        background: '#FFF', border: `0.5px solid ${THEME.danger}`,
+                        color: THEME.danger, padding: '9px', borderRadius: '8px',
+                        fontSize: '11px', cursor: working ? 'default' : 'pointer', fontFamily: 'inherit', fontWeight: '500',
+                      }}
+                    >구독 취소</button>
+                  )}
+                </div>
+
+                <p style={{ fontSize: '10px', color: THEME.textHint, textAlign: 'center', margin: '8px 0 0', lineHeight: 1.5 }}>
+                  정식 결제 시스템은 사업자 등록·토스페이먼츠 가맹점 가입 완료 후 오픈됩니다.<br/>
+                  베타 기간 동안 무료 체험이 유지됩니다.
+                </p>
+              </>
+            )}
+          </div>
         </div>
       </div>
-    </div>
+
+      {legalOpen && <LegalModal kind="refund" onClose={() => setLegalOpen(false)} />}
+    </>
   )
 }

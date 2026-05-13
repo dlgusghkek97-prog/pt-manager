@@ -330,6 +330,18 @@ export const removeFavorite = async (favoriteId, table = 'member_favorite_exerci
   return { success: true }
 }
 
+// ── 구독 플랜 정의 ──
+export const SUBSCRIPTION_PLANS = [
+  { code: 'starter_10',    label: 'Starter',  memberLimit: 10,   amount: 9900,  desc: '회원 10명까지' },
+  { code: 'standard_30',   label: 'Standard', memberLimit: 30,   amount: 19900, desc: '회원 30명까지' },
+  { code: 'pro_unlimited', label: 'Pro',      memberLimit: null, amount: 39900, desc: '회원 무제한' },
+]
+
+export const getPlanByCode = (code) => SUBSCRIPTION_PLANS.find(p => p.code === code) || SUBSCRIPTION_PLANS[0]
+
+// 운영자 연락처 (환불 신청 등)
+export const ADMIN_EMAIL = 'dlgusghkek97@gmail.com'
+
 // ── 구독 (SaaS 사용료) ──
 // 상태: trial / active / expired / cancelled
 // 트라이얼은 가입 후 30일 자동. 정식 결제는 토스페이먼츠 연동 후 활성화.
@@ -348,26 +360,35 @@ export const loadSubscription = async (trainerId) => {
 }
 
 // 구독 요약 — UI 표시용
-// 반환: { state: 'trial'|'active'|'expired', daysLeft: number, expiresAt: Date|null, label: string }
 export const summarizeSubscription = (sub) => {
   if (!sub) {
-    return { state: 'expired', daysLeft: 0, expiresAt: null, label: '구독 정보 없음' }
+    return { state: 'expired', daysLeft: 0, expiresAt: null, label: '구독 정보 없음', plan: SUBSCRIPTION_PLANS[0] }
   }
+  const plan = getPlanByCode(sub.plan_code)
   const now = new Date()
   const trialEnd = sub.trial_expires_at ? new Date(sub.trial_expires_at) : null
   const paidEnd = sub.paid_expires_at ? new Date(sub.paid_expires_at) : null
 
-  // 유료가 살아있으면 active
   if (paidEnd && paidEnd > now) {
     const days = Math.ceil((paidEnd - now) / (1000 * 60 * 60 * 24))
-    return { state: 'active', daysLeft: days, expiresAt: paidEnd, label: `구독 ${days}일 남음` }
+    return { state: 'active', daysLeft: days, expiresAt: paidEnd, label: `구독 ${days}일 남음 · ${plan.label}`, plan }
   }
-  // 트라이얼이 살아있으면 trial
   if (trialEnd && trialEnd > now) {
     const days = Math.ceil((trialEnd - now) / (1000 * 60 * 60 * 24))
-    return { state: 'trial', daysLeft: days, expiresAt: trialEnd, label: `무료 체험 ${days}일 남음` }
+    return { state: 'trial', daysLeft: days, expiresAt: trialEnd, label: `무료 체험 ${days}일 남음 · ${plan.label}`, plan }
   }
-  return { state: 'expired', daysLeft: 0, expiresAt: paidEnd || trialEnd, label: '구독 만료' }
+  return { state: 'expired', daysLeft: 0, expiresAt: paidEnd || trialEnd, label: '구독 만료', plan }
+}
+
+// 회원 추가 가능 여부 (서버 RPC). 반환: { ok: bool, reason?: string }
+export const canAddMember = async (trainerId) => {
+  if (!trainerId) return { ok: false, reason: '인증 정보 없음' }
+  const { data, error } = await supabase.rpc('can_add_member', { _trainer_id: trainerId })
+  if (error) {
+    console.error('[canAddMember] error:', error)
+    return { ok: false, reason: error.message }
+  }
+  return data || { ok: false, reason: '알 수 없는 오류' }
 }
 
 // ── 미디어 업로드 공통 ──

@@ -15,7 +15,7 @@ import ChatUnreadBadge from './ChatUnreadBadge'
 import PushPromptModal from './PushPromptModal'
 import SubscriptionModal from './SubscriptionModal'
 import useModalBackButton from './useModalBackButton'
-import { loadSubscription, summarizeSubscription } from './utils'
+import { loadSubscription, summarizeSubscription, canAddMember } from './utils'
 
 const NOTE_COLOR_POOL = [
   { name: '코랄', bg: '#FCE4E0', text: '#8E3D2E' },
@@ -722,6 +722,16 @@ export default function TrainerDashboard({ user, onLogout }) {
   const addMember = async () => {
     if (!newMemberName) return
     setLoading(true)
+
+    // 구독 상태·회원 한도 검사 (서버 RPC)
+    const check = await canAddMember(user.id)
+    if (!check.ok) {
+      setLoading(false)
+      const goSub = window.confirm(`${check.reason}\n\n[구독 관리] 를 여시겠습니까?`)
+      if (goSub) setShowSubscription(true)
+      return
+    }
+
     const code = generateCode()
     const ptTotal = parseInt(newMemberPtTotal) || 0
     const { data, error } = await supabase.from('members').insert({
