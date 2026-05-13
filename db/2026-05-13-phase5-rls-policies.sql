@@ -233,6 +233,39 @@ ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON SEQUENCES TO anon, authen
 NOTIFY pgrst, 'reload schema';
 
 -- =========================================
+-- 5.3b) RLS 활성화 — Step 1: 핵심(members/trainers) 빼고 21개 ON
+--    문제 생기면 그 테이블만 DISABLE 하면 됨:
+--      ALTER TABLE public.<name> DISABLE ROW LEVEL SECURITY;
+-- =========================================
+ALTER TABLE public.workout_logs              ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.diet_logs                 ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.diet_feedback             ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.personal_records          ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.member_favorite_exercises ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.member_inbody             ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.member_notes              ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.member_note_categories    ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.diet_favorites            ENABLE ROW LEVEL SECURITY;
+
+ALTER TABLE public.trainer_workout_logs        ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.trainer_diet_logs           ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.trainer_diet_feedback       ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.trainer_favorite_exercises  ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.trainer_personal_records    ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.trainer_diet_favorites      ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.trainer_inbody              ENABLE ROW LEVEL SECURITY;
+
+ALTER TABLE public.conversations      ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.messages           ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.notifications      ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.push_subscriptions ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.feedbacks          ENABLE ROW LEVEL SECURITY;
+
+NOTIFY pgrst, 'reload schema';
+
+-- 5.3c) members / trainers 는 위 21개 테스트 OK 후 별도 단계에서 ON 예정.
+
+-- =========================================
 -- 6) 확인 쿼리 (참고용 — 정책 개수가 표시되면 성공)
 -- =========================================
 -- 실행 시 23 row 정도, 각 테이블마다 p5_* 정책 1~4 개 보여야 함
