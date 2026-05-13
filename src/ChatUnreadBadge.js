@@ -50,22 +50,23 @@ export default function ChatUnreadBadge({ userId, userType }) {
   return (
     <span style={{
       position: 'absolute',
-      top: '2px',
-      right: '2px',
+      top: '-4px',
+      right: '-4px',
       background: THEME.danger,
       color: '#FFF',
-      borderRadius: '8px',
-      minWidth: '14px',
-      height: '14px',
+      borderRadius: '9px',
+      minWidth: '16px',
+      height: '16px',
       fontSize: '9px',
       fontWeight: '500',
       display: 'flex',
       alignItems: 'center',
       justifyContent: 'center',
-      padding: '0 3px',
+      padding: '0 4px',
       lineHeight: 1,
+      border: '2px solid #FFF',
+      boxSizing: 'border-box',
       pointerEvents: 'none',
-      border: '1.5px solid #FFF',
     }}>
       {count > 99 ? '99+' : count}
     </span>
