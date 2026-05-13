@@ -96,71 +96,60 @@ export default function App() {
     setLoading(false)
   }
 
-  // ─── 회원 로그인 (익명 Auth + 자동 매칭) ───
+  // ─── 회원 로그인 (익명 Auth + claim_member RPC) ───
+  // RPC 가 서버에서 code+name 검증 후 auth_user_id 를 세팅함.
+  // 직접 UPDATE 하던 옛 방식과 달리 — 외부에서 코드/이름 모르고 가로채기 불가.
   const memberLogin = async () => {
     setLoading(true); setError('')
 
     try {
-      // 1. 코드 + 이름으로 회원 찾기
-      const { data: memberData, error: memberError } = await supabase
-        .from('members')
-        .select('*')
-        .eq('code', memberCode.toUpperCase())
-        .maybeSingle()
-
-      if (memberError || !memberData) {
-        setError('코드를 확인해주세요.')
-        setLoading(false)
-        return
-      }
-
-      if (memberData.name !== memberName.trim()) {
-        setError('이름이 일치하지 않습니다.')
-        setLoading(false)
-        return
-      }
-
-      // 2. 현재 익명 Auth 세션이 있는지 확인
+      // 1. 익명 Auth 세션 확보 (RPC 가 auth.uid() 사용)
       const { data: { session: existingSession } } = await supabase.auth.getSession()
-
-      let authUserId = existingSession?.user?.id
-
-      // 3. 세션 없으면 익명 Auth 새로 생성
-      if (!authUserId) {
-        const { data: anonData, error: anonError } = await supabase.auth.signInAnonymously()
+      if (!existingSession) {
+        const { error: anonError } = await supabase.auth.signInAnonymously()
         if (anonError) {
           console.error('[memberLogin] anonymous auth error:', anonError)
           setError('로그인에 실패했습니다. 다시 시도해주세요.')
           setLoading(false)
           return
         }
-        authUserId = anonData.user.id
       }
 
-      // 4. 회원과 익명 user.id 매칭 처리
-      // case A: members.auth_user_id가 비어있음 → 이번에 매칭 (첫 로그인 또는 폰 변경)
-      // case B: 이미 같은 auth_user_id → 그대로 사용
-      // case C: 다른 auth_user_id로 저장돼있음 → 폰 바꿈 → 덮어쓰기
-      if (memberData.auth_user_id !== authUserId) {
-        const { error: updateError } = await supabase
-          .from('members')
-          .update({ auth_user_id: authUserId })
-          .eq('id', memberData.id)
+      // 2. RPC 로 code+name 검증 + auth_user_id 세팅 (서버 측, SECURITY DEFINER)
+      const { data: memberId, error: claimError } = await supabase.rpc('claim_member', {
+        code_input: memberCode.toUpperCase(),
+        name_input: memberName.trim(),
+      })
 
-        if (updateError) {
-          console.error('[memberLogin] auth_user_id 업데이트 실패:', updateError)
-          // RLS가 켜진 후엔 이 업데이트가 실패할 수 있음 (회원이 자기 row UPDATE 권한 필요)
-          // 일단 에러 무시하고 진행 — 나중에 RLS 정책에 SELECT/UPDATE 둘 다 포함
-          setError('회원 인증에 실패했습니다. 트레이너에게 문의해주세요.')
-          await supabase.auth.signOut()
-          setLoading(false)
-          return
+      if (claimError || !memberId) {
+        const msg = claimError?.message || ''
+        if (msg.includes('mismatch')) {
+          setError('코드 또는 이름을 확인해주세요.')
+        } else if (msg.includes('no auth session')) {
+          setError('인증 세션이 없습니다. 다시 시도해주세요.')
+        } else {
+          console.error('[memberLogin] claim_member error:', claimError)
+          setError('로그인 실패: ' + (claimError?.message || '알 수 없는 오류'))
         }
-
-        memberData.auth_user_id = authUserId
+        setLoading(false)
+        return
       }
 
-      // 5. user 세팅 + localStorage 저장
+      // 3. 클레임 성공 → 전체 회원 정보 조회
+      const { data: memberData, error: fetchError } = await supabase
+        .from('members')
+        .select('*')
+        .eq('id', memberId)
+        .single()
+
+      if (fetchError || !memberData) {
+        console.error('[memberLogin] 회원 정보 조회 실패:', fetchError)
+        setError('회원 정보를 불러오지 못했습니다.')
+        setLoading(false)
+        return
+      }
+
+      // 4. user 세팅 + localStorage 저장
       const u = { type: 'member', ...memberData }
       setUser(u)
       localStorage.setItem('pt_user', JSON.stringify(u))
