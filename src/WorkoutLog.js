@@ -924,12 +924,12 @@ export default function WorkoutLog({ user, selectedDate, setSelectedDate, exerci
               {weightExercises.filter(ex => ex.exercise_name).map((ex, i) => {
                 const vol = ex.sets.reduce((sum, s) => { const w = parseFloat(s.weight); const r = parseInt(s.reps); return sum + (!isNaN(w) && !isNaN(r) ? w * r : 0) }, 0)
                 return (
-                  <div key={`w-${i}`} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '7px 9px', background: THEME.cardAlt, borderRadius: '8px' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '5px', minWidth: 0, flex: 1 }}>
+                  <div key={`w-${i}`} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '6px', padding: '7px 9px', background: THEME.cardAlt, borderRadius: '8px', minWidth: 0, overflow: 'hidden' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '4px', minWidth: 0, flex: 1, overflow: 'hidden' }}>
                       <span style={{ fontSize: '8px', background: PART_COLORS[ex.body_part] || '#888', color: '#FFF', padding: '1px 5px', borderRadius: '6px', flexShrink: 0 }}>{ex.body_part}</span>
-                      <span style={{ fontSize: '11px', fontWeight: '500', color: THEME.text, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{ex.exercise_name}</span>
+                      <span style={{ fontSize: '10px', fontWeight: '500', color: THEME.text, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', minWidth: 0 }}>{ex.exercise_name}</span>
                     </div>
-                    <span style={{ fontSize: '10px', fontWeight: '500', color: THEME.primary, flexShrink: 0 }}>{vol.toLocaleString()}</span>
+                    <span style={{ fontSize: '10px', fontWeight: '500', color: THEME.primary, flexShrink: 0, whiteSpace: 'nowrap' }}>{vol.toLocaleString()}</span>
                   </div>
                 )
               })}
@@ -940,11 +940,11 @@ export default function WorkoutLog({ user, selectedDate, setSelectedDate, exerci
                     const idx = exercises.findIndex(e => e.slot === ex.slot && e.exercise_type === 'cardio')
                     if (idx >= 0) removeExercise(idx)
                   }
-                }} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '7px 9px', background: THEME.dangerLight, borderRadius: '8px', cursor: 'pointer' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '5px', minWidth: 0, flex: 1 }}>
-                    <span style={{ fontSize: '11px', fontWeight: '500', color: THEME.danger, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{ex.cardio_name || '유산소'}</span>
+                }} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '6px', padding: '7px 9px', background: THEME.dangerLight, borderRadius: '8px', cursor: 'pointer', minWidth: 0, overflow: 'hidden' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '4px', minWidth: 0, flex: 1, overflow: 'hidden' }}>
+                    <span style={{ fontSize: '10px', fontWeight: '500', color: THEME.danger, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', minWidth: 0 }}>{ex.cardio_name || '유산소'}</span>
                   </div>
-                  <span style={{ fontSize: '10px', fontWeight: '500', color: THEME.danger, flexShrink: 0 }}>{ex.calories_burned}kcal</span>
+                  <span style={{ fontSize: '10px', fontWeight: '500', color: THEME.danger, flexShrink: 0, whiteSpace: 'nowrap' }}>{ex.calories_burned}kcal</span>
                 </div>
               ))}
             </div>

@@ -29,8 +29,12 @@ export default function useModalBackButton(isOpen, onClose) {
 
     const handlePopState = (e) => {
       if (!armed) return
-      // 본인이 push 한 state 가 아직 top 이면 무시
-      if (e.state && e.state.__modalBack === myMarker) return
+      // 본인 marker 가 새 top 이면 — 다른 모달이 위에 있다가 pop. 본인 close 안 함.
+      if (e.state?.__modalBack === myMarker) return
+      // 새 top 에 다른 modal marker 가 있으면 — 본인 위에 그 modal 이 더 있었던 것.
+      // 즉 본인은 stack 에 그대로 남아 있고 위쪽이 정리된 것 → close 안 함 (cascade 차단).
+      if (e.state?.__modalBack != null) return
+      // 새 top 이 tab marker / 빈 state 면 본인 entry 가 진짜 빠진 것 → close.
       closedByBack = true
       onCloseRef.current?.()
     }
