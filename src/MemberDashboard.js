@@ -922,7 +922,7 @@ export default function MemberDashboard({ user, onLogout }) {
                   {[
                     { key: 'workout', label: '운동' },
                     { key: 'diet', label: '식단' },
-                    { key: 'media', label: '미디어' },
+                    { key: 'media', label: '운동영상' },
                   ].map(({ key, label }) => {
                     const active = trainerSubTab === key
                     return (
