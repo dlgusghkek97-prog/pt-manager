@@ -75,12 +75,13 @@ const computeCal = (carbs, protein, fat) => {
   return Math.round(c * 4 + p * 4 + f * 9)
 }
 
-const MealRow = React.memo(function MealRow({ meal, onUpdate, onBlur, onRemove, onStar, canRemove }) {
+const MealRow = React.memo(function MealRow({ meal, onUpdate, onBlur, onRemove, onStar, canRemove, readOnly = false }) {
   const kcalStyle = meal.calorieManual ? CELL_STYLE : CELL_STYLE_AUTO
+  const ro = !!readOnly
   return (
     <div style={{ background: THEME.cardAlt, borderRadius: '10px', padding: '10px', marginBottom: '8px' }}>
       {/* 식사 이름 + ★ 즐겨찾기 + ✕ 삭제 */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 34px 28px', gap: '6px', marginBottom: '8px' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: ro ? '1fr' : '1fr 34px 28px', gap: '6px', marginBottom: '8px' }}>
         <input
           type="text"
           value={meal.name}
@@ -88,18 +89,24 @@ const MealRow = React.memo(function MealRow({ meal, onUpdate, onBlur, onRemove, 
           onBlur={() => onBlur(meal.slot)}
           placeholder={`식사 ${meal.slot}`}
           style={NAME_INPUT_STYLE}
+          readOnly={ro}
+          disabled={ro}
         />
-        <button
-          onClick={() => onStar(meal.slot)}
-          style={{ background: THEME.warningLight, border: `0.5px solid ${THEME.warningBorder}`, color: THEME.warning, padding: '6px 0', borderRadius: '6px', fontSize: '14px', fontWeight: '500', cursor: 'pointer', fontFamily: 'inherit', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
-          title="즐겨찾기 (현재 값 저장 / 저장된 즐겨찾기 적용)"
-        >★</button>
-        <button
-          onClick={() => onRemove(meal.slot)}
-          disabled={!canRemove}
-          style={{ background: canRemove ? '#FBE8E8' : '#F5F5F0', color: canRemove ? '#C57878' : THEME.textHint, border: 'none', borderRadius: '6px', padding: '4px 0', cursor: canRemove ? 'pointer' : 'not-allowed', fontSize: '11px' }}
-          title="이 식사 삭제"
-        >✕</button>
+        {!ro && (
+          <button
+            onClick={() => onStar(meal.slot)}
+            style={{ background: THEME.warningLight, border: `0.5px solid ${THEME.warningBorder}`, color: THEME.warning, padding: '6px 0', borderRadius: '6px', fontSize: '14px', fontWeight: '500', cursor: 'pointer', fontFamily: 'inherit', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+            title="즐겨찾기 (현재 값 저장 / 저장된 즐겨찾기 적용)"
+          >★</button>
+        )}
+        {!ro && (
+          <button
+            onClick={() => onRemove(meal.slot)}
+            disabled={!canRemove}
+            style={{ background: canRemove ? '#FBE8E8' : '#F5F5F0', color: canRemove ? '#C57878' : THEME.textHint, border: 'none', borderRadius: '6px', padding: '4px 0', cursor: canRemove ? 'pointer' : 'not-allowed', fontSize: '11px' }}
+            title="이 식사 삭제"
+          >✕</button>
+        )}
       </div>
       {/* 영양소 라벨 */}
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: '4px', marginBottom: '3px' }}>
@@ -117,6 +124,7 @@ const MealRow = React.memo(function MealRow({ meal, onUpdate, onBlur, onRemove, 
           value={meal.carbs}
           onChange={e => onUpdate(meal.slot, 'carbs', e.target.value)}
           onBlur={() => onBlur(meal.slot)}
+          readOnly={ro} disabled={ro}
         />
         <input
           style={CELL_STYLE}
@@ -125,6 +133,7 @@ const MealRow = React.memo(function MealRow({ meal, onUpdate, onBlur, onRemove, 
           value={meal.protein}
           onChange={e => onUpdate(meal.slot, 'protein', e.target.value)}
           onBlur={() => onBlur(meal.slot)}
+          readOnly={ro} disabled={ro}
         />
         <input
           style={CELL_STYLE}
@@ -133,6 +142,7 @@ const MealRow = React.memo(function MealRow({ meal, onUpdate, onBlur, onRemove, 
           value={meal.fat}
           onChange={e => onUpdate(meal.slot, 'fat', e.target.value)}
           onBlur={() => onBlur(meal.slot)}
+          readOnly={ro} disabled={ro}
         />
         <input
           style={kcalStyle}
@@ -142,13 +152,14 @@ const MealRow = React.memo(function MealRow({ meal, onUpdate, onBlur, onRemove, 
           onChange={e => onUpdate(meal.slot, 'calories', e.target.value)}
           onBlur={() => onBlur(meal.slot)}
           title={meal.calorieManual ? '직접 입력 (수동)' : '탄단지로 자동 계산 — 비우면 자동 모드 유지'}
+          readOnly={ro} disabled={ro}
         />
       </div>
     </div>
   )
 })
 
-export default function DietLog({ user, onDietUpdate, tableOverride, trainerIdField, weight, muscle, occupation, workoutTable, workoutIdField, forcedTab, macroResult, goal, intensity, ptIsZero = false }) {
+export default function DietLog({ user, onDietUpdate, tableOverride, trainerIdField, weight, muscle, bodyFat, occupation, workoutTable, workoutIdField, forcedTab, macroResult, goal, intensity, ptIsZero = false, readOnly = false }) {
   const TABLE = tableOverride || 'diet_logs'
   const ID_FIELD = trainerIdField || 'member_id'
   const W_TABLE = workoutTable || 'workout_logs'
@@ -445,6 +456,7 @@ export default function DietLog({ user, onDietUpdate, tableOverride, trainerIdFi
   // 모든 식사를 DB에 반영 (없으면 INSERT / 있으면 UPDATE / 다 비었으면 DELETE).
   // 동시 실행 방지: 진행 중이면 끝난 뒤 한 번 더 실행 → 같은 식사가 두 번 INSERT 되는 일 차단.
   const persistAll = async () => {
+    if (readOnly) return
     if (savingRef.current) { pendingSaveRef.current = true; return }
     savingRef.current = true
     pendingSaveRef.current = false
@@ -525,6 +537,7 @@ export default function DietLog({ user, onDietUpdate, tableOverride, trainerIdFi
   requestSaveRef.current = () => { persistAll() }
 
   const uploadMealPhoto = async (slot, file) => {
+    if (readOnly) return
     if (ptIsZero) {
       alert('PT 잔여 횟수가 없어 사진 업로드가 제한됩니다.\n트레이너에게 추가 결제를 문의해주세요.')
       return
@@ -618,6 +631,8 @@ export default function DietLog({ user, onDietUpdate, tableOverride, trainerIdFi
     const dailyBurn = calcDailyBurn({
       muscle,
       occupation,
+      weight,
+      bodyFat,
       weightCal: burned.weightCal,
       cardioCal: burned.cardioCal,
     })
@@ -772,7 +787,7 @@ export default function DietLog({ user, onDietUpdate, tableOverride, trainerIdFi
     let sumBmr = 0, sumNeat = 0, sumWeight = 0, sumCardio = 0, dayCount = 0
     for (const d of dates) {
       const { weightCal, cardioCal } = calcBurnedByDate(d)
-      const bd = calcDailyBurnBreakdown({ muscle, occupation, weightCal, cardioCal })
+      const bd = calcDailyBurnBreakdown({ muscle, occupation, weight, bodyFat, weightCal, cardioCal })
       if (!bd) continue
       sumBmr += bd.bmr
       sumNeat += bd.neat
@@ -1009,23 +1024,30 @@ export default function DietLog({ user, onDietUpdate, tableOverride, trainerIdFi
         <div style={S.card}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px', gap: '8px' }}>
             <p style={{ ...S.cardTitle, margin: 0 }}>식단 기록</p>
-            <button
-              onClick={() => setDayFavOpen(true)}
-              style={{
-                background: THEME.warningLight,
-                border: `0.5px solid ${THEME.warningBorder}`,
-                color: THEME.warning,
-                padding: '5px 10px',
-                borderRadius: '8px',
-                fontSize: '11px',
-                fontWeight: '500',
-                cursor: 'pointer',
-                fontFamily: 'inherit',
-                flexShrink: 0,
-              }}
-              title="하루 식단 통째로 저장·불러오기"
-            >📅 일일 즐겨찾기</button>
+            {!readOnly && (
+              <button
+                onClick={() => setDayFavOpen(true)}
+                style={{
+                  background: THEME.warningLight,
+                  border: `0.5px solid ${THEME.warningBorder}`,
+                  color: THEME.warning,
+                  padding: '5px 10px',
+                  borderRadius: '8px',
+                  fontSize: '11px',
+                  fontWeight: '500',
+                  cursor: 'pointer',
+                  fontFamily: 'inherit',
+                  flexShrink: 0,
+                }}
+                title="하루 식단 통째로 저장·불러오기"
+              >📅 일일 즐겨찾기</button>
+            )}
           </div>
+          {readOnly && (
+            <div style={{ background: THEME.primaryLight, border: `0.5px solid ${THEME.primaryAccent}`, borderRadius: '8px', padding: '7px 10px', marginBottom: '10px', fontSize: '11px', color: THEME.primaryDark }}>
+              참고용 — 편집 불가 (트레이너의 기록)
+            </div>
+          )}
           <div style={{ marginBottom: '14px' }}>
             <DatePicker value={selectedDate} onChange={(d) => { if (dirtyRef.current) persistAll(); setSelectedDate(d) }} />
           </div>
@@ -1039,17 +1061,20 @@ export default function DietLog({ user, onDietUpdate, tableOverride, trainerIdFi
               onRemove={removeMeal}
               onStar={(slot) => setFavModalSlot(slot)}
               canRemove={meals.length > 1}
+              readOnly={readOnly}
             />
           ))}
 
-          <button
-            onClick={addMeal}
-            style={{
-              background: 'transparent', border: `0.5px dashed ${THEME.primaryAccent}`, color: THEME.primary,
-              borderRadius: '8px', padding: '10px', fontSize: '12px', fontWeight: '500',
-              cursor: 'pointer', width: '100%', marginBottom: '10px', fontFamily: 'inherit'
-            }}
-          >＋ 식사 추가</button>
+          {!readOnly && (
+            <button
+              onClick={addMeal}
+              style={{
+                background: 'transparent', border: `0.5px dashed ${THEME.primaryAccent}`, color: THEME.primary,
+                borderRadius: '8px', padding: '10px', fontSize: '12px', fontWeight: '500',
+                cursor: 'pointer', width: '100%', marginBottom: '10px', fontFamily: 'inherit'
+              }}
+            >＋ 식사 추가</button>
+          )}
 
           {/* 합계 */}
           <div style={{
@@ -1128,38 +1153,48 @@ export default function DietLog({ user, onDietUpdate, tableOverride, trainerIdFi
             })}
           </div>
 
-          <div style={{ background: THEME.cardAlt, border: `0.5px solid ${THEME.border}`, borderRadius: '10px', padding: '11px', marginBottom: '12px' }}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '7px' }}>
-              <span style={{ fontSize: '11px', color: THEME.primary, fontWeight: '500' }}>트레이너 피드백</span>
-              <button
-                onClick={saveFeedback}
-                disabled={savingFeedback}
-                style={{ background: THEME.primary, color: '#FFF', border: 'none', borderRadius: '6px', padding: '4px 10px', fontSize: '10px', fontWeight: '500', cursor: 'pointer' }}
-              >{savingFeedback ? '저장 중...' : '피드백 저장'}</button>
+          {(!readOnly || feedback) && (
+            <div style={{ background: THEME.cardAlt, border: `0.5px solid ${THEME.border}`, borderRadius: '10px', padding: '11px', marginBottom: '12px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '7px' }}>
+                <span style={{ fontSize: '11px', color: THEME.primary, fontWeight: '500' }}>트레이너 피드백</span>
+                {!readOnly && (
+                  <button
+                    onClick={saveFeedback}
+                    disabled={savingFeedback}
+                    style={{ background: THEME.primary, color: '#FFF', border: 'none', borderRadius: '6px', padding: '4px 10px', fontSize: '10px', fontWeight: '500', cursor: 'pointer' }}
+                  >{savingFeedback ? '저장 중...' : '피드백 저장'}</button>
+                )}
+              </div>
+              <textarea
+                value={feedback}
+                onChange={e => setFeedback(e.target.value)}
+                placeholder={readOnly ? '' : "오늘 식단에 대한 피드백을 입력해주세요..."}
+                readOnly={readOnly}
+                disabled={readOnly}
+                style={{ width: '100%', background: '#FFF', borderRadius: '6px', padding: '9px 10px', minHeight: '60px', fontSize: '12px', color: THEME.text, lineHeight: '1.6', border: `0.5px solid ${THEME.border}`, resize: 'vertical', boxSizing: 'border-box', fontFamily: 'inherit', outline: 'none' }}
+              />
             </div>
-            <textarea
-              value={feedback}
-              onChange={e => setFeedback(e.target.value)}
-              placeholder="오늘 식단에 대한 피드백을 입력해주세요..."
-              style={{ width: '100%', background: '#FFF', borderRadius: '6px', padding: '9px 10px', minHeight: '60px', fontSize: '12px', color: THEME.text, lineHeight: '1.6', border: `0.5px solid ${THEME.border}`, resize: 'vertical', boxSizing: 'border-box', fontFamily: 'inherit', outline: 'none' }}
-            />
-          </div>
+          )}
 
-          <div style={{
-            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px',
-            padding: '12px', borderRadius: '8px', fontSize: '12px', fontWeight: '500',
-            background: saveStatus === 'error' ? THEME.dangerLight : THEME.cardAlt,
-            color: saveStatus === 'error' ? THEME.dangerDark : (saveStatus === 'saving' ? THEME.textSub : THEME.primary),
-          }}>
-            {saveStatus === 'saving' ? '저장 중…'
-              : saveStatus === 'saved' ? '✓ 자동 저장됨'
-              : saveStatus === 'error' ? '저장 실패 — 잠시 후 다시 시도합니다'
-              : '입력하면 자동으로 저장됩니다'}
-          </div>
+          {!readOnly && (
+            <div style={{
+              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px',
+              padding: '12px', borderRadius: '8px', fontSize: '12px', fontWeight: '500',
+              background: saveStatus === 'error' ? THEME.dangerLight : THEME.cardAlt,
+              color: saveStatus === 'error' ? THEME.dangerDark : (saveStatus === 'saving' ? THEME.textSub : THEME.primary),
+            }}>
+              {saveStatus === 'saving' ? '저장 중…'
+                : saveStatus === 'saved' ? '✓ 자동 저장됨'
+                : saveStatus === 'error' ? '저장 실패 — 잠시 후 다시 시도합니다'
+                : '입력하면 자동으로 저장됩니다'}
+            </div>
+          )}
 
-          <p style={{ fontSize: '10px', color: THEME.textHint, margin: '8px 0 0', textAlign: 'center' }}>
-            칼로리는 입력칸을 떠나면 자동 계산·저장됩니다. 직접 입력 후 비우면 다시 자동 계산됩니다.
-          </p>
+          {!readOnly && (
+            <p style={{ fontSize: '10px', color: THEME.textHint, margin: '8px 0 0', textAlign: 'center' }}>
+              칼로리는 입력칸을 떠나면 자동 계산·저장됩니다. 직접 입력 후 비우면 다시 자동 계산됩니다.
+            </p>
+          )}
         </div>
       )}
 

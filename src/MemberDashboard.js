@@ -4,6 +4,7 @@ import { S, THEME, calcMacro, CYCLE_PHASES, OCCUPATION_MULTIPLIER, OCCUPATION_DE
 import WorkoutLog from './WorkoutLog'
 import WorkoutStats from './WorkoutStats'
 import DietLog from './DietLog'
+import TrainerMediaGallery from './TrainerMediaGallery'
 import HelpModal from './HelpModal'
 import InbodyModal from './InbodyModal'
 import NotificationBell from './NotificationBell'
@@ -122,7 +123,12 @@ export default function MemberDashboard({ user, onLogout }) {
   const [mainTab, setMainTab] = useState('workout')
   const [workoutSubTab, setWorkoutSubTab] = useState('log')
   const [dietSubTab, setDietSubTab] = useState('log')
-  const [trainerSubTab, setTrainerSubTab] = useState('workout') // 트레이너 보기: 운동 / 식단
+  const [trainerSubTab, setTrainerSubTab] = useState('workout') // 트레이너 보기: 운동 / 식단 / 미디어
+  const [trainerWorkoutMode, setTrainerWorkoutMode] = useState('log') // 운동 → 기록 / 통계
+  const [trainerDietMode, setTrainerDietMode] = useState('log')       // 식단 → 기록 / 통계
+  // 트레이너 보기 → 운동 기록 보기용 selectedDate (회원 본인 selectedDate 와 분리)
+  const [trainerViewDate, setTrainerViewDate] = useState(new Date().toISOString().split('T')[0])
+  const [trainerExercises, setTrainerExercises] = useState([])
 
   // 핸드폰 뒤로가기 → 직전 탭으로 복귀 (운동 ↔ 식단 ↔ 트레이너, 기록 ↔ 통계)
   useTabHistory({
@@ -130,13 +136,15 @@ export default function MemberDashboard({ user, onLogout }) {
     workoutSubTab: [workoutSubTab, setWorkoutSubTab],
     dietSubTab: [dietSubTab, setDietSubTab],
     trainerSubTab: [trainerSubTab, setTrainerSubTab],
+    trainerWorkoutMode: [trainerWorkoutMode, setTrainerWorkoutMode],
+    trainerDietMode: [trainerDietMode, setTrainerDietMode],
   })
 
   // 담당 트레이너의 운동 기록 (회원이 참고용으로 열람)
   const [trainerLogs, setTrainerLogs] = useState([])
   // 담당 트레이너의 체성분/목표 — DietLog 소비 계산용
   const [trainerProfile, setTrainerProfile] = useState({
-    weight: '', muscle: '', occupation: '',
+    weight: '', muscle: '', bodyFat: '', occupation: '',
     macroResult: null, goal: '다이어트', intensity: '일반',
   })
 
@@ -168,6 +176,7 @@ export default function MemberDashboard({ user, onLogout }) {
   const [gender, setGender] = useState(() => localStorage.getItem(`macro_gender_${user.id}`) || user.gender || '여성')
   const [weight, setWeight] = useState(() => localStorage.getItem(`macro_weight_${user.id}`) || '')
   const [muscle, setMuscle] = useState(() => localStorage.getItem(`macro_muscle_${user.id}`) || '')
+  const [bodyFat, setBodyFat] = useState(() => localStorage.getItem(`macro_body_fat_${user.id}`) || '')
   const [activity, setActivity] = useState(() => localStorage.getItem(`macro_activity_${user.id}`) || '보통 운동 (주 4~5회)')
   const [intensity, setIntensity] = useState(() => localStorage.getItem(`macro_intensity_${user.id}`) || '일반')
   const [cyclePhase, setCyclePhase] = useState(() => localStorage.getItem(`macro_cycle_${user.id}`) || '')
@@ -240,7 +249,7 @@ export default function MemberDashboard({ user, onLogout }) {
   const loadMacroFromDB = async () => {
     const { data, error } = await supabase
       .from('members')
-      .select('goal, gender, target_calories, target_carbs, target_protein, target_fat, macro_weight, macro_muscle, macro_activity, macro_intensity, macro_cycle, macro_occupation')
+      .select('goal, gender, target_calories, target_carbs, target_protein, target_fat, macro_weight, macro_muscle, macro_body_fat, macro_activity, macro_intensity, macro_cycle, macro_occupation')
       .eq('id', user.id)
       .single()
 
@@ -265,6 +274,7 @@ export default function MemberDashboard({ user, onLogout }) {
     if (data.gender) setGender(data.gender)
     if (data.macro_weight) setWeight(String(data.macro_weight))
     if (data.macro_muscle) setMuscle(String(data.macro_muscle))
+    if (data.macro_body_fat != null) setBodyFat(String(data.macro_body_fat))
     if (data.macro_activity) setActivity(data.macro_activity)
     if (data.macro_intensity) setIntensity(data.macro_intensity)
     if (data.macro_cycle) setCyclePhase(data.macro_cycle)
@@ -288,6 +298,7 @@ export default function MemberDashboard({ user, onLogout }) {
       payload.gender = inputs.gender
       payload.macro_weight = parseFloat(inputs.weight) || null
       payload.macro_muscle = parseFloat(inputs.muscle) || null
+      payload.macro_body_fat = parseFloat(inputs.bodyFat) || null
       payload.macro_activity = inputs.activity
       payload.macro_intensity = inputs.intensity
       payload.macro_cycle = inputs.cyclePhase || null
@@ -324,7 +335,7 @@ export default function MemberDashboard({ user, onLogout }) {
     if (!user.trainer_id) return
     const { data, error } = await supabase
       .from('trainers')
-      .select('goal, macro_weight, macro_muscle, macro_occupation, macro_intensity, target_calories, target_carbs, target_protein, target_fat')
+      .select('goal, macro_weight, macro_muscle, macro_body_fat, macro_occupation, macro_intensity, target_calories, target_carbs, target_protein, target_fat')
       .eq('id', user.trainer_id)
       .maybeSingle()
     if (error) { console.error('[MemberDashboard] loadTrainerProfile error:', error); return }
@@ -332,6 +343,7 @@ export default function MemberDashboard({ user, onLogout }) {
     setTrainerProfile({
       weight: data.macro_weight != null ? String(data.macro_weight) : '',
       muscle: data.macro_muscle != null ? String(data.macro_muscle) : '',
+      bodyFat: data.macro_body_fat != null ? String(data.macro_body_fat) : '',
       occupation: data.macro_occupation || '',
       goal: data.goal || '다이어트',
       intensity: data.macro_intensity || '일반',
@@ -357,7 +369,7 @@ export default function MemberDashboard({ user, onLogout }) {
     if (!weight || !muscle) { alert('체중과 골격근량을 입력해주세요.'); return }
     if (!occupation) { alert('직업 활동량을 선택해주세요.'); return }
     const result = calcMacro({ goal, gender, weight: parseFloat(weight), muscle: parseFloat(muscle), activity, intensity, cyclePhase, occupation })
-    const ok = await saveMacroToDB(result, { goal, gender, weight, muscle, activity, intensity, cyclePhase, occupation })
+    const ok = await saveMacroToDB(result, { goal, gender, weight, muscle, bodyFat, activity, intensity, cyclePhase, occupation })
     if (!ok) return
     setMacroResult(result)
     setHasOccupation(true)
@@ -366,6 +378,8 @@ export default function MemberDashboard({ user, onLogout }) {
     localStorage.setItem(`macro_gender_${user.id}`, gender)
     localStorage.setItem(`macro_weight_${user.id}`, weight)
     localStorage.setItem(`macro_muscle_${user.id}`, muscle)
+    if (bodyFat) localStorage.setItem(`macro_body_fat_${user.id}`, bodyFat)
+    else localStorage.removeItem(`macro_body_fat_${user.id}`)
     localStorage.setItem(`macro_activity_${user.id}`, activity)
     localStorage.setItem(`macro_intensity_${user.id}`, intensity)
     localStorage.setItem(`macro_cycle_${user.id}`, cyclePhase)
@@ -711,6 +725,7 @@ export default function MemberDashboard({ user, onLogout }) {
                 <input style={{ ...S.input, padding: '10px', fontSize: '13px' }} type="number" placeholder="체중 (kg)" value={weight} onChange={e => setWeight(e.target.value)} />
                 <input style={{ ...S.input, padding: '10px', fontSize: '13px' }} type="number" placeholder="골격근량 (kg)" value={muscle} onChange={e => setMuscle(e.target.value)} />
               </div>
+              <input style={{ ...S.input, padding: '10px', fontSize: '13px', marginBottom: '8px' }} type="number" step="0.1" placeholder="체지방률 (%) — 선택 (입력하면 기초대사 계산이 더 정확해져요)" value={bodyFat} onChange={e => setBodyFat(e.target.value)} />
               <select style={{ ...S.input, padding: '10px', marginBottom: '8px', fontSize: '13px' }} value={activity} onChange={e => setActivity(e.target.value)}>
                 <option value="가벼운 운동 (주 2~3회)">가벼운 운동 (주 2~3회)</option>
                 <option value="보통 운동 (주 4~5회)">보통 운동 (주 4~5회)</option>
@@ -890,7 +905,7 @@ export default function MemberDashboard({ user, onLogout }) {
         {mainTab === 'diet' && (
           <>
             <SubTabs value={dietSubTab} onChange={setDietSubTab} />
-            <DietLog user={user} onDietUpdate={loadTodayDiet} weight={weight} muscle={muscle} occupation={occupation} forcedTab={dietSubTab} macroResult={macroResult} goal={goal} intensity={intensity} ptIsZero={ptIsZero} />
+            <DietLog user={user} onDietUpdate={loadTodayDiet} weight={weight} muscle={muscle} bodyFat={bodyFat} occupation={occupation} forcedTab={dietSubTab} macroResult={macroResult} goal={goal} intensity={intensity} ptIsZero={ptIsZero} />
           </>
         )}
 
@@ -902,10 +917,12 @@ export default function MemberDashboard({ user, onLogout }) {
               </div>
             ) : (
               <>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px', marginBottom: '12px', background: THEME.borderLight, padding: '4px', borderRadius: '12px' }}>
+                {/* 운동 / 식단 / 미디어 */}
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '4px', marginBottom: '12px', background: THEME.borderLight, padding: '4px', borderRadius: '12px' }}>
                   {[
                     { key: 'workout', label: '운동' },
                     { key: 'diet', label: '식단' },
+                    { key: 'media', label: '미디어' },
                   ].map(({ key, label }) => {
                     const active = trainerSubTab === key
                     return (
@@ -932,24 +949,81 @@ export default function MemberDashboard({ user, onLogout }) {
                 </div>
 
                 {trainerSubTab === 'workout' && (
-                  <WorkoutStats allLogs={trainerLogs} memberId={null} />
+                  <>
+                    {/* 기록 / 통계 sub-sub-tab */}
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px', marginBottom: '10px' }}>
+                      {[{ k: 'log', l: '기록' }, { k: 'stats', l: '통계' }].map(({ k, l }) => {
+                        const active = trainerWorkoutMode === k
+                        return (
+                          <button key={k} onClick={() => setTrainerWorkoutMode(k)} style={{
+                            background: active ? THEME.primaryAccent : '#FFF',
+                            color: active ? THEME.primaryDark : THEME.textSub,
+                            border: 'none', borderRadius: '10px', padding: '7px',
+                            fontSize: '11px', fontWeight: active ? '500' : '400', cursor: 'pointer',
+                          }}>{l}</button>
+                        )
+                      })}
+                    </div>
+                    {trainerWorkoutMode === 'log' && (
+                      <WorkoutLog
+                        user={{ ...user, id: user.trainer_id }}
+                        selectedDate={trainerViewDate}
+                        setSelectedDate={setTrainerViewDate}
+                        exercises={trainerExercises}
+                        setExercises={setTrainerExercises}
+                        onUpdate={() => {}}
+                        tableOverride="trainer_workout_logs"
+                        trainerIdField="trainer_id"
+                        weight={trainerProfile.weight}
+                        muscle={trainerProfile.muscle}
+                        allLogs={trainerLogs}
+                        favorites={[]}
+                        onFavoritesUpdate={() => {}}
+                        readOnly
+                      />
+                    )}
+                    {trainerWorkoutMode === 'stats' && (
+                      <WorkoutStats allLogs={trainerLogs} memberId={null} />
+                    )}
+                  </>
                 )}
 
                 {trainerSubTab === 'diet' && (
-                  <DietLog
-                    user={{ ...user, id: user.trainer_id }}
-                    tableOverride="trainer_diet_logs"
-                    trainerIdField="trainer_id"
-                    workoutTable="trainer_workout_logs"
-                    workoutIdField="trainer_id"
-                    forcedTab="stats"
-                    weight={trainerProfile.weight}
-                    muscle={trainerProfile.muscle}
-                    occupation={trainerProfile.occupation}
-                    macroResult={trainerProfile.macroResult}
-                    goal={trainerProfile.goal}
-                    intensity={trainerProfile.intensity}
-                  />
+                  <>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px', marginBottom: '10px' }}>
+                      {[{ k: 'log', l: '기록' }, { k: 'stats', l: '통계' }].map(({ k, l }) => {
+                        const active = trainerDietMode === k
+                        return (
+                          <button key={k} onClick={() => setTrainerDietMode(k)} style={{
+                            background: active ? THEME.primaryAccent : '#FFF',
+                            color: active ? THEME.primaryDark : THEME.textSub,
+                            border: 'none', borderRadius: '10px', padding: '7px',
+                            fontSize: '11px', fontWeight: active ? '500' : '400', cursor: 'pointer',
+                          }}>{l}</button>
+                        )
+                      })}
+                    </div>
+                    <DietLog
+                      user={{ ...user, id: user.trainer_id }}
+                      tableOverride="trainer_diet_logs"
+                      trainerIdField="trainer_id"
+                      workoutTable="trainer_workout_logs"
+                      workoutIdField="trainer_id"
+                      forcedTab={trainerDietMode}
+                      weight={trainerProfile.weight}
+                      muscle={trainerProfile.muscle}
+                      bodyFat={trainerProfile.bodyFat}
+                      occupation={trainerProfile.occupation}
+                      macroResult={trainerProfile.macroResult}
+                      goal={trainerProfile.goal}
+                      intensity={trainerProfile.intensity}
+                      readOnly
+                    />
+                  </>
+                )}
+
+                {trainerSubTab === 'media' && (
+                  <TrainerMediaGallery trainerId={user.trainer_id} />
                 )}
               </>
             )}

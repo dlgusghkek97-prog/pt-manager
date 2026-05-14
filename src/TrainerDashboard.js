@@ -331,6 +331,7 @@ export default function TrainerDashboard({ user, onLogout }) {
   const [memberGender, setMemberGender] = useState('여성')
   const [memberWeight, setMemberWeight] = useState('')
   const [memberMuscle, setMemberMuscle] = useState('')
+  const [memberBodyFat, setMemberBodyFat] = useState('')
   const [memberActivity, setMemberActivity] = useState('보통 운동 (주 4~5회)')
   const [memberIntensity, setMemberIntensity] = useState('일반')
   const [memberCyclePhase, setMemberCyclePhase] = useState('')
@@ -411,6 +412,7 @@ export default function TrainerDashboard({ user, onLogout }) {
   const [gender, setGender] = useState(() => localStorage.getItem(`tmacro_gender_${user.id}`) || '남성')
   const [weight, setWeight] = useState(() => localStorage.getItem(`tmacro_weight_${user.id}`) || '')
   const [muscle, setMuscle] = useState(() => localStorage.getItem(`tmacro_muscle_${user.id}`) || '')
+  const [bodyFat, setBodyFat] = useState(() => localStorage.getItem(`tmacro_body_fat_${user.id}`) || '')
   const [activity, setActivity] = useState(() => localStorage.getItem(`tmacro_activity_${user.id}`) || '보통 운동 (주 4~5회)')
   const [intensity, setIntensity] = useState(() => localStorage.getItem(`tmacro_intensity_${user.id}`) || '일반')
   const [cyclePhase, setCyclePhase] = useState(() => localStorage.getItem(`tmacro_cycle_${user.id}`) || '')
@@ -481,7 +483,7 @@ export default function TrainerDashboard({ user, onLogout }) {
     setTrainerTodayDiet(data || [])
   }
 
-  const saveTrainerMacro = async (macro, withOccupation = null) => {
+  const saveTrainerMacro = async (macro, withOccupation = null, withBodyComp = null) => {
     const payload = {
       target_calories: parseInt(macro.target) || 0,
       target_carbs: parseInt(macro.carbs) || 0,
@@ -490,6 +492,11 @@ export default function TrainerDashboard({ user, onLogout }) {
     }
     if (withOccupation !== null) {
       payload.macro_occupation = withOccupation || null
+    }
+    if (withBodyComp) {
+      payload.macro_weight = parseFloat(withBodyComp.weight) || null
+      payload.macro_muscle = parseFloat(withBodyComp.muscle) || null
+      payload.macro_body_fat = parseFloat(withBodyComp.bodyFat) || null
     }
     const { error } = await supabase
       .from('trainers')
@@ -503,7 +510,7 @@ export default function TrainerDashboard({ user, onLogout }) {
     if (!weight || !muscle) { alert('체중과 골격근량을 입력해주세요.'); return }
     if (!occupation) { alert('직업 활동량을 선택해주세요.'); return }
     const result = calcMacro({ goal, gender, weight: parseFloat(weight), muscle: parseFloat(muscle), activity, intensity, cyclePhase, occupation })
-    const ok = await saveTrainerMacro(result, occupation)
+    const ok = await saveTrainerMacro(result, occupation, { weight, muscle, bodyFat })
     if (!ok) return
     setTrainerMacro(result)
     setTrainerHasOccupation(true)
@@ -511,6 +518,8 @@ export default function TrainerDashboard({ user, onLogout }) {
     localStorage.setItem(`tmacro_gender_${user.id}`, gender)
     localStorage.setItem(`tmacro_weight_${user.id}`, weight)
     localStorage.setItem(`tmacro_muscle_${user.id}`, muscle)
+    if (bodyFat) localStorage.setItem(`tmacro_body_fat_${user.id}`, bodyFat)
+    else localStorage.removeItem(`tmacro_body_fat_${user.id}`)
     localStorage.setItem(`tmacro_activity_${user.id}`, activity)
     localStorage.setItem(`tmacro_intensity_${user.id}`, intensity)
     localStorage.setItem(`tmacro_cycle_${user.id}`, cyclePhase)
@@ -548,7 +557,7 @@ export default function TrainerDashboard({ user, onLogout }) {
   const loadMemberMacroFromDB = async (memberId) => {
     const { data, error } = await supabase
       .from('members')
-      .select('goal, gender, target_calories, target_carbs, target_protein, target_fat, macro_weight, macro_muscle, macro_activity, macro_intensity, macro_cycle, macro_occupation')
+      .select('goal, gender, target_calories, target_carbs, target_protein, target_fat, macro_weight, macro_muscle, macro_body_fat, macro_activity, macro_intensity, macro_cycle, macro_occupation')
       .eq('id', memberId)
       .single()
 
@@ -571,6 +580,7 @@ export default function TrainerDashboard({ user, onLogout }) {
       gender: data.gender || '여성',
       weight: data.macro_weight ? String(data.macro_weight) : '',
       muscle: data.macro_muscle ? String(data.macro_muscle) : '',
+      bodyFat: data.macro_body_fat != null ? String(data.macro_body_fat) : '',
       activity: data.macro_activity || '보통 운동 (주 4~5회)',
       intensity: data.macro_intensity || '일반',
       cyclePhase: data.macro_cycle || '',
@@ -605,6 +615,7 @@ export default function TrainerDashboard({ user, onLogout }) {
         gender: inputs.gender,
         macro_weight: parseFloat(inputs.weight) || null,
         macro_muscle: parseFloat(inputs.muscle) || null,
+        macro_body_fat: parseFloat(inputs.bodyFat) || null,
         macro_activity: inputs.activity,
         macro_intensity: inputs.intensity,
         macro_cycle: inputs.cyclePhase || null,
@@ -634,6 +645,7 @@ export default function TrainerDashboard({ user, onLogout }) {
       gender: memberGender,
       weight: memberWeight,
       muscle: memberMuscle,
+      bodyFat: memberBodyFat,
       activity: memberActivity,
       intensity: memberIntensity,
       cyclePhase: memberCyclePhase,
@@ -822,6 +834,7 @@ export default function TrainerDashboard({ user, onLogout }) {
       setMemberGender(memData.gender)
       setMemberWeight(memData.weight)
       setMemberMuscle(memData.muscle)
+      setMemberBodyFat(memData.bodyFat || '')
       setMemberActivity(memData.activity)
       setMemberIntensity(memData.intensity)
       setMemberCyclePhase(memData.cyclePhase)
@@ -1552,6 +1565,7 @@ export default function TrainerDashboard({ user, onLogout }) {
                 </select>
                 <input style={{ ...S.input, padding: '10px', fontSize: '13px' }} type="number" placeholder="체중 (kg)" value={weight} onChange={e => setWeight(e.target.value)} />
                 <input style={{ ...S.input, padding: '10px', fontSize: '13px' }} type="number" placeholder="골격근량 (kg)" value={muscle} onChange={e => setMuscle(e.target.value)} />
+                <input style={{ ...S.input, padding: '10px', fontSize: '13px', gridColumn: '1 / -1' }} type="number" step="0.1" placeholder="체지방률 (%) — 선택 (입력하면 기초대사 계산이 더 정확)" value={bodyFat} onChange={e => setBodyFat(e.target.value)} />
               </div>
               <select style={{ ...S.input, padding: '10px', marginBottom: '8px', fontSize: '13px' }} value={activity} onChange={e => setActivity(e.target.value)}>
                 <option value="가벼운 운동 (주 2~3회)">가벼운 운동 (주 2~3회)</option>
@@ -1622,6 +1636,7 @@ export default function TrainerDashboard({ user, onLogout }) {
                 </select>
                 <input style={{ ...S.input, padding: '10px', fontSize: '13px' }} type="number" placeholder="체중 (kg)" value={memberWeight} onChange={e => setMemberWeight(e.target.value)} />
                 <input style={{ ...S.input, padding: '10px', fontSize: '13px' }} type="number" placeholder="골격근량 (kg)" value={memberMuscle} onChange={e => setMemberMuscle(e.target.value)} />
+                <input style={{ ...S.input, padding: '10px', fontSize: '13px', gridColumn: '1 / -1' }} type="number" step="0.1" placeholder="체지방률 (%) — 선택 (입력하면 기초대사 계산이 더 정확)" value={memberBodyFat} onChange={e => setMemberBodyFat(e.target.value)} />
               </div>
               <select style={{ ...S.input, padding: '10px', marginBottom: '8px', fontSize: '13px' }} value={memberActivity} onChange={e => setMemberActivity(e.target.value)}>
                 <option value="가벼운 운동 (주 2~3회)">가벼운 운동 (주 2~3회)</option>
@@ -1853,7 +1868,7 @@ export default function TrainerDashboard({ user, onLogout }) {
             {trainerMainTab === 'diet' && (
               <>
                 <SubTabs value={trainerSubTab} onChange={setTrainerSubTab} />
-                <DietLog user={trainerAsUser} onDietUpdate={loadTrainerTodayDiet} tableOverride="trainer_diet_logs" trainerIdField="trainer_id" weight={weight} muscle={muscle} occupation={occupation} workoutTable="trainer_workout_logs" workoutIdField="trainer_id" forcedTab={trainerSubTab} macroResult={trainerMacro} goal={goal} intensity={intensity} />
+                <DietLog user={trainerAsUser} onDietUpdate={loadTrainerTodayDiet} tableOverride="trainer_diet_logs" trainerIdField="trainer_id" weight={weight} muscle={muscle} bodyFat={bodyFat} occupation={occupation} workoutTable="trainer_workout_logs" workoutIdField="trainer_id" forcedTab={trainerSubTab} macroResult={trainerMacro} goal={goal} intensity={intensity} />
               </>
             )}
           </>
@@ -1950,7 +1965,7 @@ export default function TrainerDashboard({ user, onLogout }) {
             {memberMainTab === 'diet' && (
               <>
                 <SubTabs value={memberSubTab} onChange={setMemberSubTab} />
-                <DietLog user={selectedMember} onDietUpdate={() => loadMemberTodayDiet(selectedMember.id)} weight={memberWeight} muscle={memberMuscle} occupation={memberOccupation} forcedTab={memberSubTab} macroResult={memberMacro} goal={memberGoal} intensity={memberIntensity} ptIsZero={(() => { const r = calcPtRemaining(selectedMember); return r.hasNoPt || r.remaining <= 0 })()} />
+                <DietLog user={selectedMember} onDietUpdate={() => loadMemberTodayDiet(selectedMember.id)} weight={memberWeight} muscle={memberMuscle} bodyFat={memberBodyFat} occupation={memberOccupation} forcedTab={memberSubTab} macroResult={memberMacro} goal={memberGoal} intensity={memberIntensity} ptIsZero={(() => { const r = calcPtRemaining(selectedMember); return r.hasNoPt || r.remaining <= 0 })()} />
               </>
             )}
           </>

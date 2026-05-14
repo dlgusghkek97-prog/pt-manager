@@ -25,7 +25,7 @@ const TimerIcon = ({ color = '#FFF', size = 22 }) => (
   </svg>
 )
 
-export default function WorkoutLog({ user, selectedDate, setSelectedDate, exercises, setExercises, onUpdate, tableOverride, trainerIdField, weight, muscle, allLogs, favorites, onFavoritesUpdate, ptIsZero = false }) {
+export default function WorkoutLog({ user, selectedDate, setSelectedDate, exercises, setExercises, onUpdate, tableOverride, trainerIdField, weight, muscle, allLogs, favorites, onFavoritesUpdate, ptIsZero = false, readOnly = false }) {
   const TABLE = tableOverride || 'workout_logs'
   const ID_FIELD = trainerIdField || 'member_id'
   const FAV_TABLE = trainerIdField ? 'trainer_favorite_exercises' : 'member_favorite_exercises'
@@ -255,6 +255,7 @@ export default function WorkoutLog({ user, selectedDate, setSelectedDate, exerci
   // 모든 웨이트 세트를 DB에 반영 (부위·운동명 둘 다 있고, 무게·횟수가 채워진 세트만).
   // 동시 실행 방지 → 같은 세트가 두 번 INSERT 되는 일 차단.
   const persistSets = async () => {
+    if (readOnly) return
     if (savingRef.current) { pendingSaveRef.current = true; return }
     savingRef.current = true
     pendingSaveRef.current = false
@@ -381,6 +382,7 @@ export default function WorkoutLog({ user, selectedDate, setSelectedDate, exerci
   }
 
   const uploadMedia = async (exIdx, file) => {
+    if (readOnly) return
     if (ptIsZero) {
       alert('PT 잔여 횟수가 없어 사진/영상 업로드가 제한됩니다.\n트레이너에게 추가 결제를 문의해주세요.')
       return
@@ -971,6 +973,11 @@ export default function WorkoutLog({ user, selectedDate, setSelectedDate, exerci
 
       <div style={{ ...S.card, paddingBottom: '90px' }}>
         <p style={{ ...S.cardTitle, margin: '0 0 10px' }}>운동 기록</p>
+        {readOnly && (
+          <div style={{ background: THEME.primaryLight, border: `0.5px solid ${THEME.primaryAccent}`, borderRadius: '8px', padding: '7px 10px', marginBottom: '10px', fontSize: '11px', color: THEME.primaryDark }}>
+            참고용 — 편집 불가 (트레이너의 기록)
+          </div>
+        )}
         <div style={{ marginBottom: '14px' }}>
           <DatePicker value={selectedDate} onChange={(d) => { if (dirtyRef.current) persistSets(); setSelectedDate(d) }} />
         </div>
@@ -1116,10 +1123,12 @@ export default function WorkoutLog({ user, selectedDate, setSelectedDate, exerci
                     >−</button>
                   </div>
                 ))}
-                <button
-                  style={{ background: 'transparent', border: `0.5px dashed ${THEME.primaryAccent}`, borderRadius: '6px', padding: '5px', fontSize: '11px', color: THEME.primary, width: '100%', cursor: 'pointer', marginTop: '4px', fontWeight: '500' }}
-                  onClick={() => addSet(realIdx)}
-                >＋ 세트 추가</button>
+                {!readOnly && (
+                  <button
+                    style={{ background: 'transparent', border: `0.5px dashed ${THEME.primaryAccent}`, borderRadius: '6px', padding: '5px', fontSize: '11px', color: THEME.primary, width: '100%', cursor: 'pointer', marginTop: '4px', fontWeight: '500' }}
+                    onClick={() => addSet(realIdx)}
+                  >＋ 세트 추가</button>
+                )}
               </div>
 
               <div style={{ borderTop: `0.5px solid ${THEME.border}`, marginTop: '10px', paddingTop: '10px' }}>
@@ -1180,7 +1189,7 @@ export default function WorkoutLog({ user, selectedDate, setSelectedDate, exerci
           )
         })}
 
-        <button style={S.addExBtn} onClick={addExercise}>＋ 종목 추가</button>
+        {!readOnly && <button style={S.addExBtn} onClick={addExercise}>＋ 종목 추가</button>}
         <div style={{
           display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px',
           marginTop: '12px', padding: '12px', borderRadius: '8px', fontSize: '12px', fontWeight: '500',

@@ -74,30 +74,40 @@ export function calcWeightCalories({ volume = 0, totalSets = 0, weight, muscle }
   return Math.round(metKcal + volumeKcal)
 }
 
-// 일일 소비 분해 — { bmr, neat, weight, cardio, total } 또는 null
-// 식단 통계의 '소비' 표에서 항목별 비율 표시용
-export const calcDailyBurnBreakdown = ({ muscle, occupation, weightCal = 0, cardioCal = 0 }) => {
-  const m = parseFloat(muscle) || 0
-  if (m <= 0) return null
-  const leanMass = m * 1.4
-  const bmr = Math.round(370 + 21.6 * leanMass)
-  const occMult = OCCUPATION_MULTIPLIER[occupation] || 1.0
-  const neat = Math.round(bmr * (occMult - 1.0))
-  const weight = Math.round(weightCal || 0)
-  const cardio = Math.round(cardioCal || 0)
-  return { bmr, neat, weight, cardio, total: bmr + neat + weight + cardio }
+// LBM (제지방량) 추산 — bodyFat·weight 가 있으면 그게 더 정확.
+// 없으면 골격근량 × 1.4 fallback. 둘 다 없으면 0.
+const estimateLBM = ({ weight, bodyFat, muscle }) => {
+  const bf = parseFloat(bodyFat)
+  const w = parseFloat(weight)
+  if (!isNaN(bf) && bf > 0 && bf < 100 && !isNaN(w) && w > 0) {
+    return w * (1 - bf / 100)
+  }
+  const m = parseFloat(muscle)
+  if (!isNaN(m) && m > 0) return m * 1.4
+  return 0
 }
 
-export const calcDailyBurn = ({ muscle, occupation, weightCal = 0, cardioCal = 0 }) => {
-  const m = parseFloat(muscle) || 0
-  if (m <= 0) return null
-
-  const leanMass = m * 1.4
+// 일일 소비 분해 — { bmr, neat, weight, cardio, total } 또는 null
+// 식단 통계의 '소비' 표에서 항목별 비율 표시용
+// Katch-McArdle: BMR = 370 + 21.6 × LBM
+//   LBM 은 (weight, bodyFat) 우선 → 없으면 muscle × 1.4 fallback.
+export const calcDailyBurnBreakdown = ({ muscle, occupation, weight, bodyFat, weightCal = 0, cardioCal = 0 }) => {
+  const leanMass = estimateLBM({ weight, bodyFat, muscle })
+  if (leanMass <= 0) return null
   const bmr = Math.round(370 + 21.6 * leanMass)
-
   const occMult = OCCUPATION_MULTIPLIER[occupation] || 1.0
   const neat = Math.round(bmr * (occMult - 1.0))
+  const w = Math.round(weightCal || 0)
+  const cardio = Math.round(cardioCal || 0)
+  return { bmr, neat, weight: w, cardio, total: bmr + neat + w + cardio }
+}
 
+export const calcDailyBurn = ({ muscle, occupation, weight, bodyFat, weightCal = 0, cardioCal = 0 }) => {
+  const leanMass = estimateLBM({ weight, bodyFat, muscle })
+  if (leanMass <= 0) return null
+  const bmr = Math.round(370 + 21.6 * leanMass)
+  const occMult = OCCUPATION_MULTIPLIER[occupation] || 1.0
+  const neat = Math.round(bmr * (occMult - 1.0))
   return bmr + neat + (weightCal || 0) + (cardioCal || 0)
 }
 
