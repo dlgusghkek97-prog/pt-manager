@@ -122,13 +122,18 @@ export default function MemberDashboard({ user, onLogout }) {
   const [mainTab, setMainTab] = useState('workout')
   const [workoutSubTab, setWorkoutSubTab] = useState('log')
   const [dietSubTab, setDietSubTab] = useState('log')
+  const [trainerSubTab, setTrainerSubTab] = useState('workout') // 트레이너 보기: 운동 / 식단
 
-  // 핸드폰 뒤로가기 → 직전 탭으로 복귀 (운동 ↔ 식단, 기록 ↔ 통계)
+  // 핸드폰 뒤로가기 → 직전 탭으로 복귀 (운동 ↔ 식단 ↔ 트레이너, 기록 ↔ 통계)
   useTabHistory({
     mainTab: [mainTab, setMainTab],
     workoutSubTab: [workoutSubTab, setWorkoutSubTab],
     dietSubTab: [dietSubTab, setDietSubTab],
+    trainerSubTab: [trainerSubTab, setTrainerSubTab],
   })
+
+  // 담당 트레이너의 운동 기록 (회원이 참고용으로 열람)
+  const [trainerLogs, setTrainerLogs] = useState([])
 
   const [exercises, setExercises] = useState([{ slot: 1, exercise_type: 'weight', body_part: '', exercise_name: '', memo: '', description: '', sets: [{ id: null, weight: '', reps: '', media_url: '' }] }])
   const [allLogs, setAllLogs] = useState([])
@@ -178,6 +183,7 @@ export default function MemberDashboard({ user, onLogout }) {
     loadAllFavorites()
     refreshMemberInfo()
     loadTrainerName()
+    loadTrainerWorkoutLogs()
 
     // 푸시 알림 안내 모달 (2초 뒤 — 화면 렌더 안정화 후)
     const timer = setTimeout(async () => {
@@ -293,6 +299,18 @@ export default function MemberDashboard({ user, onLogout }) {
   const loadAllLogs = async () => {
     const { data } = await supabase.from('workout_logs').select('*').eq('member_id', user.id).order('log_date')
     if (data) setAllLogs(data)
+  }
+
+  // 담당 트레이너의 운동 기록 — 회원이 참고용으로 열람 (RLS: is_my_trainer 정책)
+  const loadTrainerWorkoutLogs = async () => {
+    if (!user.trainer_id) return
+    const { data, error } = await supabase
+      .from('trainer_workout_logs')
+      .select('*')
+      .eq('trainer_id', user.trainer_id)
+      .order('log_date')
+    if (error) { console.error('[MemberDashboard] loadTrainerWorkoutLogs error:', error); return }
+    setTrainerLogs(data || [])
   }
 
   const loadTodayDiet = async () => {
@@ -809,9 +827,10 @@ export default function MemberDashboard({ user, onLogout }) {
           </div>
         )}
 
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px', marginBottom: '10px' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '6px', marginBottom: '10px' }}>
           <MainTabBtn tabKey="workout" label="운동" />
           <MainTabBtn tabKey="diet" label="식단" />
+          <MainTabBtn tabKey="trainer" label={`${trainerName} 보기`} />
         </div>
 
         {mainTab === 'workout' && (
@@ -826,6 +845,62 @@ export default function MemberDashboard({ user, onLogout }) {
           <>
             <SubTabs value={dietSubTab} onChange={setDietSubTab} />
             <DietLog user={user} onDietUpdate={loadTodayDiet} weight={weight} muscle={muscle} occupation={occupation} forcedTab={dietSubTab} macroResult={macroResult} goal={goal} intensity={intensity} ptIsZero={ptIsZero} />
+          </>
+        )}
+
+        {mainTab === 'trainer' && (
+          <>
+            {!user.trainer_id ? (
+              <div style={{ ...S.card, textAlign: 'center', color: THEME.textSub, fontSize: '12px', padding: '20px' }}>
+                담당 트레이너가 아직 연결되지 않았습니다.
+              </div>
+            ) : (
+              <>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px', marginBottom: '12px', background: THEME.borderLight, padding: '4px', borderRadius: '12px' }}>
+                  {[
+                    { key: 'workout', label: '운동' },
+                    { key: 'diet', label: '식단' },
+                  ].map(({ key, label }) => {
+                    const active = trainerSubTab === key
+                    return (
+                      <button
+                        key={key}
+                        onClick={() => setTrainerSubTab(key)}
+                        style={{
+                          background: active ? '#FFF' : 'transparent',
+                          color: active ? THEME.primaryDark : THEME.textSub,
+                          border: 'none',
+                          borderRadius: '10px',
+                          padding: '8px',
+                          fontSize: '12px',
+                          fontWeight: active ? '500' : '400',
+                          cursor: 'pointer',
+                        }}
+                      >{label}</button>
+                    )
+                  })}
+                </div>
+
+                <div style={{ background: THEME.primaryLight, borderRadius: '10px', padding: '8px 12px', marginBottom: '10px', fontSize: '11px', color: THEME.primaryDark }}>
+                  {trainerName} 트레이너의 기록 — 참고용 (편집 불가)
+                </div>
+
+                {trainerSubTab === 'workout' && (
+                  <WorkoutStats allLogs={trainerLogs} memberId={null} />
+                )}
+
+                {trainerSubTab === 'diet' && (
+                  <DietLog
+                    user={{ ...user, id: user.trainer_id }}
+                    tableOverride="trainer_diet_logs"
+                    trainerIdField="trainer_id"
+                    workoutTable="trainer_workout_logs"
+                    workoutIdField="trainer_id"
+                    forcedTab="stats"
+                  />
+                )}
+              </>
+            )}
           </>
         )}
 
