@@ -83,6 +83,14 @@ export default function WorkoutLog({ user, selectedDate, setSelectedDate, exerci
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user.id, selectedDate])
 
+  // unmount 시 미실행 retry timer 정리 — 탭 전환·언로드 후 잔존 호출 방지
+  useEffect(() => () => {
+    if (retryTimerRef.current) {
+      clearTimeout(retryTimerRef.current)
+      retryTimerRef.current = null
+    }
+  }, [])
+
   useEffect(() => {
     if (timerActive && !timerPaused && timerSeconds > 0) {
       timerIntervalRef.current = setInterval(() => {

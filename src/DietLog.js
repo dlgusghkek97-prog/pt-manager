@@ -7,11 +7,11 @@ import useModalBackButton from './useModalBackButton'
 
 const NUTRIENTS = [
   { key: 'calories', label: '칼로리', unit: 'kcal', color: THEME.nutCalories },
-  { key: 'carbs', label: '탄수화물', unit: 'g', color: THEME.nutCarbs },
-  { key: 'protein', label: '단백질', unit: 'g', color: THEME.nutProtein },
+  { key: 'carbs', label: '탄수', unit: 'g', color: THEME.nutCarbs },
+  { key: 'protein', label: '단백', unit: 'g', color: THEME.nutProtein },
   { key: 'fat', label: '지방', unit: 'g', color: THEME.nutFat },
   { key: 'consumption', label: '소비', unit: 'kcal', color: THEME.danger },
-  { key: 'net', label: '잉여 / 적자', unit: 'kcal', color: THEME.primary },
+  { key: 'net', label: '잉여/적자', unit: 'kcal', color: THEME.primary },
 ]
 
 const COLOR_SURPLUS = THEME.surplus
@@ -208,6 +208,14 @@ export default function DietLog({ user, onDietUpdate, tableOverride, trainerIdFi
 
   useEffect(() => { loadLogs(selectedDate); loadFeedback(selectedDate) }, [selectedDate, user.id])
   useEffect(() => { if (tab === 'stats') loadStatsLogs() }, [tab, statMode, statValue])
+
+  // unmount 시 미실행 retry timer 정리 — 탭 전환·언로드 후 잔존 호출 방지
+  useEffect(() => () => {
+    if (retryTimerRef.current) {
+      clearTimeout(retryTimerRef.current)
+      retryTimerRef.current = null
+    }
+  }, [])
 
   const loadLogs = async (date) => {
     const { data, error } = await supabase
@@ -1191,7 +1199,7 @@ export default function DietLog({ user, onDietUpdate, tableOverride, trainerIdFi
               <NutrientChart nutrientKey={activeNutrient} color={currentNutrient.color} />
             )}
 
-            <div style={{ display: 'grid', gridTemplateColumns: `repeat(${NUTRIENTS.length}, 1fr)`, gap: '4px', marginTop: '10px' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: `repeat(${NUTRIENTS.length}, 1fr)`, gap: '3px', marginTop: '10px' }}>
               {NUTRIENTS.map(n => (
                 <button
                   key={n.key}
@@ -1200,12 +1208,18 @@ export default function DietLog({ user, onDietUpdate, tableOverride, trainerIdFi
                     background: activeNutrient === n.key ? THEME.primaryDark : THEME.borderLight,
                     color: activeNutrient === n.key ? '#FFF' : THEME.textSub,
                     border: 'none',
-                    borderRadius: '14px',
-                    padding: '6px 2px',
-                    fontSize: '10px',
+                    borderRadius: '12px',
+                    padding: '6px 0',
+                    fontSize: '9.5px',
                     fontWeight: activeNutrient === n.key ? '500' : '400',
-                    cursor: 'pointer'
+                    cursor: 'pointer',
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                    whiteSpace: 'nowrap',
+                    minWidth: 0,
+                    letterSpacing: '-0.3px',
                   }}
+                  title={n.label}
                 >{n.label}</button>
               ))}
             </div>

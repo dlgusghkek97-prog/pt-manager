@@ -452,6 +452,8 @@ export default function MemberDashboard({ user, onLogout }) {
 
   const MainTabBtn = ({ tabKey, label }) => {
     const active = mainTab === tabKey
+    // 라벨 길이 안전망: 6자 초과면 폰트 축소
+    const longLabel = (label || '').length > 6
     return (
       <button
         onClick={() => setMainTab(tabKey)}
@@ -460,11 +462,16 @@ export default function MemberDashboard({ user, onLogout }) {
           color: active ? THEME.primaryDark : THEME.textSub,
           border: 'none',
           borderRadius: '14px',
-          padding: '12px',
-          fontSize: '13px',
+          padding: '12px 6px',
+          fontSize: longLabel ? '11px' : '13px',
           fontWeight: active ? '500' : '400',
           cursor: 'pointer',
+          overflow: 'hidden',
+          textOverflow: 'ellipsis',
+          whiteSpace: 'nowrap',
+          minWidth: 0,
         }}
+        title={label}
       >{label}</button>
     )
   }
