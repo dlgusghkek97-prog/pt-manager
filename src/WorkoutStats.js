@@ -6,6 +6,7 @@ export default function WorkoutStats({
   memberId,
   bigPrTable = 'personal_records',
   bigPrIdField = 'member_id',
+  onJumpToLog,  // (dateStr) => void — 캘린더 셀 클릭 시 운동 기록 탭으로 이동
 }) {
   const [statsTab, setStatsTab] = useState('daily')
   const today = new Date()
@@ -255,10 +256,19 @@ export default function WorkoutStats({
                 volColor = THEME.textHint
               }
 
+              const handleCellClick = () => {
+                setSelectedDate(dateStr)
+                if (!onJumpToLog) return
+                const wk = weekdayKor[new Date(dateStr).getDay()]
+                const msg = hasWorkout
+                  ? `${viewMonth}월 ${day}일(${wk}) 운동 기록으로 이동할까요?`
+                  : `${viewMonth}월 ${day}일(${wk}) 은 기록이 없습니다. 그래도 운동 기록 화면으로 이동할까요?`
+                if (window.confirm(msg)) onJumpToLog(dateStr)
+              }
               return (
                 <div
                   key={dateStr}
-                  onClick={() => setSelectedDate(dateStr)}
+                  onClick={handleCellClick}
                   style={{
                     aspectRatio: '1',
                     borderRadius: '8px',

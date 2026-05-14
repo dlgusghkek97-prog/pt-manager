@@ -1305,19 +1305,19 @@ export default function TrainerDashboard({ user, onLogout }) {
               title="도움말"
             >?</button>
             {view === 'members' && topTab === 'myRecord' && (
-              <button onClick={() => setShowCalcModal(true)} style={{ background: '#FFF', border: `0.5px solid ${THEME.border}`, color: THEME.primary, padding: '0 12px', borderRadius: '15px', cursor: 'pointer', fontSize: '11px', fontWeight: '500', height: '30px', display: 'flex', alignItems: 'center', flexShrink: 0 }}>
+              <button onClick={() => setShowCalcModal(true)} style={{ background: '#FFF', border: `0.5px solid ${THEME.border}`, color: THEME.primary, padding: '0 12px', borderRadius: '15px', cursor: 'pointer', fontSize: '11px', fontWeight: '500', height: '30px', display: 'flex', alignItems: 'center', flexShrink: 0, fontFamily: 'inherit' }}>
                 식단 설정
               </button>
             )}
             {view === 'memberDetail' && (
-              <button onClick={() => setShowMemberCalcModal(true)} style={{ background: '#FFF', border: `0.5px solid ${THEME.border}`, color: THEME.primary, padding: '0 12px', borderRadius: '15px', cursor: 'pointer', fontSize: '11px', fontWeight: '500', height: '30px', display: 'flex', alignItems: 'center', flexShrink: 0 }}>
+              <button onClick={() => setShowMemberCalcModal(true)} style={{ background: '#FFF', border: `0.5px solid ${THEME.border}`, color: THEME.primary, padding: '0 12px', borderRadius: '15px', cursor: 'pointer', fontSize: '11px', fontWeight: '500', height: '30px', display: 'flex', alignItems: 'center', flexShrink: 0, fontFamily: 'inherit' }}>
                 식단 설정
               </button>
             )}
             {view !== 'members' && (
-              <button style={{ background: '#FFF', border: `0.5px solid ${THEME.border}`, color: THEME.primary, padding: '0 12px', borderRadius: '15px', cursor: 'pointer', fontSize: '11px', height: '30px', display: 'flex', alignItems: 'center', flexShrink: 0 }} onClick={() => { setView('members'); setSelectedMember(null) }}>← 목록</button>
+              <button style={{ background: '#FFF', border: `0.5px solid ${THEME.border}`, color: THEME.primary, padding: '0 12px', borderRadius: '15px', cursor: 'pointer', fontSize: '11px', fontWeight: '500', height: '30px', display: 'flex', alignItems: 'center', flexShrink: 0, fontFamily: 'inherit' }} onClick={() => { setView('members'); setSelectedMember(null) }}>회원 목록</button>
             )}
-            <button style={{ background: '#FFF', border: `0.5px solid ${THEME.border}`, color: THEME.textSub, padding: '0 12px', borderRadius: '15px', cursor: 'pointer', fontSize: '11px', height: '30px', display: 'flex', alignItems: 'center', flexShrink: 0 }} onClick={onLogout}>로그아웃</button>
+            <button style={{ background: '#FFF', border: `0.5px solid ${THEME.border}`, color: THEME.textSub, padding: '0 12px', borderRadius: '15px', cursor: 'pointer', fontSize: '11px', fontWeight: '500', height: '30px', display: 'flex', alignItems: 'center', flexShrink: 0, fontFamily: 'inherit' }} onClick={onLogout}>로그아웃</button>
           </div>
         </div>
 
@@ -1838,7 +1838,15 @@ export default function TrainerDashboard({ user, onLogout }) {
               <>
                 <SubTabs value={trainerSubTab} onChange={setTrainerSubTab} />
                 {trainerSubTab === 'log' && <WorkoutLog user={trainerAsUser} selectedDate={selectedDate} setSelectedDate={setSelectedDate} exercises={exercises} setExercises={setExercises} onUpdate={loadTrainerLogs} tableOverride="trainer_workout_logs" trainerIdField="trainer_id" weight={weight} muscle={muscle} allLogs={allLogs} favorites={trainerFavorites} onFavoritesUpdate={loadTrainerFavorites} />}
-                {trainerSubTab === 'stats' && <WorkoutStats allLogs={allLogs} memberId={user.id} bigPrTable="trainer_personal_records" bigPrIdField="trainer_id" />}
+                {trainerSubTab === 'stats' && (
+                  <WorkoutStats
+                    allLogs={allLogs}
+                    memberId={user.id}
+                    bigPrTable="trainer_personal_records"
+                    bigPrIdField="trainer_id"
+                    onJumpToLog={(d) => { setSelectedDate(d); setTrainerSubTab('log') }}
+                  />
+                )}
               </>
             )}
 
@@ -1929,7 +1937,13 @@ export default function TrainerDashboard({ user, onLogout }) {
               <>
                 <SubTabs value={memberSubTab} onChange={setMemberSubTab} />
                 {memberSubTab === 'log' && <WorkoutLog user={selectedMember} selectedDate={selectedDate} setSelectedDate={setSelectedDate} exercises={exercises} setExercises={setExercises} onUpdate={async () => { await loadMemberLogs(selectedMember.id) }} weight={memberWeight} muscle={memberMuscle} allLogs={allLogs} favorites={memberFavorites} onFavoritesUpdate={() => loadMemberFavorites(selectedMember.id)} ptIsZero={(() => { const r = calcPtRemaining(selectedMember); return r.hasNoPt || r.remaining <= 0 })()} />}
-                {memberSubTab === 'stats' && <WorkoutStats allLogs={allLogs} memberId={selectedMember.id} />}
+                {memberSubTab === 'stats' && (
+                  <WorkoutStats
+                    allLogs={allLogs}
+                    memberId={selectedMember.id}
+                    onJumpToLog={(d) => { setSelectedDate(d); setMemberSubTab('log') }}
+                  />
+                )}
               </>
             )}
 

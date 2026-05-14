@@ -844,7 +844,13 @@ export default function MemberDashboard({ user, onLogout }) {
           <>
             <SubTabs value={workoutSubTab} onChange={setWorkoutSubTab} />
             {workoutSubTab === 'log' && <WorkoutLog user={user} selectedDate={selectedDate} setSelectedDate={setSelectedDate} exercises={exercises} setExercises={setExercises} onUpdate={loadAllLogs} weight={weight} muscle={muscle} allLogs={allLogs} favorites={favorites} onFavoritesUpdate={loadAllFavorites} ptIsZero={ptIsZero} />}
-            {workoutSubTab === 'stats' && <WorkoutStats allLogs={allLogs} memberId={user.id} />}
+            {workoutSubTab === 'stats' && (
+              <WorkoutStats
+                allLogs={allLogs}
+                memberId={user.id}
+                onJumpToLog={(d) => { setSelectedDate(d); setWorkoutSubTab('log') }}
+              />
+            )}
           </>
         )}
 
