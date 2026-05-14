@@ -4,7 +4,6 @@ import { S, THEME, calcMacro, CYCLE_PHASES, OCCUPATION_MULTIPLIER, OCCUPATION_DE
 import WorkoutLog from './WorkoutLog'
 import WorkoutStats from './WorkoutStats'
 import DietLog from './DietLog'
-import TrainerMediaGallery from './TrainerMediaGallery'
 import HelpModal from './HelpModal'
 import InbodyModal from './InbodyModal'
 import NotificationBell from './NotificationBell'
@@ -917,12 +916,11 @@ export default function MemberDashboard({ user, onLogout }) {
               </div>
             ) : (
               <>
-                {/* 운동 / 식단 / 미디어 */}
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '4px', marginBottom: '12px', background: THEME.borderLight, padding: '4px', borderRadius: '12px' }}>
+                {/* 운동 / 식단 */}
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px', marginBottom: '12px', background: THEME.borderLight, padding: '4px', borderRadius: '12px' }}>
                   {[
                     { key: 'workout', label: '운동' },
                     { key: 'diet', label: '식단' },
-                    { key: 'media', label: '운동영상' },
                   ].map(({ key, label }) => {
                     const active = trainerSubTab === key
                     return (
@@ -1022,9 +1020,6 @@ export default function MemberDashboard({ user, onLogout }) {
                   </>
                 )}
 
-                {trainerSubTab === 'media' && (
-                  <TrainerMediaGallery trainerId={user.trainer_id} />
-                )}
               </>
             )}
           </>
