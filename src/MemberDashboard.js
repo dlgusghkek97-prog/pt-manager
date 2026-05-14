@@ -837,7 +837,7 @@ export default function MemberDashboard({ user, onLogout }) {
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '6px', marginBottom: '10px' }}>
           <MainTabBtn tabKey="workout" label="운동" />
           <MainTabBtn tabKey="diet" label="식단" />
-          <MainTabBtn tabKey="trainer" label={`${trainerName} 보기`} />
+          <MainTabBtn tabKey="trainer" label="내 트레이너" />
         </div>
 
         {mainTab === 'workout' && (

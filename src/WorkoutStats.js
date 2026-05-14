@@ -81,6 +81,20 @@ export default function WorkoutStats({
     if (row.body_part) byDay[row.log_date].parts[row.body_part] = (byDay[row.log_date].parts[row.body_part] || 0) + (row.volume || 0)
   })
 
+  // 부위별 → 그 부위에 운동한 날짜·볼륨 리스트 (이번 달 한정, 최신 순)
+  const byPart = {}
+  PARTS.forEach(p => { byPart[p] = { dates: [], total: 0 } })
+  Object.entries(byDay).forEach(([date, d]) => {
+    Object.entries(d.parts).forEach(([part, vol]) => {
+      if (vol > 0 && byPart[part]) {
+        byPart[part].dates.push({ date, vol })
+        byPart[part].total += vol
+      }
+    })
+  })
+  Object.values(byPart).forEach(p => p.dates.sort((a, b) => b.date.localeCompare(a.date)))
+  const activePartsThisMonth = PARTS.filter(p => byPart[p].total > 0).sort((a, b) => byPart[b].total - byPart[a].total)
+
   const weeklyByPart = Array.from({ length: 5 }, () => { const o = {}; PARTS.forEach(p => o[p] = 0); return o })
   const weeklyTotals = [0, 0, 0, 0, 0]
   monthLogs.forEach(row => {
@@ -129,12 +143,7 @@ export default function WorkoutStats({
   }
   while (calendarCells.length % 7 !== 0) calendarCells.push(null)
 
-  const selectedData = byDay[selectedDate]
-  const selectedDayNum = selectedDate ? parseInt(selectedDate.split('-')[2]) : null
-  const selectedDayWeekday = selectedDate ? new Date(selectedDate).getDay() : null
   const weekdayKor = ['일', '월', '화', '수', '목', '금', '토']
-  const isSelectedToday = selectedDate === todayStr
-  const selectedInView = selectedDate && selectedDate.startsWith(`${yearStr}-${monthStr}`)
 
   const prs = calcPRs(allLogs)
 
@@ -326,82 +335,68 @@ export default function WorkoutStats({
             ))}
           </div>
 
-          {selectedInView && (
-            <div style={{
-              marginTop: '12px',
-              background: THEME.cardAlt,
-              borderRadius: '12px',
-              padding: '12px',
-              border: `0.5px solid ${THEME.border}`,
-            }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: '4px' }}>
-                <span style={{ fontSize: '13px', color: THEME.text, fontWeight: '500' }}>
-                  {viewMonth}월 {selectedDayNum}일 ({weekdayKor[selectedDayWeekday]})
-                  {isSelectedToday && (
-                    <span style={{
-                      fontSize: '9px',
-                      color: THEME.primary,
-                      background: THEME.primaryLight,
-                      padding: '1px 7px',
-                      borderRadius: '8px',
-                      marginLeft: '5px',
-                      fontWeight: '500',
-                    }}>오늘</span>
-                  )}
-                </span>
-                {selectedData && (
-                  <span style={{ fontSize: '15px', color: THEME.primary, fontWeight: '500', letterSpacing: '-0.3px' }}>
-                    {formatVol(selectedData.total)}
-                  </span>
-                )}
-              </div>
-
-              {!selectedData ? (
-                <p style={{ fontSize: '11px', color: THEME.textHint, margin: '8px 0 0', textAlign: 'center' }}>
-                  운동 기록이 없습니다
-                </p>
-              ) : (() => {
-                const activeParts = Object.entries(selectedData.parts).filter(([, v]) => v > 0).sort((a, b) => b[1] - a[1])
-                const maxPartVol = Math.max(...activeParts.map(([, v]) => v), 1)
-                const totalSets = monthLogs.filter(r => r.log_date === selectedDate).length
+          {/* 부위별 → 날짜별 볼륨 리스트 (이번 달) */}
+          {activePartsThisMonth.length === 0 ? (
+            <p style={{ fontSize: '11px', color: THEME.textHint, margin: '14px 0 0', textAlign: 'center' }}>
+              이번 달 운동 기록이 없습니다
+            </p>
+          ) : (
+            <div style={{ marginTop: '12px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              {activePartsThisMonth.map(part => {
+                const { dates, total } = byPart[part]
+                const partMax = Math.max(...dates.map(d => d.vol), 1)
                 return (
-                  <>
-                    <p style={{ fontSize: '10px', color: THEME.textSub, margin: '0 0 10px' }}>
-                      총 {totalSets}세트 · 부위 {activeParts.length}개
-                    </p>
-                    {activeParts.map(([part, vol]) => (
-                      <div key={part} style={{
-                        display: 'grid',
-                        gridTemplateColumns: '50px 1fr 60px',
-                        alignItems: 'center',
-                        gap: '8px',
-                        marginBottom: '5px',
-                      }}>
-                        <span style={{
-                          fontSize: '10px',
-                          color: '#FFF',
-                          background: PART_COLORS[part],
-                          padding: '3px 0',
-                          borderRadius: '5px',
-                          textAlign: 'center',
-                          fontWeight: '500',
-                        }}>{part}</span>
-                        <div style={{ height: '5px', background: '#E8E6DE', borderRadius: '3px', overflow: 'hidden' }}>
-                          <div style={{
-                            height: '100%',
-                            width: `${vol / maxPartVol * 100}%`,
-                            background: PART_COLORS[part],
-                            borderRadius: '3px',
-                          }} />
+                  <div key={part} style={{
+                    background: THEME.cardAlt,
+                    borderRadius: '12px',
+                    padding: '10px 12px',
+                    border: `0.5px solid ${THEME.border}`,
+                  }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: '8px' }}>
+                      <span style={{
+                        fontSize: '11px',
+                        color: '#FFF',
+                        background: PART_COLORS[part],
+                        padding: '3px 10px',
+                        borderRadius: '6px',
+                        fontWeight: '500',
+                      }}>{part}</span>
+                      <span style={{ fontSize: '12px', color: THEME.text, fontWeight: '500', letterSpacing: '-0.3px' }}>
+                        총 {formatVol(total)} · {dates.length}일
+                      </span>
+                    </div>
+                    {dates.map(({ date, vol }) => {
+                      const d = parseInt(date.split('-')[2])
+                      const wk = weekdayKor[new Date(date).getDay()]
+                      const isToday = date === todayStr
+                      return (
+                        <div key={date} style={{
+                          display: 'grid',
+                          gridTemplateColumns: '60px 1fr 70px',
+                          alignItems: 'center',
+                          gap: '8px',
+                          marginBottom: '4px',
+                        }}>
+                          <span style={{ fontSize: '10px', color: isToday ? THEME.primary : THEME.textSub, fontWeight: isToday ? '500' : '400' }}>
+                            {viewMonth}/{d}({wk}){isToday && ' ·오늘'}
+                          </span>
+                          <div style={{ height: '5px', background: '#E8E6DE', borderRadius: '3px', overflow: 'hidden' }}>
+                            <div style={{
+                              height: '100%',
+                              width: `${vol / partMax * 100}%`,
+                              background: PART_COLORS[part],
+                              borderRadius: '3px',
+                            }} />
+                          </div>
+                          <span style={{ fontSize: '10px', color: THEME.text, textAlign: 'right', fontWeight: '500' }}>
+                            {vol.toLocaleString()}kg
+                          </span>
                         </div>
-                        <span style={{ fontSize: '10px', color: THEME.text, textAlign: 'right', fontWeight: '500' }}>
-                          {vol.toLocaleString()}kg
-                        </span>
-                      </div>
-                    ))}
-                  </>
+                      )
+                    })}
+                  </div>
                 )
-              })()}
+              })}
             </div>
           )}
         </div>
