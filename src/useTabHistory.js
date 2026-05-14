@@ -60,13 +60,16 @@ export default function useTabHistory(tabs) {
   }, [serialized])
 
   // popstate → snapshot 복원
+  // 안전망: e.state 가 modal marker(__modalBack) 를 함께 가지고 있으면
+  //   모달 닫기 흐름의 부산물 — tab snapshot 복원으로 인한 부모 state 변경 회피.
   useEffect(() => {
     const handle = (e) => {
       const s = e.state
       if (!s || s.__tabSnapshot !== instanceRef.current) return
       if (!s.snapshot) return
+      // 모달 close 로 인한 popstate 면 tab 복원 안 함
+      if (s.__modalBack != null) return
 
-      // 이미 같은 값이면 setter 호출 생략 (불필요한 rerender 방지)
       let changed = false
       Object.entries(s.snapshot).forEach(([k, v]) => {
         if (tabsRef.current[k]?.[0] !== v) changed = true

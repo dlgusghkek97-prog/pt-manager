@@ -639,16 +639,12 @@ export default function MemberDashboard({ user, onLogout }) {
           </div>
         </div>
 
-        {/* 헤더 다음 줄: [인바디] [추이] [🔔] [💬] [?] 5칸 균등 캡슐 */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: '6px', marginBottom: '10px' }}>
+        {/* 헤더 다음 줄: [인바디] [🔔] [💬] [?] 4칸 균등 캡슐 */}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '6px', marginBottom: '10px' }}>
           <button
             onClick={() => { setInbodyDefaultView('input'); setInbodyOpen(true) }}
             style={{ background: '#FFF', border: `0.5px solid ${THEME.primaryAccent}`, color: THEME.primary, padding: '0 8px', borderRadius: '18px', cursor: 'pointer', fontSize: '12px', fontWeight: '500', height: '36px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'inherit' }}
           >인바디</button>
-          <button
-            onClick={() => { setInbodyDefaultView('chart'); setInbodyOpen(true) }}
-            style={{ background: '#FFF', border: `0.5px solid ${THEME.primaryAccent}`, color: THEME.primary, padding: '0 8px', borderRadius: '18px', cursor: 'pointer', fontSize: '12px', fontWeight: '500', height: '36px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'inherit' }}
-          >추이</button>
           <NotificationBell userId={user.id} userType="member" onNavigate={handleNavigate} size={36} wide />
           <button
             onClick={() => setChatOpen(true)}

@@ -1891,7 +1891,6 @@ export default function TrainerDashboard({ user, onLogout }) {
                     메모
                   </button>
                   <button onClick={() => { setInbodyDefaultView('input'); setInbodyOpen(true) }} style={memberActionBtn}>인바디</button>
-                  <button onClick={() => { setInbodyDefaultView('chart'); setInbodyOpen(true) }} style={memberActionBtn}>추이</button>
                 </div>
               </div>
 

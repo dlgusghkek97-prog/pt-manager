@@ -19,12 +19,17 @@ export default function useModalBackButton(isOpen, onClose) {
     if (!isOpen) return
 
     let closedByBack = false
+    let armed = false  // pushState 직후 같은 tick 의 spurious popstate 가드
     const myMarker = Date.now() + Math.random()
     window.history.pushState({ __modalBack: myMarker }, '')
 
+    // 다음 task 부터 popstate 신뢰 — pushState 가 동기적으로 발생시키는
+    // 잠재적 잔여 popstate (브라우저별 차이) 차단
+    setTimeout(() => { armed = true }, 0)
+
     const handlePopState = (e) => {
-      // 본인이 push 한 state 가 아직 history 에 남아 있으면 (= 다른 모달/화면의
-      // history.back() 으로 인한 popstate) 무시. 본인 state 가 빠졌을 때만 닫힘.
+      if (!armed) return
+      // 본인이 push 한 state 가 아직 top 이면 무시
       if (e.state && e.state.__modalBack === myMarker) return
       closedByBack = true
       onCloseRef.current?.()
@@ -34,7 +39,7 @@ export default function useModalBackButton(isOpen, onClose) {
 
     return () => {
       window.removeEventListener('popstate', handlePopState)
-      // 뒤로가기 외 경로(X 버튼/저장 등)로 닫힘 → 푸시했던 state 한 번 비워줘야 함
+      // X 버튼 등으로 닫힘 → 푸시했던 state 비우기
       if (!closedByBack) {
         try { window.history.back() } catch {}
       }
