@@ -1283,7 +1283,7 @@ export default function TrainerDashboard({ user, onLogout }) {
         <div style={S.header}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px', minWidth: 0, flex: 1 }}>
             <PTLogo />
-            {user?.name && (
+            {user?.name && view !== 'memberDetail' && (
               <span style={{ fontSize: '16px', color: THEME.text, fontWeight: '500', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', minWidth: 0 }}>
                 {user.name}님
               </span>
