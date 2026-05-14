@@ -39,10 +39,15 @@ export default function useModalBackButton(isOpen, onClose) {
 
     return () => {
       window.removeEventListener('popstate', handlePopState)
-      // X 버튼 등으로 닫힘 → 푸시했던 state 비우기
-      if (!closedByBack) {
-        try { window.history.back() } catch {}
-      }
+      // X 버튼/외부 close 등으로 닫힘 → 본인 marker 가 stack top 일 때만 pop.
+      // (다른 모달이 위에 추가로 push 되어 있는 경우엔 stale 1개 잠시 leftover 되지만,
+      //  사용자의 system back 으로 자연 정리됨 — cascade close 가 가장 큰 문제라 이걸 우선.)
+      if (closedByBack) return
+      try {
+        if (window.history.state?.__modalBack === myMarker) {
+          window.history.back()
+        }
+      } catch {}
     }
   }, [isOpen])
 }
