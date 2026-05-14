@@ -374,7 +374,7 @@ export default function TrainerDashboard({ user, onLogout }) {
     if (!user?.id) return
     let alive = true
     loadSubscription(user.id).then(sub => {
-      if (alive) setSubSummary(summarizeSubscription(sub))
+      if (alive) setSubSummary(summarizeSubscription(sub, user.email))
     })
     return () => { alive = false }
   }, [user?.id, showSubscription])  // 모달 닫힐 때 갱신
@@ -733,8 +733,8 @@ export default function TrainerDashboard({ user, onLogout }) {
     if (!newMemberName) return
     setLoading(true)
 
-    // 구독 상태·회원 한도 검사 (서버 RPC)
-    const check = await canAddMember(user.id)
+    // 구독 상태·회원 한도 검사 (서버 RPC). 마스터 계정은 utils 에서 우회.
+    const check = await canAddMember(user.id, user.email)
     if (!check.ok) {
       setLoading(false)
       const goSub = window.confirm(`${check.reason}\n\n[구독 관리] 를 여시겠습니까?`)
@@ -1334,6 +1334,7 @@ export default function TrainerDashboard({ user, onLogout }) {
         {showSubscription && (
           <SubscriptionModal
             trainerId={user.id}
+            trainerEmail={user.email}
             onClose={() => setShowSubscription(false)}
           />
         )}
@@ -1705,7 +1706,9 @@ export default function TrainerDashboard({ user, onLogout }) {
 
         {/* 구독 상태 배너 — 회원 목록 탭에서만 표시 (회원 상세·내 기록 진입 시 숨김) */}
         {view === 'members' && topTab === 'members' && subSummary && (() => {
-          const bColor = subSummary.state === 'expired'
+          const bColor = subSummary.state === 'admin'
+            ? { bg: '#2D4A3E', border: THEME.primaryDark, text: '#FFF' }
+            : subSummary.state === 'expired'
             ? { bg: THEME.dangerLight, border: THEME.danger, text: THEME.dangerDark }
             : subSummary.state === 'active'
             ? { bg: '#E6F4EB', border: THEME.primary, text: THEME.primaryDark }

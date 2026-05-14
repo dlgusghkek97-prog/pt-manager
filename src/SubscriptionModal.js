@@ -15,7 +15,7 @@ import LegalModal from './LegalModal'
 // - 환불 정책 보기
 // - 환불 신청 (이메일 mailto, 운영자 수동 처리)
 // - 구독 취소 (다음 결제 차단, status=cancelled)
-export default function SubscriptionModal({ trainerId, onClose }) {
+export default function SubscriptionModal({ trainerId, trainerEmail, onClose }) {
   useModalBackButton(true, onClose)
 
   const [sub, setSub] = useState(null)
@@ -36,10 +36,12 @@ export default function SubscriptionModal({ trainerId, onClose }) {
   }
   useEffect(() => { reload() /* eslint-disable-next-line */ }, [trainerId])
 
-  const info = summarizeSubscription(sub)
+  const info = summarizeSubscription(sub, trainerEmail)
   const currentPlanCode = sub?.plan_code || 'starter_10'
+  const isAdmin = info.state === 'admin'
 
   const stateConfig = {
+    admin:    { bg: '#2D4A3E', color: '#FFF', icon: '★' },
     trial:    { bg: '#FFF7E6', color: '#8B6F2A', icon: '⏳' },
     active:   { bg: '#E6F4EB', color: THEME.primaryDark, icon: '✓' },
     expired:  { bg: THEME.dangerLight, color: THEME.dangerDark, icon: '!' },
@@ -141,7 +143,14 @@ export default function SubscriptionModal({ trainerId, onClose }) {
                   )}
                 </div>
 
-                {/* 플랜 3개 카드 */}
+                {isAdmin && (
+                  <p style={{ fontSize: '11px', color: THEME.textSub, textAlign: 'center', margin: '0 0 14px', lineHeight: 1.5 }}>
+                    운영자(마스터) 계정 — 구독·회원 한도 검사가 적용되지 않습니다.
+                  </p>
+                )}
+
+                {/* 플랜 3개 카드 — 마스터는 숨김 */}
+                {!isAdmin && (<>
                 <p style={{ fontSize: '11px', color: THEME.textSub, fontWeight: '500', margin: '0 0 6px' }}>플랜 선택</p>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '14px' }}>
                   {SUBSCRIPTION_PLANS.map(plan => {
@@ -173,8 +182,9 @@ export default function SubscriptionModal({ trainerId, onClose }) {
                     )
                   })}
                 </div>
+                </>)}
 
-                {/* 관리 버튼들 */}
+                {/* 관리 버튼들 — 마스터는 환불 정책만 노출 */}
                 <div style={{ display: 'flex', gap: '6px', marginBottom: '10px', flexWrap: 'wrap' }}>
                   <button
                     onClick={() => setLegalOpen(true)}
@@ -210,10 +220,12 @@ export default function SubscriptionModal({ trainerId, onClose }) {
                   )}
                 </div>
 
-                <p style={{ fontSize: '10px', color: THEME.textHint, textAlign: 'center', margin: '8px 0 0', lineHeight: 1.5 }}>
-                  정식 결제 시스템은 사업자 등록·토스페이먼츠 가맹점 가입 완료 후 오픈됩니다.<br/>
-                  베타 기간 동안 무료 체험이 유지됩니다.
-                </p>
+                {!isAdmin && (
+                  <p style={{ fontSize: '10px', color: THEME.textHint, textAlign: 'center', margin: '8px 0 0', lineHeight: 1.5 }}>
+                    정식 결제 시스템은 사업자 등록·토스페이먼츠 가맹점 가입 완료 후 오픈됩니다.<br/>
+                    베타 기간 동안 무료 체험이 유지됩니다.
+                  </p>
+                )}
               </>
             )}
           </div>

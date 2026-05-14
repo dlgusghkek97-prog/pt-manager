@@ -353,8 +353,11 @@ export const SUBSCRIPTION_PLANS = [
 
 export const getPlanByCode = (code) => SUBSCRIPTION_PLANS.find(p => p.code === code) || SUBSCRIPTION_PLANS[0]
 
-// 운영자 연락처 (환불 신청 등)
+// 운영자 연락처 (환불 신청 등) — 이 계정은 모든 구독/한도 검사 우회
 export const ADMIN_EMAIL = 'dlgusghkek97@gmail.com'
+
+export const isAdminEmail = (email) =>
+  !!email && String(email).trim().toLowerCase() === ADMIN_EMAIL.toLowerCase()
 
 // ── 구독 (SaaS 사용료) ──
 // 상태: trial / active / expired / cancelled
@@ -374,7 +377,12 @@ export const loadSubscription = async (trainerId) => {
 }
 
 // 구독 요약 — UI 표시용
-export const summarizeSubscription = (sub) => {
+// email 인자가 ADMIN_EMAIL 이면 모든 제한 우회 ("마스터")
+export const summarizeSubscription = (sub, email) => {
+  const proPlan = SUBSCRIPTION_PLANS[SUBSCRIPTION_PLANS.length - 1]
+  if (isAdminEmail(email)) {
+    return { state: 'admin', daysLeft: Infinity, expiresAt: null, label: '마스터 · 무제한', plan: proPlan }
+  }
   if (!sub) {
     return { state: 'expired', daysLeft: 0, expiresAt: null, label: '구독 정보 없음', plan: SUBSCRIPTION_PLANS[0] }
   }
@@ -395,7 +403,9 @@ export const summarizeSubscription = (sub) => {
 }
 
 // 회원 추가 가능 여부 (서버 RPC). 반환: { ok: bool, reason?: string }
-export const canAddMember = async (trainerId) => {
+// email 이 ADMIN_EMAIL 이면 RPC 호출 없이 즉시 통과.
+export const canAddMember = async (trainerId, email) => {
+  if (isAdminEmail(email)) return { ok: true }
   if (!trainerId) return { ok: false, reason: '인증 정보 없음' }
   const { data, error } = await supabase.rpc('can_add_member', { _trainer_id: trainerId })
   if (error) {
