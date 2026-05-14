@@ -3,6 +3,9 @@ html {
   -ms-text-size-adjust: 100%;
   text-size-adjust: 100%;
   font-size: 16px;
+  /* 가로 스크롤 차단 — 콘텐츠가 viewport 폭 넘쳐도 좌우 흔들림 없게 */
+  overflow-x: hidden;
+  width: 100%;
 }
 
 body {
@@ -14,9 +17,19 @@ body {
   -moz-osx-font-smoothing: grayscale;
   font-size: 14px;
   touch-action: manipulation;
+  /* 가로 스크롤 차단 */
+  overflow-x: hidden;
+  width: 100%;
+  max-width: 100vw;
   /* 안드로이드 시스템 폰트 크기 무시 강화 */
   -webkit-text-size-adjust: none !important;
   text-size-adjust: none !important;
+}
+
+#root {
+  width: 100%;
+  max-width: 100vw;
+  overflow-x: hidden;
 }
 
 /* 모든 요소가 시스템 폰트 크기 영향 안 받게 강제 */
