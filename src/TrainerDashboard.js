@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react'
 import { supabase } from './supabase'
-import { S, THEME, PART_COLORS, generateCode, calcMacro, CYCLE_PHASES, OCCUPATION_MULTIPLIER, OCCUPATION_DESCRIPTION, loadFavorites, calcPtRemaining, addPtSessions } from './utils'
+import { S, THEME, PART_COLORS, generateCode, calcMacro, CYCLE_PHASES, OCCUPATION_MULTIPLIER, OCCUPATION_DESCRIPTION, loadFavorites, calcPtRemaining, addPtSessions, formatSupabaseError } from './utils'
 import WorkoutLog from './WorkoutLog'
 import WorkoutStats from './WorkoutStats'
 import DietLog from './DietLog'
@@ -502,7 +502,7 @@ export default function TrainerDashboard({ user, onLogout }) {
       .from('trainers')
       .update(payload)
       .eq('id', user.id)
-    if (error) { console.error('[TrainerDashboard] saveTrainerMacro error:', error); alert('목표 저장 실패: ' + error.message); return false }
+    if (error) { console.error('[TrainerDashboard] saveTrainerMacro error:', error); alert(formatSupabaseError(error, '목표 저장 실패')); return false }
     return true
   }
 
@@ -599,7 +599,7 @@ export default function TrainerDashboard({ user, onLogout }) {
         target_fat: parseInt(macro.fat) || 0,
       })
       .eq('id', memberId)
-    if (error) { console.error('[TrainerDashboard] saveMemberMacroToDB error:', error); alert('목표 저장 실패: ' + error.message); return false }
+    if (error) { console.error('[TrainerDashboard] saveMemberMacroToDB error:', error); alert(formatSupabaseError(error, '목표 저장 실패')); return false }
     return true
   }
 
@@ -622,7 +622,7 @@ export default function TrainerDashboard({ user, onLogout }) {
         macro_occupation: inputs.occupation || null,
       })
       .eq('id', memberId)
-    if (error) { console.error('[TrainerDashboard] saveMemberMacroFullToDB error:', error); alert('식단 설정 저장 실패: ' + error.message); return false }
+    if (error) { console.error('[TrainerDashboard] saveMemberMacroFullToDB error:', error); alert(formatSupabaseError(error, '식단 설정 저장 실패')); return false }
     return true
   }
 

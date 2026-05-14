@@ -354,6 +354,20 @@ export const removeFavorite = async (favoriteId, table = 'member_favorite_exerci
   return { success: true }
 }
 
+// Supabase / PostgREST 가 던지는 스키마 캐시 에러를 사용자에게 친절히 옮겨주는 헬퍼.
+// 누락된 컬럼·테이블이 있는 경우 메시지에 "Could not find ..." / "schema cache" 가 포함됨.
+// 호출처에서: alert(formatSupabaseError(error, '저장 실패'))
+export const formatSupabaseError = (error, prefix = '오류') => {
+  const msg = error?.message || String(error || '')
+  if (/Could not find|schema cache|does not exist/i.test(msg)) {
+    return `${prefix}: DB 스키마가 최신이 아닙니다. Supabase SQL Editor 에서 db/2026-05-14-CONSOLIDATED.sql 을 한 번 실행해주세요.\n\n원본: ${msg}`
+  }
+  if (/row-level security|RLS|policy/i.test(msg)) {
+    return `${prefix}: 권한이 없습니다 (RLS). 본인 계정으로 로그인됐는지 확인해주세요.\n\n원본: ${msg}`
+  }
+  return `${prefix}: ${msg}`
+}
+
 // ── 구독 플랜 정의 ──
 export const SUBSCRIPTION_PLANS = [
   { code: 'starter_10',    label: 'Starter',  memberLimit: 10,   amount: 9900,  desc: '회원 10명까지' },

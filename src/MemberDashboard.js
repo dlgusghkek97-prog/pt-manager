@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react'
 import { supabase } from './supabase'
-import { S, THEME, calcMacro, CYCLE_PHASES, OCCUPATION_MULTIPLIER, OCCUPATION_DESCRIPTION, loadFavorites, calcPtRemaining, markTodayComplete, isTodayCompleted } from './utils'
+import { S, THEME, calcMacro, CYCLE_PHASES, OCCUPATION_MULTIPLIER, OCCUPATION_DESCRIPTION, loadFavorites, calcPtRemaining, markTodayComplete, isTodayCompleted, formatSupabaseError } from './utils'
 import WorkoutLog from './WorkoutLog'
 import WorkoutStats from './WorkoutStats'
 import DietLog from './DietLog'
@@ -307,7 +307,7 @@ export default function MemberDashboard({ user, onLogout }) {
     const { error } = await supabase.from('members').update(payload).eq('id', user.id)
     if (error) {
       console.error('[MemberDashboard] saveMacroToDB error:', error)
-      alert('서버 저장 실패: ' + error.message)
+      alert(formatSupabaseError(error, '서버 저장 실패'))
       return false
     }
     return true

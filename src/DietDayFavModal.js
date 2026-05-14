@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react'
-import { THEME, loadDietDayFavorites, addDietDayFavorite, removeDietDayFavorite } from './utils'
+import { THEME, loadDietDayFavorites, addDietDayFavorite, removeDietDayFavorite, formatSupabaseError } from './utils'
 import useModalBackButton from './useModalBackButton'
 
 // 일일 식단 즐겨찾기 모달 — 하루 전체 끼니(N개)를 한 번에 저장·불러오기.
@@ -47,14 +47,14 @@ export default function DietDayFavModal({
     setSaving(true)
     const result = await addDietDayFavorite(userId, newLabel, filledMeals, favTable, favIdField)
     setSaving(false)
-    if (!result.success) { alert('저장 실패: ' + result.error); return }
+    if (!result.success) { alert(formatSupabaseError({ message: result.error }, '저장 실패')); return }
     onClose?.()
   }
 
   const handleDelete = async (id) => {
     if (!window.confirm('이 일일 즐겨찾기를 삭제할까요?')) return
     const result = await removeDietDayFavorite(id, favTable)
-    if (!result.success) { alert('삭제 실패: ' + result.error); return }
+    if (!result.success) { alert(formatSupabaseError({ message: result.error }, '삭제 실패')); return }
     setFavs(prev => prev.filter(f => f.id !== id))
   }
 
