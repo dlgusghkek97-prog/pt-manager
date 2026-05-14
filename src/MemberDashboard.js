@@ -160,7 +160,7 @@ export default function MemberDashboard({ user, onLogout }) {
   const [showHelp, setShowHelp] = useState(false)
 
   const [inbodyOpen, setInbodyOpen] = useState(false)
-  const [inbodyChartOpen, setInbodyChartOpen] = useState(false)
+  const [inbodyDefaultView, setInbodyDefaultView] = useState('input')  // 'input' | 'chart'
 
   const [memberInfo, setMemberInfo] = useState(user)
   const [completingToday, setCompletingToday] = useState(false)
@@ -641,11 +641,11 @@ export default function MemberDashboard({ user, onLogout }) {
         {/* 헤더 다음 줄: [인바디] [추이] [🔔] [💬] [?] 5칸 균등 캡슐 */}
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: '6px', marginBottom: '10px' }}>
           <button
-            onClick={() => setInbodyOpen(true)}
+            onClick={() => { setInbodyDefaultView('input'); setInbodyOpen(true) }}
             style={{ background: '#FFF', border: `0.5px solid ${THEME.primaryAccent}`, color: THEME.primary, padding: '0 8px', borderRadius: '18px', cursor: 'pointer', fontSize: '12px', fontWeight: '500', height: '36px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'inherit' }}
           >인바디</button>
           <button
-            onClick={() => setInbodyChartOpen(true)}
+            onClick={() => { setInbodyDefaultView('chart'); setInbodyOpen(true) }}
             style={{ background: '#FFF', border: `0.5px solid ${THEME.primaryAccent}`, color: THEME.primary, padding: '0 8px', borderRadius: '18px', cursor: 'pointer', fontSize: '12px', fontWeight: '500', height: '36px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'inherit' }}
           >추이</button>
           <NotificationBell userId={user.id} userType="member" onNavigate={handleNavigate} size={36} wide />
@@ -691,18 +691,8 @@ export default function MemberDashboard({ user, onLogout }) {
           user={user}
           memberId={user.id}
           isOpen={inbodyOpen}
-          mode="input"
+          defaultView={inbodyDefaultView}
           onClose={() => setInbodyOpen(false)}
-          table="member_inbody"
-          idField="member_id"
-        />
-
-        <InbodyModal
-          user={user}
-          memberId={user.id}
-          isOpen={inbodyChartOpen}
-          mode="chart"
-          onClose={() => setInbodyChartOpen(false)}
           table="member_inbody"
           idField="member_id"
         />

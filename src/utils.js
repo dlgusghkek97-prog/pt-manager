@@ -168,6 +168,19 @@ export const ICONS = {
   snack: `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#C5705C" stroke-width="2"><path d="M12 2a7 7 0 0 0-7 7c0 5 7 13 7 13s7-8 7-13a7 7 0 0 0-7-7z"/><circle cx="12" cy="9" r="2.5"/></svg>`,
 }
 
+// ── Design Tokens — 컴포넌트 일관성용 (미니멀 정리 기준) ──
+// 사용: padding: SPACING.md, fontSize: FONT.sm, borderRadius: RADIUS.md
+export const SPACING = {
+  xs: 4, sm: 8, md: 12, lg: 16, xl: 20, xxl: 24,
+}
+export const FONT = {
+  xxs: 9, xs: 10, sm: 11, md: 12, lg: 13, xl: 14, xxl: 16, h1: 18,
+}
+export const RADIUS = {
+  sm: 6, md: 10, lg: 14, pill: 999,
+}
+export const BTN_HEIGHT = { sm: 32, md: 38, lg: 44 }
+
 export const S = {
   container: { minHeight: '100vh', background: THEME.bg, display: 'flex', alignItems: 'flex-start', justifyContent: 'center', fontFamily: "'Apple SD Gothic Neo', sans-serif", padding: '12px 10px' },
   wrap: { width: '100%', maxWidth: '480px', paddingTop: '8px' },

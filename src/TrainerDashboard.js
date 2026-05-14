@@ -351,7 +351,7 @@ export default function TrainerDashboard({ user, onLogout }) {
   const [memberCategories, setMemberCategories] = useState([])
 
   const [inbodyOpen, setInbodyOpen] = useState(false)
-  const [inbodyChartOpen, setInbodyChartOpen] = useState(false)
+  const [inbodyDefaultView, setInbodyDefaultView] = useState('input')
 
   const [ptChargeTarget, setPtChargeTarget] = useState(null)
   const [ptChargeAmount, setPtChargeAmount] = useState('')
@@ -998,7 +998,7 @@ export default function TrainerDashboard({ user, onLogout }) {
       }
       if (member) {
         await openMember(member)
-        setTimeout(() => setInbodyChartOpen(true), 300)
+        setTimeout(() => { setInbodyDefaultView('chart'); setInbodyOpen(true) }, 300)
       }
     } else if (link.startsWith('member:')) {
       // member:<member_id> — 해당 회원 상세 열기
@@ -1396,20 +1396,8 @@ export default function TrainerDashboard({ user, onLogout }) {
             user={user}
             memberId={selectedMember.id}
             isOpen={inbodyOpen}
-            mode="input"
+            defaultView={inbodyDefaultView}
             onClose={() => setInbodyOpen(false)}
-            table="trainer_inbody"
-            idField="trainer_id"
-          />
-        )}
-
-        {selectedMember && (
-          <InbodyModal
-            user={user}
-            memberId={selectedMember.id}
-            isOpen={inbodyChartOpen}
-            mode="chart"
-            onClose={() => setInbodyChartOpen(false)}
             table="trainer_inbody"
             idField="trainer_id"
           />
@@ -1900,8 +1888,8 @@ export default function TrainerDashboard({ user, onLogout }) {
                     <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke={THEME.primary} strokeWidth="2" strokeLinecap="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
                     메모
                   </button>
-                  <button onClick={() => setInbodyOpen(true)} style={memberActionBtn}>인바디</button>
-                  <button onClick={() => setInbodyChartOpen(true)} style={memberActionBtn}>추이</button>
+                  <button onClick={() => { setInbodyDefaultView('input'); setInbodyOpen(true) }} style={memberActionBtn}>인바디</button>
+                  <button onClick={() => { setInbodyDefaultView('chart'); setInbodyOpen(true) }} style={memberActionBtn}>추이</button>
                 </div>
               </div>
 
