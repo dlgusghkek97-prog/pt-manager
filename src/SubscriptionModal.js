@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react'
+import { loadTossPayments } from '@tosspayments/payment-sdk'
 import { supabase } from './supabase'
 import {
   THEME,
@@ -8,6 +9,9 @@ import {
 } from './utils'
 import useModalBackButton from './useModalBackButton'
 import LegalModal from './LegalModal'
+
+const TOSS_CLIENT_KEY = process.env.REACT_APP_TOSS_CLIENT_KEY || ''
+const TOSS_ENABLED = TOSS_CLIENT_KEY && !TOSS_CLIENT_KEY.includes('PLACEHOLDER')
 
 // 구독 관리 모달
 // - 현재 상태(trial / active / expired) + 사용 중인 플랜
@@ -49,9 +53,31 @@ export default function SubscriptionModal({ trainerId, trainerEmail, onClose }) 
   }
   const cfg = stateConfig[info.state] || stateConfig.expired
 
-  // 플랜 변경 (실제 결제는 추후 토스 연동, 지금은 plan_code 만 변경 — UI 검증용)
+  // 플랜 선택 → 토스 결제 / 토스 비활성 시 plan_code 만 변경 (테스트키 등록 전 fallback)
   const handleSelectPlan = async (plan) => {
-    if (plan.code === currentPlanCode) return
+    if (plan.code === currentPlanCode && info.state === 'active') return
+
+    // 토스 활성화: billingKey 발급용 결제창 띄우기 (정기결제)
+    if (TOSS_ENABLED) {
+      if (!window.confirm(`${plan.label} 플랜으로 구독을 시작합니다.\n\n· ₩${plan.amount.toLocaleString()}/월 · 매월 자동 결제\n· 다음 화면에서 카드를 등록하면 즉시 활성화됩니다.\n· 언제든 [구독 취소] 가능합니다.\n\n진행할까요?`)) return
+      setWorking(true)
+      try {
+        const tossPayments = await loadTossPayments(TOSS_CLIENT_KEY)
+        const customerKey = trainerId  // 토스 customerKey 는 회원 unique id
+        await tossPayments.requestBillingAuth('카드', {
+          customerKey,
+          successUrl: `${window.location.origin}/?toss=billing-success&plan=${plan.code}`,
+          failUrl:    `${window.location.origin}/?toss=billing-fail`,
+        })
+        // 위 호출은 페이지 리다이렉트 — 이 아래 코드는 실행되지 않음
+      } catch (e) {
+        setWorking(false)
+        alert('결제창 실패: ' + (e.message || e))
+      }
+      return
+    }
+
+    // 토스 비활성 (베타 테스트키 미입력) — plan_code 만 변경
     if (!window.confirm(`${plan.label} 플랜으로 변경할까요? (₩${plan.amount.toLocaleString()}/월)\n\n정식 결제 연동 전이라 plan_code 만 변경됩니다.`)) return
     setWorking(true)
     const { error } = await supabase

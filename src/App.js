@@ -5,6 +5,7 @@ import TrainerDashboard from './TrainerDashboard'
 import MemberDashboard from './MemberDashboard'
 import LegalModal from './LegalModal'
 import { TERMS_VERSION } from './legal'
+import { identifyUser, resetUser } from './monitoring'
 
 const PTLogo = ({ size = 48 }) => (
   <div style={{
@@ -54,6 +55,12 @@ export default function App() {
   // ─── 자동 로그인 ───
   // 1. localStorage에서 user 정보 복원
   // 2. Supabase Auth 세션도 같이 복원 (RLS 작동을 위해)
+  // user 변경에 따라 모니터링 식별 동기화
+  useEffect(() => {
+    if (user) identifyUser(user)
+    else resetUser()
+  }, [user])
+
   useEffect(() => {
     const restoreSession = async () => {
       const savedUser = localStorage.getItem('pt_user')
@@ -91,6 +98,57 @@ export default function App() {
     }
 
     restoreSession()
+  }, [])
+
+  // ─── 토스페이먼츠 결제창 success/fail 리다이렉트 감지 ───
+  // SubscriptionModal 의 requestBillingAuth 가 ?toss=billing-success&plan=...&authKey=...&customerKey=... 로 복귀
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search)
+    const toss = params.get('toss')
+    if (!toss) return
+
+    const cleanUrl = () => {
+      window.history.replaceState(null, '', window.location.pathname)
+    }
+
+    if (toss === 'billing-success') {
+      const authKey = params.get('authKey')
+      const customerKey = params.get('customerKey')
+      const plan = params.get('plan')
+      if (!authKey || !customerKey || !plan) { cleanUrl(); return }
+      ;(async () => {
+        const { data: { session } } = await supabase.auth.getSession()
+        if (!session) { alert('세션이 만료되어 결제 처리 못 했습니다. 다시 로그인 후 결제해주세요.'); cleanUrl(); return }
+        try {
+          const res = await fetch(
+            `${process.env.REACT_APP_SUPABASE_URL}/functions/v1/toss-issue-billing`,
+            {
+              method: 'POST',
+              headers: {
+                'Authorization': `Bearer ${session.access_token}`,
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({ authKey, customerKey, plan }),
+            }
+          )
+          const result = await res.json()
+          if (result.ok) {
+            alert(`구독이 활성화됐습니다.\n다음 결제일: ${new Date(result.expires_at).toLocaleDateString()}`)
+          } else {
+            alert(`결제 실패: ${result.reason}\n\n다른 카드로 다시 시도하거나 문의해주세요.`)
+          }
+        } catch (e) {
+          alert('결제 처리 중 오류: ' + e.message)
+        } finally {
+          cleanUrl()
+          window.location.reload()  // SubscriptionGate 재검사
+        }
+      })()
+    } else if (toss === 'billing-fail') {
+      const msg = params.get('message') || params.get('code') || '카드 등록 취소됨'
+      alert(`결제 실패: ${msg}`)
+      cleanUrl()
+    }
   }, [])
 
   // ─── 비밀번호 재설정 메일 링크 진입 감지 ───

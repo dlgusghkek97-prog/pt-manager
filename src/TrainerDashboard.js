@@ -14,6 +14,7 @@ import ChatRoom from './ChatRoom'
 import ChatUnreadBadge from './ChatUnreadBadge'
 import PushPromptModal from './PushPromptModal'
 import SubscriptionModal from './SubscriptionModal'
+import SubscriptionGate from './SubscriptionGate'
 import useModalBackButton from './useModalBackButton'
 import useTabHistory from './useTabHistory'
 import { loadSubscription, summarizeSubscription, canAddMember } from './utils'
@@ -1291,6 +1292,22 @@ export default function TrainerDashboard({ user, onLogout }) {
   const showMemberOccupationBanner = memberMacro && !memberHasOccupation
 
   return (
+    <>
+      {/* 결제 모달은 Gate 외부에 두어 차단 화면에서도 띄울 수 있게 */}
+      {showSubscription && (
+        <SubscriptionModal
+          trainerId={user.id}
+          trainerEmail={user.email}
+          onClose={() => setShowSubscription(false)}
+        />
+      )}
+      <SubscriptionGate
+        user={user}
+        userType="trainer"
+        onOpenPay={() => setShowSubscription(true)}
+        onLogout={onLogout}
+        refreshKey={showSubscription ? 0 : 1}
+      >
     <div style={S.container}>
       <div style={S.wrap}>
         <div style={S.header}>
@@ -1341,14 +1358,6 @@ export default function TrainerDashboard({ user, onLogout }) {
             userId={user.id}
             userType="trainer"
             onClose={() => setShowPushPrompt(false)}
-          />
-        )}
-
-        {showSubscription && (
-          <SubscriptionModal
-            trainerId={user.id}
-            trainerEmail={user.email}
-            onClose={() => setShowSubscription(false)}
           />
         )}
 
@@ -1972,5 +1981,7 @@ export default function TrainerDashboard({ user, onLogout }) {
         )}
       </div>
     </div>
+      </SubscriptionGate>
+    </>
   )
 }

@@ -12,6 +12,7 @@ import ChatUnreadBadge from './ChatUnreadBadge'
 import useModalBackButton from './useModalBackButton'
 import useTabHistory from './useTabHistory'
 import PushPromptModal from './PushPromptModal'
+import SubscriptionGate from './SubscriptionGate'
 
 const MACRO_INPUT_STYLE = {
   background: 'transparent',
@@ -588,6 +589,7 @@ export default function MemberDashboard({ user, onLogout }) {
   const todayDone = isTodayCompleted(memberInfo)
 
   return (
+    <SubscriptionGate user={user} userType="member" onLogout={onLogout}>
     <div style={S.container}>
       <div style={S.wrap}>
         <div style={S.header}>
@@ -1028,5 +1030,6 @@ export default function MemberDashboard({ user, onLogout }) {
         <button style={{ background: '#FFF', color: THEME.textSub, border: `0.5px solid ${THEME.border}`, padding: '12px', borderRadius: '12px', cursor: 'pointer', fontSize: '12px', width: '100%', marginTop: '12px' }} onClick={onLogout}>로그아웃</button>
       </div>
     </div>
+    </SubscriptionGate>
   )
 }

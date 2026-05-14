@@ -1,6 +1,7 @@
 import React from 'react'
 import ReactDOM from 'react-dom/client'
 import './index.css'
+import './monitoring'  // Sentry + PostHog 초기화 (env 비어있으면 no-op)
 import App from './App'
 
 const root = ReactDOM.createRoot(document.getElementById('root'))
