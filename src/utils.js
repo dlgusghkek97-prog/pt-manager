@@ -468,6 +468,54 @@ export const removeDietFavorite = async (favId, table = 'diet_favorites') => {
   return { success: true }
 }
 
+// ── 일일 식단 즐겨찾기 (하루 전체 끼니 set) ──
+export const loadDietDayFavorites = async (userId, table = 'diet_day_favorites', idField = 'member_id') => {
+  const { data, error } = await supabase
+    .from(table)
+    .select('*')
+    .eq(idField, userId)
+    .order('created_at', { ascending: false })
+  if (error) {
+    console.error('[loadDietDayFavorites] error:', error)
+    return []
+  }
+  return data || []
+}
+
+// meals: 현재 화면의 meals 배열 (slot/name/carbs/protein/fat/calories)
+// 빈 끼니는 저장하지 않음.
+export const addDietDayFavorite = async (userId, label, meals, table = 'diet_day_favorites', idField = 'member_id') => {
+  const trimmed = (label || '').trim()
+  if (!trimmed) return { success: false, error: '이름이 필요합니다' }
+  const cleaned = (meals || [])
+    .map(m => ({
+      slot: m.slot,
+      name: m.name || `식사 ${m.slot}`,
+      carbs: parseFloat(m.carbs) || 0,
+      protein: parseFloat(m.protein) || 0,
+      fat: parseFloat(m.fat) || 0,
+      calories: parseInt(m.calories) || 0,
+    }))
+    .filter(m => m.carbs || m.protein || m.fat || m.calories)
+  if (cleaned.length === 0) return { success: false, error: '저장할 식단 내용이 없습니다' }
+  const payload = { [idField]: userId, label: trimmed, meals: cleaned }
+  const { data, error } = await supabase.from(table).insert(payload).select().single()
+  if (error) {
+    console.error('[addDietDayFavorite] error:', error)
+    return { success: false, error: error.message }
+  }
+  return { success: true, data }
+}
+
+export const removeDietDayFavorite = async (favId, table = 'diet_day_favorites') => {
+  const { error } = await supabase.from(table).delete().eq('id', favId)
+  if (error) {
+    console.error('[removeDietDayFavorite] error:', error)
+    return { success: false, error: error.message }
+  }
+  return { success: true }
+}
+
 export const getLatestRecord = (allLogs, bodyPart, exerciseName) => {
   if (!allLogs || !bodyPart || !exerciseName) return null
   const matched = allLogs.filter(l =>

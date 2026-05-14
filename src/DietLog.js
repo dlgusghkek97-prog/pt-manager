@@ -3,6 +3,7 @@ import { supabase } from './supabase'
 import { S, THEME, calcWeightCalories, calcTDEE, calcDailyBurn, calcDailyBurnBreakdown, checkMediaSize } from './utils'
 import DatePicker from './DatePicker'
 import DietFavModal from './DietFavModal'
+import DietDayFavModal from './DietDayFavModal'
 import useModalBackButton from './useModalBackButton'
 
 const NUTRIENTS = [
@@ -182,6 +183,8 @@ export default function DietLog({ user, onDietUpdate, tableOverride, trainerIdFi
 
   // 즐겨찾기 모달: 어느 슬롯에서 열렸는지
   const [favModalSlot, setFavModalSlot] = useState(null)
+  // 일일 즐겨찾기 모달
+  const [dayFavOpen, setDayFavOpen] = useState(false)
 
   // ── 자동 저장 (저장 버튼 없음 — 입력칸을 벗어나면 자동 반영) ──
   const [saveStatus, setSaveStatus] = useState('idle') // idle | saving | saved | error
@@ -390,6 +393,51 @@ export default function DietLog({ user, onDietUpdate, tableOverride, trainerIdFi
       })
       mealsRef.current = u
       return u
+    })
+    setTimeout(() => requestSaveRef.current?.(), 0)
+  }
+
+  // 일일 즐겨찾기 적용 — 오늘 meals 를 통째로 교체. 기존 DB 행은 persistAll 의
+  // empty-content 분기에서 삭제되도록 빈 row 표현으로 두지 않고, 적용된 meals
+  // 전체를 새 slot 으로 재구성 (기존 id 유지: 같은 slot 이면 UPDATE, 없으면 INSERT).
+  const applyDayFavorite = (newMeals) => {
+    if (!Array.isArray(newMeals) || newMeals.length === 0) return
+    dirtyRef.current = true
+    setMeals(prev => {
+      // 기존 id 를 slot 기준으로 매핑해 보존 (UPDATE 경로)
+      const idBySlot = {}
+      prev.forEach(m => { if (m.id) idBySlot[m.slot] = m.id })
+      // 새 meals — 슬롯 번호는 1..N 으로 재부여 (즐겨찾기 저장 시 slot 값 그대로 사용)
+      const next = newMeals.map((m, i) => {
+        const slot = m.slot || i + 1
+        const calNum = parseInt(m.calories) || 0
+        const carbs = parseFloat(m.carbs) || 0
+        const protein = parseFloat(m.protein) || 0
+        const fat = parseFloat(m.fat) || 0
+        const auto = computeCal(carbs, protein, fat)
+        const isManual = calNum > 0 && auto > 0 && Math.abs(calNum - auto) > 1
+        return {
+          slot,
+          name: m.name || `식사 ${slot}`,
+          carbs: carbs > 0 ? String(carbs) : '',
+          protein: protein > 0 ? String(protein) : '',
+          fat: fat > 0 ? String(fat) : '',
+          calories: calNum > 0 ? String(calNum) : '',
+          media_url: '',
+          calorieManual: isManual,
+          id: idBySlot[slot] || null,
+        }
+      })
+      // 사용 안 된 기존 슬롯들도 살려둠 (id 보존해 persistAll 이 빈 내용으로 DELETE)
+      const usedSlots = new Set(next.map(m => m.slot))
+      prev.forEach(m => {
+        if (!usedSlots.has(m.slot) && m.id) {
+          next.push({ ...m, carbs: '', protein: '', fat: '', calories: '', media_url: '', calorieManual: false })
+        }
+      })
+      next.sort((a, b) => a.slot - b.slot)
+      mealsRef.current = next
+      return next
     })
     setTimeout(() => requestSaveRef.current?.(), 0)
   }
@@ -935,6 +983,17 @@ export default function DietLog({ user, onDietUpdate, tableOverride, trainerIdFi
         />
       )}
 
+      {dayFavOpen && (
+        <DietDayFavModal
+          userId={user.id}
+          currentMeals={meals}
+          onApply={applyDayFavorite}
+          onClose={() => setDayFavOpen(false)}
+          favTable={trainerIdField ? 'trainer_diet_day_favorites' : 'diet_day_favorites'}
+          favIdField={trainerIdField ? 'trainer_id' : 'member_id'}
+        />
+      )}
+
       {!forcedTab && (
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px', marginBottom: '12px' }}>
           <button onClick={() => setTab('log')} style={{ background: tab === 'log' ? THEME.primaryAccent : '#FFF', color: tab === 'log' ? THEME.primaryDark : THEME.textSub, border: 'none', borderRadius: '12px', padding: '10px', fontSize: '12px', fontWeight: tab === 'log' ? '500' : '400', cursor: 'pointer' }}>
@@ -948,7 +1007,25 @@ export default function DietLog({ user, onDietUpdate, tableOverride, trainerIdFi
 
       {tab === 'log' && (
         <div style={S.card}>
-          <p style={{ ...S.cardTitle, margin: '0 0 10px' }}>식단 기록</p>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px', gap: '8px' }}>
+            <p style={{ ...S.cardTitle, margin: 0 }}>식단 기록</p>
+            <button
+              onClick={() => setDayFavOpen(true)}
+              style={{
+                background: THEME.warningLight,
+                border: `0.5px solid ${THEME.warningBorder}`,
+                color: THEME.warning,
+                padding: '5px 10px',
+                borderRadius: '8px',
+                fontSize: '11px',
+                fontWeight: '500',
+                cursor: 'pointer',
+                fontFamily: 'inherit',
+                flexShrink: 0,
+              }}
+              title="하루 식단 통째로 저장·불러오기"
+            >📅 일일 즐겨찾기</button>
+          </div>
           <div style={{ marginBottom: '14px' }}>
             <DatePicker value={selectedDate} onChange={(d) => { if (dirtyRef.current) persistAll(); setSelectedDate(d) }} />
           </div>

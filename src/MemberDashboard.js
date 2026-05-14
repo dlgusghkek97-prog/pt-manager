@@ -134,6 +134,11 @@ export default function MemberDashboard({ user, onLogout }) {
 
   // 담당 트레이너의 운동 기록 (회원이 참고용으로 열람)
   const [trainerLogs, setTrainerLogs] = useState([])
+  // 담당 트레이너의 체성분/목표 — DietLog 소비 계산용
+  const [trainerProfile, setTrainerProfile] = useState({
+    weight: '', muscle: '', occupation: '',
+    macroResult: null, goal: '다이어트', intensity: '일반',
+  })
 
   const [exercises, setExercises] = useState([{ slot: 1, exercise_type: 'weight', body_part: '', exercise_name: '', memo: '', description: '', sets: [{ id: null, weight: '', reps: '', media_url: '' }] }])
   const [allLogs, setAllLogs] = useState([])
@@ -184,6 +189,7 @@ export default function MemberDashboard({ user, onLogout }) {
     refreshMemberInfo()
     loadTrainerName()
     loadTrainerWorkoutLogs()
+    loadTrainerProfile()
 
     // 푸시 알림 안내 모달 (2초 뒤 — 화면 렌더 안정화 후)
     const timer = setTimeout(async () => {
@@ -311,6 +317,33 @@ export default function MemberDashboard({ user, onLogout }) {
       .order('log_date')
     if (error) { console.error('[MemberDashboard] loadTrainerWorkoutLogs error:', error); return }
     setTrainerLogs(data || [])
+  }
+
+  // 담당 트레이너의 체성분/목표 — 식단 소비 계산용 (RLS: trainers SELECT 정책)
+  const loadTrainerProfile = async () => {
+    if (!user.trainer_id) return
+    const { data, error } = await supabase
+      .from('trainers')
+      .select('goal, macro_weight, macro_muscle, macro_occupation, macro_intensity, target_calories, target_carbs, target_protein, target_fat')
+      .eq('id', user.trainer_id)
+      .maybeSingle()
+    if (error) { console.error('[MemberDashboard] loadTrainerProfile error:', error); return }
+    if (!data) return
+    setTrainerProfile({
+      weight: data.macro_weight != null ? String(data.macro_weight) : '',
+      muscle: data.macro_muscle != null ? String(data.macro_muscle) : '',
+      occupation: data.macro_occupation || '',
+      goal: data.goal || '다이어트',
+      intensity: data.macro_intensity || '일반',
+      macroResult: (data.target_calories || data.target_carbs || data.target_protein || data.target_fat)
+        ? {
+            target: data.target_calories || 0,
+            carbs: data.target_carbs || 0,
+            protein: data.target_protein || 0,
+            fat: data.target_fat || 0,
+          }
+        : null,
+    })
   }
 
   const loadTodayDiet = async () => {
@@ -910,6 +943,12 @@ export default function MemberDashboard({ user, onLogout }) {
                     workoutTable="trainer_workout_logs"
                     workoutIdField="trainer_id"
                     forcedTab="stats"
+                    weight={trainerProfile.weight}
+                    muscle={trainerProfile.muscle}
+                    occupation={trainerProfile.occupation}
+                    macroResult={trainerProfile.macroResult}
+                    goal={trainerProfile.goal}
+                    intensity={trainerProfile.intensity}
                   />
                 )}
               </>
