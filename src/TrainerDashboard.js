@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react'
 import { supabase } from './supabase'
-import { S, THEME, PART_COLORS, generateCode, calcMacro, CYCLE_PHASES, OCCUPATION_MULTIPLIER, OCCUPATION_DESCRIPTION, loadFavorites, calcPtRemaining, addPtSessions, formatSupabaseError } from './utils'
+import { S, THEME, FONT, SPACING, RADIUS, PART_COLORS, generateCode, calcMacro, CYCLE_PHASES, OCCUPATION_MULTIPLIER, OCCUPATION_DESCRIPTION, loadFavorites, calcPtRemaining, addPtSessions, formatSupabaseError } from './utils'
 import WorkoutLog from './WorkoutLog'
 import WorkoutStats from './WorkoutStats'
 import DietLog from './DietLog'
@@ -1056,16 +1056,17 @@ export default function TrainerDashboard({ user, onLogout }) {
       background: active ? THEME.primaryAccent : '#FFF',
       color: active ? THEME.primaryDark : THEME.textSub,
       border: 'none',
-      borderRadius: '14px',
-      padding: '12px',
-      fontSize: '13px',
-      fontWeight: active ? '500' : '400',
+      borderRadius: RADIUS.lg,
+      padding: SPACING.md,
+      fontSize: `${FONT.lg}px`,
+      fontWeight: active ? 500 : 400,
       cursor: 'pointer',
+      fontFamily: 'inherit',
     }}>{label}</button>
   )
 
   const SubTabs = ({ value, onChange }) => (
-    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px', marginBottom: '12px', background: THEME.borderLight, padding: '4px', borderRadius: '12px' }}>
+    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: SPACING.xs, marginBottom: SPACING.md, background: THEME.borderLight, padding: SPACING.xs, borderRadius: RADIUS.md }}>
       {[
         { key: 'log', label: '기록' },
         { key: 'stats', label: '통계' },
@@ -1076,11 +1077,12 @@ export default function TrainerDashboard({ user, onLogout }) {
             background: active ? '#FFF' : 'transparent',
             color: active ? THEME.text : THEME.textSub,
             border: 'none',
-            borderRadius: '9px',
-            padding: '8px',
-            fontSize: '12px',
-            fontWeight: active ? '500' : '400',
+            borderRadius: RADIUS.sm,
+            padding: SPACING.sm,
+            fontSize: `${FONT.md}px`,
+            fontWeight: active ? 500 : 400,
             cursor: 'pointer',
+            fontFamily: 'inherit',
           }}>{label}</button>
         )
       })}

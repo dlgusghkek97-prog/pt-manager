@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react'
 import { supabase } from './supabase'
-import { S, THEME, calcMacro, CYCLE_PHASES, OCCUPATION_MULTIPLIER, OCCUPATION_DESCRIPTION, loadFavorites, calcPtRemaining, markTodayComplete, isTodayCompleted, formatSupabaseError } from './utils'
+import { S, THEME, FONT, SPACING, RADIUS, BTN_HEIGHT, calcMacro, CYCLE_PHASES, OCCUPATION_MULTIPLIER, OCCUPATION_DESCRIPTION, loadFavorites, calcPtRemaining, markTodayComplete, isTodayCompleted, formatSupabaseError } from './utils'
 import WorkoutLog from './WorkoutLog'
 import WorkoutStats from './WorkoutStats'
 import DietLog from './DietLog'
@@ -499,7 +499,6 @@ export default function MemberDashboard({ user, onLogout }) {
 
   const MainTabBtn = ({ tabKey, label }) => {
     const active = mainTab === tabKey
-    // 라벨 길이 안전망: 6자 초과면 폰트 축소
     const longLabel = (label || '').length > 6
     return (
       <button
@@ -508,15 +507,16 @@ export default function MemberDashboard({ user, onLogout }) {
           background: active ? THEME.primaryAccent : '#FFF',
           color: active ? THEME.primaryDark : THEME.textSub,
           border: 'none',
-          borderRadius: '14px',
-          padding: '12px 6px',
-          fontSize: longLabel ? '11px' : '13px',
-          fontWeight: active ? '500' : '400',
+          borderRadius: RADIUS.lg,
+          padding: `${SPACING.md}px ${SPACING.xs + 2}px`,
+          fontSize: longLabel ? `${FONT.sm}px` : `${FONT.lg}px`,
+          fontWeight: active ? 500 : 400,
           cursor: 'pointer',
           overflow: 'hidden',
           textOverflow: 'ellipsis',
           whiteSpace: 'nowrap',
           minWidth: 0,
+          fontFamily: 'inherit',
         }}
         title={label}
       >{label}</button>
@@ -524,7 +524,7 @@ export default function MemberDashboard({ user, onLogout }) {
   }
 
   const SubTabs = ({ value, onChange }) => (
-    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px', marginBottom: '12px', background: THEME.borderLight, padding: '4px', borderRadius: '12px' }}>
+    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: SPACING.xs, marginBottom: SPACING.md, background: THEME.borderLight, padding: SPACING.xs, borderRadius: RADIUS.md }}>
       {[
         { key: 'log', label: '기록' },
         { key: 'stats', label: '통계' },
@@ -538,11 +538,12 @@ export default function MemberDashboard({ user, onLogout }) {
               background: active ? '#FFF' : 'transparent',
               color: active ? THEME.text : THEME.textSub,
               border: 'none',
-              borderRadius: '9px',
-              padding: '8px',
-              fontSize: '12px',
-              fontWeight: active ? '500' : '400',
+              borderRadius: RADIUS.sm,
+              padding: SPACING.sm,
+              fontSize: `${FONT.md}px`,
+              fontWeight: active ? 500 : 400,
               cursor: 'pointer',
+              fontFamily: 'inherit',
             }}
           >{label}</button>
         )

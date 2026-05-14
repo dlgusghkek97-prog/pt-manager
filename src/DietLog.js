@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react'
 import { supabase } from './supabase'
-import { S, THEME, calcWeightCalories, calcTDEE, calcDailyBurn, calcDailyBurnBreakdown, checkMediaSize } from './utils'
+import { S, THEME, FONT, SPACING, RADIUS, calcWeightCalories, calcTDEE, calcDailyBurn, calcDailyBurnBreakdown, checkMediaSize } from './utils'
 import DatePicker from './DatePicker'
 import DietFavModal from './DietFavModal'
 import DietDayFavModal from './DietDayFavModal'
