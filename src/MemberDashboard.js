@@ -163,8 +163,7 @@ export default function MemberDashboard({ user, onLogout }) {
   const [todayDiet, setTodayDiet] = useState([])
   const [showHelp, setShowHelp] = useState(false)
 
-  const [inbodyOpen, setInbodyOpen] = useState(false)
-  const [inbodyDefaultView, setInbodyDefaultView] = useState('input')  // 'input' | 'chart'
+  // 인바디는 메인 탭 [인바디] 로 이동 (embedded)
 
   const [memberInfo, setMemberInfo] = useState(user)
   const [completingToday, setCompletingToday] = useState(false)
@@ -642,12 +641,8 @@ export default function MemberDashboard({ user, onLogout }) {
           </div>
         </div>
 
-        {/* 헤더 다음 줄: [인바디] [🔔] [💬] [?] 4칸 균등 캡슐 */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '6px', marginBottom: '10px' }}>
-          <button
-            onClick={() => { setInbodyDefaultView('input'); setInbodyOpen(true) }}
-            style={{ background: '#FFF', border: `0.5px solid ${THEME.primaryAccent}`, color: THEME.primary, padding: '0 8px', borderRadius: '18px', cursor: 'pointer', fontSize: '12px', fontWeight: '500', height: '36px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'inherit' }}
-          >인바디</button>
+        {/* 헤더 다음 줄: [🔔] [💬] [?] 3칸 균등 캡슐 — 인바디는 메인 탭으로 이동 */}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '6px', marginBottom: '10px' }}>
           <NotificationBell userId={user.id} userType="member" onNavigate={handleNavigate} size={36} wide />
           <button
             onClick={() => setChatOpen(true)}
@@ -686,16 +681,6 @@ export default function MemberDashboard({ user, onLogout }) {
             ptIsZero={ptIsZero}
           />
         )}
-
-        <InbodyModal
-          user={user}
-          memberId={user.id}
-          isOpen={inbodyOpen}
-          defaultView={inbodyDefaultView}
-          onClose={() => setInbodyOpen(false)}
-          table="member_inbody"
-          idField="member_id"
-        />
 
         {showCalcModal && (
           <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.5)', zIndex: 1000, display: 'flex', alignItems: 'flex-end', justifyContent: 'center' }}>
@@ -873,11 +858,24 @@ export default function MemberDashboard({ user, onLogout }) {
           </div>
         )}
 
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '6px', marginBottom: '10px' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '5px', marginBottom: '10px' }}>
           <MainTabBtn tabKey="workout" label="운동" />
           <MainTabBtn tabKey="diet" label="식단" />
+          <MainTabBtn tabKey="inbody" label="인바디" />
           <MainTabBtn tabKey="trainer" label="내 트레이너" />
         </div>
+
+        {mainTab === 'inbody' && (
+          <InbodyModal
+            user={user}
+            memberId={user.id}
+            isOpen={true}
+            defaultView="input"
+            table="member_inbody"
+            idField="member_id"
+            embedded
+          />
+        )}
 
         {mainTab === 'workout' && (
           <>

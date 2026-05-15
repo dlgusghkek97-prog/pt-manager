@@ -221,8 +221,9 @@ function MiniMetricChart({ data, metric, isLast }) {
 export default function InbodyModal({
   user, memberId, isOpen, defaultView = 'input', onClose,
   table = 'member_inbody', idField = 'member_id',
+  embedded = false,  // true 면 모달 overlay 없이 인라인 카드처럼 렌더 (메인 탭 안에서 사용)
 }) {
-  useModalBackButton(isOpen, onClose)
+  useModalBackButton(!embedded && isOpen, onClose)
 
   const [view, setView] = useState(defaultView)
   const [records, setRecords] = useState([])
@@ -352,11 +353,18 @@ export default function InbodyModal({
     return records.filter(r => r._source === 'member' || r._table === 'member_inbody')
   }, [records, isTrainerInput])
 
-  if (!isOpen) return null
+  if (!embedded && !isOpen) return null
 
-  return (
-    <div style={overlay}>
-      <div style={modal}>
+  // 인라인(embedded) 모드는 카드 형태로 렌더. 메인 탭 안에서 직접 사용.
+  const wrapStyle = embedded
+    ? { background: '#FFF', borderRadius: RADIUS.lg, padding: '14px 16px', marginBottom: SPACING.md }
+    : modal
+  const wrapper = (content) => embedded
+    ? <div style={wrapStyle}>{content}</div>
+    : <div style={overlay}><div style={modal}>{content}</div></div>
+
+  return wrapper(
+    <>
         <div style={headerStyle}>
           <div style={{ display: 'flex', alignItems: 'center' }}>
             <h3 style={titleStyle}>인바디</h3>
@@ -368,7 +376,7 @@ export default function InbodyModal({
               '체지방률 입력하면 기초대사량(BMR) 계산이 정확해짐. 안 넣으면 골격근량 × 1.4로 추정.',
             ]} />
           </div>
-          <CloseButton onClick={onClose} />
+          {!embedded && <CloseButton onClick={onClose} />}
         </div>
 
         {/* 입력 / 추이 메인 탭 */}
@@ -548,7 +556,6 @@ export default function InbodyModal({
             )}
           </>
         )}
-      </div>
-    </div>
+    </>
   )
 }
