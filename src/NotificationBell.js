@@ -6,6 +6,7 @@ import {
   isPushSupported, getPushPermissionStatus, isPushSubscribed,
   subscribeToPush, unsubscribeFromPush,
 } from './utils'
+import CloseButton from './CloseButton'
 
 const BellIcon = ({ color = THEME.text, size = 16 }) => (
   <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
@@ -281,18 +282,7 @@ export default function NotificationBell({ userId, userType, onNavigate, size = 
                     }}
                   >모두 읽음</button>
                 )}
-                <button
-                  onClick={() => setOpen(false)}
-                  style={{
-                    background: 'none',
-                    border: 'none',
-                    fontSize: '20px',
-                    cursor: 'pointer',
-                    color: THEME.textSub,
-                    padding: 0,
-                    lineHeight: 1,
-                  }}
-                >✕</button>
+                <CloseButton onClick={() => setOpen(false)} size={28} />
               </div>
             </div>
 

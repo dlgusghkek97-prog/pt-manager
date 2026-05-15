@@ -9,6 +9,7 @@ import {
 } from './utils'
 import useModalBackButton from './useModalBackButton'
 import LegalModal from './LegalModal'
+import CloseButton from './CloseButton'
 
 const TOSS_CLIENT_KEY = process.env.REACT_APP_TOSS_CLIENT_KEY || ''
 const TOSS_ENABLED = TOSS_CLIENT_KEY && !TOSS_CLIENT_KEY.includes('PLACEHOLDER')
@@ -137,10 +138,7 @@ export default function SubscriptionModal({ trainerId, trainerEmail, onClose }) 
             padding: '14px 16px', borderBottom: `0.5px solid ${THEME.border}`, flexShrink: 0,
           }}>
             <p style={{ fontSize: '14px', fontWeight: '500', color: THEME.primary, margin: 0 }}>구독 관리</p>
-            <button onClick={onClose} style={{
-              background: 'none', border: 'none', fontSize: '20px', cursor: 'pointer',
-              color: THEME.textSub, padding: '0 4px', lineHeight: 1,
-            }}>✕</button>
+            <CloseButton onClick={onClose} />
           </div>
 
           <div style={{ padding: '14px 16px', overflowY: 'auto', flex: 1 }}>

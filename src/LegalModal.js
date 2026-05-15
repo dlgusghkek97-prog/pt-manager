@@ -2,6 +2,7 @@ import React from 'react'
 import { THEME } from './utils'
 import { TERMS_OF_SERVICE, PRIVACY_POLICY, REFUND_POLICY, TERMS_VERSION } from './legal'
 import useModalBackButton from './useModalBackButton'
+import CloseButton from './CloseButton'
 
 // 약관 / 개인정보 처리방침 / 환불 정책 텍스트 표시용 모달.
 // kind: 'terms' | 'privacy' | 'refund'
@@ -51,10 +52,7 @@ export default function LegalModal({ kind, onClose }) {
           <p style={{ fontSize: '14px', fontWeight: '500', color: THEME.primary, margin: 0 }}>
             {title}
           </p>
-          <button
-            onClick={onClose}
-            style={{ background: 'none', border: 'none', fontSize: '20px', cursor: 'pointer', color: THEME.textSub, padding: '0 4px', lineHeight: 1 }}
-          >✕</button>
+          <CloseButton onClick={onClose} />
         </div>
         <div style={{
           flex: 1,

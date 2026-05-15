@@ -1,6 +1,7 @@
 import React from 'react'
 import { THEME } from './utils'
 import useModalBackButton from './useModalBackButton'
+import CloseButton from './CloseButton'
 
 export default function HelpModal({ type, onClose }) {
   useModalBackButton(true, onClose)
@@ -503,10 +504,7 @@ export default function HelpModal({ type, onClose }) {
           <p style={{ fontSize: '14px', fontWeight: '500', color: THEME.primary, margin: 0 }}>
             {isTrainer ? '트레이너' : '회원'} 사용 설명서
           </p>
-          <button
-            onClick={onClose}
-            style={{ background: 'none', border: 'none', fontSize: '20px', cursor: 'pointer', color: THEME.textSub, padding: '0 4px', lineHeight: 1 }}
-          >✕</button>
+          <CloseButton onClick={onClose} />
         </div>
 
         <div style={{

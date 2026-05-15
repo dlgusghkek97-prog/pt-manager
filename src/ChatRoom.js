@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react'
 import { supabase } from './supabase'
 import { THEME, loadMessages, sendMessage, markMessagesRead, uploadChatImage, getOrCreateConversation } from './utils'
 import useModalBackButton from './useModalBackButton'
+import CloseButton from './CloseButton'
 
 const PhotoIcon = ({ color = THEME.primary, size = 16 }) => (
   <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="1.8" strokeLinecap="round">
@@ -262,18 +263,6 @@ export default function ChatRoom({
           gap: '10px',
           flexShrink: 0,
         }}>
-          <button
-            onClick={onClose}
-            style={{
-              background: 'none',
-              border: 'none',
-              color: THEME.primary,
-              fontSize: '20px',
-              padding: 0,
-              cursor: 'pointer',
-              lineHeight: 1,
-            }}
-          >←</button>
           <div style={{
             width: '32px',
             height: '32px',
@@ -298,6 +287,7 @@ export default function ChatRoom({
               연결됨
             </p>
           </div>
+          <CloseButton onClick={onClose} />
         </div>
 
         {/* 메시지 영역 */}

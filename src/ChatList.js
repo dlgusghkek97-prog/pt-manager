@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react'
 import { supabase } from './supabase'
 import { THEME, loadChatListForTrainer } from './utils'
 import useModalBackButton from './useModalBackButton'
+import CloseButton from './CloseButton'
 
 const ChatIcon = ({ color = THEME.text, size = 16 }) => (
   <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
@@ -126,18 +127,7 @@ export default function ChatList({ trainerId, isOpen, onClose, onSelectConversat
           flexShrink: 0,
         }}>
           <p style={{ fontSize: '14px', fontWeight: '500', color: THEME.text, margin: 0 }}>채팅</p>
-          <button
-            onClick={onClose}
-            style={{
-              background: 'none',
-              border: 'none',
-              fontSize: '20px',
-              cursor: 'pointer',
-              color: THEME.textSub,
-              padding: 0,
-              lineHeight: 1,
-            }}
-          >✕</button>
+          <CloseButton onClick={onClose} />
         </div>
 
         <div style={{ flex: 1, overflowY: 'auto' }}>

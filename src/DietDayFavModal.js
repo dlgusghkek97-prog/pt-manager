@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react'
 import { THEME, loadDietDayFavorites, addDietDayFavorite, removeDietDayFavorite, formatSupabaseError } from './utils'
 import useModalBackButton from './useModalBackButton'
+import CloseButton from './CloseButton'
 
 // 일일 식단 즐겨찾기 모달 — 하루 전체 끼니(N개)를 한 번에 저장·불러오기.
 // - 현재 화면 meals 전체를 한 라벨로 저장
@@ -69,7 +70,7 @@ export default function DietDayFavModal({
       <div style={{ background: '#FFF', borderRadius: '14px', padding: '18px', width: '100%', maxWidth: '360px', maxHeight: '85vh', overflowY: 'auto', boxSizing: 'border-box' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
           <p style={{ fontSize: '14px', fontWeight: '500', color: THEME.primary, margin: 0 }}>📅 일일 식단 즐겨찾기</p>
-          <button onClick={onClose} style={{ background: 'none', border: 'none', fontSize: '18px', cursor: 'pointer', color: THEME.textSub, padding: '0 4px', lineHeight: 1 }}>✕</button>
+          <CloseButton onClick={onClose} />
         </div>
 
         {/* 현재 식단 통째로 저장 */}

@@ -5,6 +5,7 @@ import {
   addInbody, updateInbody, deleteInbody, getInbodyStats,
 } from './utils'
 import useModalBackButton from './useModalBackButton'
+import CloseButton from './CloseButton'
 
 // ─── 통합 인바디 모달 — [입력] / [추이] 탭 ───
 // props:
@@ -357,7 +358,7 @@ export default function InbodyModal({
       <div style={modal}>
         <div style={headerStyle}>
           <h3 style={titleStyle}>인바디</h3>
-          <button style={closeBtn} onClick={onClose}>×</button>
+          <CloseButton onClick={onClose} />
         </div>
 
         {/* 입력 / 추이 메인 탭 */}

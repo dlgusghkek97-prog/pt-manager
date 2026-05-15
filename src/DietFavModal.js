@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react'
 import { THEME, loadDietFavorites, addDietFavorite, removeDietFavorite } from './utils'
 import useModalBackButton from './useModalBackButton'
+import CloseButton from './CloseButton'
 
 // 식단 즐겨찾기 모달.
 // - 상단: 현재 식사 입력값을 즐겨찾기로 저장
@@ -84,7 +85,7 @@ export default function DietFavModal({
       >
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
           <p style={{ fontSize: '14px', fontWeight: '500', color: THEME.primary, margin: 0 }}>★ 식단 즐겨찾기</p>
-          <button onClick={onClose} style={{ background: 'none', border: 'none', fontSize: '18px', cursor: 'pointer', color: THEME.textSub, padding: '0 4px', lineHeight: 1 }}>✕</button>
+          <CloseButton onClick={onClose} />
         </div>
 
         {/* 현재 입력값 즐겨찾기로 저장 */}
