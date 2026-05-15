@@ -13,6 +13,7 @@ export default function SubscriptionGate({ user, userType, onOpenPay, onLogout, 
     let alive = true
 
     const check = async () => {
+      // 트레이너 본인이 마스터면 즉시 통과 (이메일로 빠른 분기)
       if (userType === 'trainer' && isAdminEmail(user.email)) {
         if (alive) setState({ loading: false, active: true, info: { state: 'admin' } })
         return
@@ -22,6 +23,20 @@ export default function SubscriptionGate({ user, userType, onOpenPay, onLogout, 
       if (!trainerId) {
         if (alive) setState({ loading: false, active: true, info: null })
         return
+      }
+
+      // 회원: 담당 트레이너가 마스터면 통과 (서버 RPC 로 확인)
+      if (userType === 'member') {
+        try {
+          const { data: isAdmin } = await supabase.rpc('is_admin_trainer', { _trainer_id: trainerId })
+          if (alive && isAdmin === true) {
+            setState({ loading: false, active: true, info: { state: 'admin_trainer' } })
+            return
+          }
+        } catch (e) {
+          // RPC 미배포 등 — fallback 으로 일반 검사 계속
+          console.warn('[SubscriptionGate] is_admin_trainer RPC failed:', e)
+        }
       }
 
       const { data, error } = await supabase
