@@ -1338,7 +1338,7 @@ export default function DietLog({ user, onDietUpdate, tableOverride, trainerIdFi
               <NutrientChart nutrientKey={activeNutrient} color={currentNutrient.color} />
             )}
 
-            <div style={{ display: 'grid', gridTemplateColumns: `repeat(${NUTRIENTS.length}, 1fr)`, gap: '3px', marginTop: '10px' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '4px', marginTop: '10px' }}>
               {NUTRIENTS.map(n => (
                 <button
                   key={n.key}
@@ -1348,15 +1348,14 @@ export default function DietLog({ user, onDietUpdate, tableOverride, trainerIdFi
                     color: activeNutrient === n.key ? '#FFF' : THEME.textSub,
                     border: 'none',
                     borderRadius: '12px',
-                    padding: '6px 0',
-                    fontSize: '9.5px',
+                    padding: '7px 0',
+                    fontSize: '11px',
                     fontWeight: activeNutrient === n.key ? '500' : '400',
                     cursor: 'pointer',
                     overflow: 'hidden',
                     textOverflow: 'ellipsis',
                     whiteSpace: 'nowrap',
                     minWidth: 0,
-                    letterSpacing: '-0.3px',
                   }}
                   title={n.label}
                 >{n.label}</button>

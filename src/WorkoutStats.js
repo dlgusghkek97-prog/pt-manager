@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react'
-import { PARTS, PART_COLORS, S, THEME, getWeekNum, weekLabels, calcPRs, BIG4_EXERCISES, loadBig4PRs, saveBig4PR } from './utils'
+import { PARTS, PART_COLORS, S, THEME, getWeekNum, weekLabels, calcPRs, BIG4_EXERCISES, loadBig4PRs, saveBig4PR, uploadPRMedia, removePRMedia } from './utils'
 import HelpDot from './HelpDot'
 
 export default function WorkoutStats({
@@ -20,6 +20,7 @@ export default function WorkoutStats({
   const [big4State, setBig4State] = useState({})
   const [big4Loading, setBig4Loading] = useState(false)
   const [big4Draft, setBig4Draft] = useState({})
+  const [prPreview, setPRPreview] = useState(null)  // { url, isVideo, label }
 
   useEffect(() => {
     if (statsTab === 'pr' && memberId) {
@@ -58,6 +59,34 @@ export default function WorkoutStats({
     const result = await saveBig4PR(memberId, key, draft.weight, draft.reps, bigPrTable, bigPrIdField)
     if (!result.success) {
       alert('저장 실패: ' + result.error)
+      return
+    }
+    await reloadBig4()
+  }
+
+  const handlePRMediaUpload = async (key, file) => {
+    if (!memberId) return
+    // 기록이 없으면 미리 빈 PR row 생성 (saveBig4PR — weight/reps null 안 됨, weight=0 placeholder)
+    if (!big4State[key]?.id) {
+      const draft = big4Draft[key] || {}
+      const w = draft.weight || '0'
+      const r = draft.reps || '0'
+      await saveBig4PR(memberId, key, w, r, bigPrTable, bigPrIdField)
+    }
+    const res = await uploadPRMedia(memberId, key, file, bigPrTable, bigPrIdField)
+    if (!res.success) {
+      alert('업로드 실패: ' + res.error)
+      return
+    }
+    await reloadBig4()
+  }
+
+  const handlePRMediaRemove = async (key) => {
+    if (!memberId) return
+    if (!window.confirm('이 PR 영상/사진을 삭제할까요?')) return
+    const res = await removePRMedia(memberId, key, bigPrTable, bigPrIdField)
+    if (!res.success) {
+      alert('삭제 실패: ' + res.error)
       return
     }
     await reloadBig4()
@@ -178,6 +207,22 @@ export default function WorkoutStats({
 
   return (
     <div>
+      {prPreview && (
+        <div
+          onClick={() => setPRPreview(null)}
+          style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.9)', zIndex: 1200, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: 20, cursor: 'pointer' }}
+        >
+          <div style={{ fontSize: 12, color: '#FFF', marginBottom: 10 }}>{prPreview.label}</div>
+          {prPreview.isVideo ? (
+            <video src={prPreview.url} controls autoPlay
+              style={{ maxWidth: '100%', maxHeight: '80vh', borderRadius: 8 }}
+              onClick={e => e.stopPropagation()} />
+          ) : (
+            <img src={prPreview.url} alt={prPreview.label}
+              style={{ maxWidth: '100%', maxHeight: '80vh', borderRadius: 8 }} />
+          )}
+        </div>
+      )}
       <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 6 }}>
         <HelpDot title="운동 통계 보기" items={[
           '상단 요약 — 오늘 / 이번 주 / 이번 달 총 볼륨.',
@@ -543,6 +588,8 @@ export default function WorkoutStats({
                   const draft = big4Draft[key] || { weight: '', reps: '' }
                   const saved = big4State[key]
                   const recordedDate = saved?.recorded_date
+                  const mediaUrl = saved?.media_url
+                  const isVideo = mediaUrl && /\.(mp4|mov|webm|m4v)(\?|$)/i.test(mediaUrl)
 
                   return (
                     <div key={key} style={{
@@ -551,11 +598,18 @@ export default function WorkoutStats({
                       borderRadius: '10px',
                       padding: '9px',
                     }}>
-                      <div style={{ fontSize: '11px', color: THEME.primary, marginBottom: '6px', fontWeight: '500' }}>
-                        {label}
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+                        <div style={{ fontSize: '11px', color: THEME.primary, fontWeight: '500' }}>{label}</div>
+                        {mediaUrl && (
+                          <button
+                            onClick={() => handlePRMediaRemove(key)}
+                            style={{ background: 'none', border: 'none', color: THEME.danger, fontSize: '10px', cursor: 'pointer', padding: 0 }}
+                            title="영상/사진 삭제"
+                          >✕</button>
+                        )}
                       </div>
 
-                      <div style={{ display: 'flex', alignItems: 'baseline', gap: '4px', whiteSpace: 'nowrap' }}>
+                      <div style={{ display: 'flex', alignItems: 'baseline', gap: '4px', whiteSpace: 'nowrap', marginBottom: '6px' }}>
                         <input
                           type="number"
                           inputMode="decimal"
@@ -579,7 +633,44 @@ export default function WorkoutStats({
                         <span style={{ fontSize: '10px', color: THEME.textSub }}>회</span>
                       </div>
 
-                      <div style={{ fontSize: '9px', color: THEME.textHint, marginTop: '3px' }}>
+                      {/* 영상/사진 슬롯 — 한 달 자동삭제 예외 (영구 보존) */}
+                      {mediaUrl ? (
+                        <div
+                          onClick={() => setPRPreview({ url: mediaUrl, isVideo, label })}
+                          style={{
+                            width: '100%', height: 70, borderRadius: 6, overflow: 'hidden',
+                            background: '#000', cursor: 'pointer', position: 'relative',
+                            marginBottom: 4,
+                          }}
+                        >
+                          {isVideo ? (
+                            <video src={mediaUrl} muted playsInline preload="metadata"
+                              style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                          ) : (
+                            <img src={mediaUrl} alt={label}
+                              style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
+                          )}
+                          {isVideo && (
+                            <div style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', width: 26, height: 26, borderRadius: '50%', background: 'rgba(0,0,0,0.55)', color: '#FFF', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11 }}>▶</div>
+                          )}
+                        </div>
+                      ) : (
+                        <label style={{
+                          display: 'flex', alignItems: 'center', justifyContent: 'center',
+                          gap: 4, height: 30, borderRadius: 6,
+                          border: `0.5px dashed ${THEME.primaryAccent}`,
+                          background: '#FFF', color: THEME.primary,
+                          fontSize: 10, fontWeight: 500, cursor: 'pointer',
+                          marginBottom: 4,
+                        }}>
+                          + 영상/사진
+                          <input type="file" accept="image/*,video/*" style={{ display: 'none' }}
+                            onChange={e => e.target.files[0] && handlePRMediaUpload(key, e.target.files[0])}
+                          />
+                        </label>
+                      )}
+
+                      <div style={{ fontSize: '9px', color: THEME.textHint }}>
                         {recordedDate ? recordedDate.replace(/-/g, '.') : '미기록'}
                       </div>
                     </div>

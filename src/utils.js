@@ -747,9 +747,62 @@ export const loadBig4PRs = async (
       reps: row.reps,
       recorded_date: row.recorded_date,
       updated_at: row.updated_at,
+      media_url: row.media_url || null,
     }
   })
   return result
+}
+
+// PR 영상/사진 업로드 — 30일 자동삭제 정책에서 제외되도록 'pr/' prefix 사용.
+// 반환: { success, url? }
+export const uploadPRMedia = async (
+  userId,
+  exerciseKey,
+  file,
+  table = 'personal_records',
+  idField = 'member_id'
+) => {
+  if (!file) return { success: false, error: '파일이 없습니다' }
+  const sizeCheck = checkMediaSize(file)
+  if (!sizeCheck.ok) return { success: false, error: sizeCheck.error }
+
+  const ext = (file.name.split('.').pop() || 'bin').toLowerCase()
+  // 'pr/' prefix — cleanup_old_media() 가 보존
+  const fileName = `pr/${userId}/${exerciseKey}_${Date.now()}.${ext}`
+  const { error: uploadError } = await supabase.storage
+    .from('workout-media')
+    .upload(fileName, file, { upsert: true })
+  if (uploadError) return { success: false, error: uploadError.message }
+
+  const { data: urlData } = supabase.storage.from('workout-media').getPublicUrl(fileName)
+  const url = urlData?.publicUrl
+  if (!url) return { success: false, error: 'URL 생성 실패' }
+
+  // PR row 의 media_url 업데이트
+  const { error: updErr } = await supabase
+    .from(table)
+    .update({ media_url: url, updated_at: new Date().toISOString() })
+    .eq(idField, userId)
+    .eq('exercise_key', exerciseKey)
+  if (updErr) return { success: false, error: updErr.message }
+
+  return { success: true, url }
+}
+
+// PR 미디어 제거
+export const removePRMedia = async (
+  userId,
+  exerciseKey,
+  table = 'personal_records',
+  idField = 'member_id'
+) => {
+  const { error } = await supabase
+    .from(table)
+    .update({ media_url: null, updated_at: new Date().toISOString() })
+    .eq(idField, userId)
+    .eq('exercise_key', exerciseKey)
+  if (error) return { success: false, error: error.message }
+  return { success: true }
 }
 
 export const saveBig4PR = async (
