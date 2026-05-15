@@ -17,6 +17,7 @@ import SubscriptionModal from './SubscriptionModal'
 import SubscriptionGate from './SubscriptionGate'
 import useModalBackButton from './useModalBackButton'
 import useTabHistory from './useTabHistory'
+import HelpDot from './HelpDot'
 import { loadSubscription, summarizeSubscription, canAddMember } from './utils'
 
 const NOTE_COLOR_POOL = [
@@ -1764,7 +1765,17 @@ export default function TrainerDashboard({ user, onLogout }) {
         {view === 'members' && topTab === 'members' && (
           <div style={S.card}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px' }}>
-              <p style={{ ...S.cardTitle, margin: 0 }}>회원 관리</p>
+              <div style={{ display: 'flex', alignItems: 'center' }}>
+                <p style={{ ...S.cardTitle, margin: 0 }}>회원 관리</p>
+                <HelpDot title="회원 관리" items={[
+                  '[+ 회원 추가] — 이름·성별·목표·PT 시작일 입력 → 6자리 코드 자동 발급.',
+                  '회원 카드의 [전송] 버튼 — 카톡으로 코드 공유.',
+                  '회원 카드 탭 → 상세 화면. 운동·식단·인바디·채팅·메모 모두 관리.',
+                  'PT 잔여 횟수 카드 탭 → 충전 / 회수 가능.',
+                  '시작일 카드 탭 → 수정 가능.',
+                  '회원 이름 옆 노란 점 = 직업 활동량 미설정 (식단 설정 안내 필요).',
+                ]} />
+              </div>
               <button style={S.addBtn} onClick={() => { setShowAddMember(!showAddMember); setGeneratedCode('') }}>+ 회원 추가</button>
             </div>
 

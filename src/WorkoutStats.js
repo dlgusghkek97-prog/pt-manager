@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react'
 import { PARTS, PART_COLORS, S, THEME, getWeekNum, weekLabels, calcPRs, BIG4_EXERCISES, loadBig4PRs, saveBig4PR } from './utils'
+import HelpDot from './HelpDot'
 
 export default function WorkoutStats({
   allLogs,
@@ -177,6 +178,15 @@ export default function WorkoutStats({
 
   return (
     <div>
+      <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 6 }}>
+        <HelpDot title="운동 통계 보기" items={[
+          '상단 요약 — 오늘 / 이번 주 / 이번 달 총 볼륨.',
+          '[일간] 달력 — 점·부위 라벨로 어떤 부위 운동했는지 한눈에. 셀 누르면 그 날의 운동 기록으로 이동.',
+          '일간 하단 — 부위별로 그 달의 날짜·볼륨 시계열.',
+          '[주간/월간] — 부위별 막대 그래프. 카드 안의 최대 부위 기준 비례.',
+          '[PR] — 4대 종목(스쿼트/데드리프트/벤치/오버헤드) 직접 입력 + 자동 PR 추적.',
+        ]} />
+      </div>
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '8px', marginBottom: '10px' }}>
         {[
           { label: '오늘', val: todayTotal, color: THEME.nutCarbsDark },

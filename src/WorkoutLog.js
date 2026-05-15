@@ -3,6 +3,7 @@ import { supabase } from './supabase'
 import { PARTS, PART_COLORS, S, THEME, calcWeightCalories, checkNewPRs, getLatestRecord, addFavorite, removeFavorite, checkMediaSize } from './utils'
 import DatePicker from './DatePicker'
 import useModalBackButton from './useModalBackButton'
+import HelpDot from './HelpDot'
 
 const CameraIcon = ({ color = '#A8C8B5', size = 20 }) => (
   <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="1.8" strokeLinecap="round">
@@ -891,7 +892,15 @@ export default function WorkoutLog({ user, selectedDate, setSelectedDate, exerci
 
       <div style={S.card}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
-          <p style={{ ...S.cardTitle, margin: 0 }}>오늘 운동 요약</p>
+          <div style={{ display: 'flex', alignItems: 'center' }}>
+            <p style={{ ...S.cardTitle, margin: 0 }}>오늘 운동 요약</p>
+            <HelpDot title="오늘 운동 요약" items={[
+              '오늘 입력한 웨이트 + 유산소를 한 카드에 모아 보여줍니다.',
+              '오늘 소비 칼로리 = 웨이트 + 유산소 합산. 웨이트는 볼륨·세트수 기반 추정치라 실제와 차이 가능.',
+              '카드를 누르면 해당 운동/유산소 기록 삭제·수정 가능.',
+              '총 볼륨 = 모든 무게 × 횟수 합계 (kg). 운동량의 핵심 지표.',
+            ]} />
+          </div>
         </div>
 
         {(weightExercises.filter(ex => ex.exercise_name).length > 0 || cardioExercises.length > 0) && (
@@ -972,7 +981,18 @@ export default function WorkoutLog({ user, selectedDate, setSelectedDate, exerci
       </div>
 
       <div style={{ ...S.card, paddingBottom: '90px' }}>
-        <p style={{ ...S.cardTitle, margin: '0 0 10px' }}>운동 기록</p>
+        <div style={{ display: 'flex', alignItems: 'center', marginBottom: '10px' }}>
+          <p style={{ ...S.cardTitle, margin: 0 }}>운동 기록</p>
+          {!readOnly && <HelpDot title="운동 기록 입력법" items={[
+            '부위 → 종목명 → 무게(kg) → 횟수 순서로 입력.',
+            '입력칸을 떠나면 자동 저장 — 별도 저장 버튼 없음.',
+            '세트 추가 시 직전 세트의 무게·횟수가 자동 복사됨.',
+            '★ 즐겨찾기 — 자주 하는 종목 저장해서 한 번에 불러오기.',
+            '사진/영상 첨부 가능 (영상 100MB 이하, 30일 후 자동 삭제).',
+            '맨몸 운동은 본인 체중 × 강도 비율로 입력 (푸쉬업 100% / 인클라인 50~70%).',
+            '유산소는 별도 카드에서 칼로리 직접 입력.',
+          ]} />}
+        </div>
         {readOnly && (
           <div style={{ background: THEME.primaryLight, border: `0.5px solid ${THEME.primaryAccent}`, borderRadius: '8px', padding: '7px 10px', marginBottom: '10px', fontSize: '11px', color: THEME.primaryDark }}>
             참고용 — 편집 불가 (트레이너의 기록)
