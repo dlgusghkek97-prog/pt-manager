@@ -23,14 +23,14 @@ export default function HelpDot({ title, items = [], size = 18 }) {
         aria-label={`${title} 도움말`}
         type="button"
         style={{
-          background: 'transparent',
-          border: `0.5px solid ${THEME.border}`,
-          color: THEME.textSub,
+          background: THEME.primaryLight,
+          border: `0.5px solid ${THEME.primaryAccent}`,
+          color: THEME.primary,
           width: size,
           height: size,
           borderRadius: '50%',
-          fontSize: `${Math.round(size * 0.6)}px`,
-          fontWeight: 500,
+          fontSize: `${Math.round(size * 0.65)}px`,
+          fontWeight: 600,
           cursor: 'pointer',
           padding: 0,
           display: 'inline-flex',

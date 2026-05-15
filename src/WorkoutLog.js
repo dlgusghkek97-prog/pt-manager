@@ -1021,19 +1021,21 @@ export default function WorkoutLog({ user, selectedDate, setSelectedDate, exerci
 
           return (
             <div key={exIdx} style={{ background: THEME.cardAlt, borderRadius: '10px', padding: '10px', marginBottom: '10px' }}>
-              <div style={{ display: 'grid', gridTemplateColumns: '70px 1fr 26px', gap: '6px', marginBottom: '7px' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: '70px 1fr 32px 32px', gap: '6px', marginBottom: '7px' }}>
                 <select style={inputBase} value={ex.body_part} onChange={e => { updateExField(realIdx, 'body_part', e.target.value); setTimeout(() => requestSaveRef.current?.(), 0) }}>
                   <option value="">부위</option>
                   {PARTS.map(p => <option key={p} value={p}>{p}</option>)}
                 </select>
                 <input style={inputBase} placeholder="운동명" value={ex.exercise_name} onChange={e => updateExField(realIdx, 'exercise_name', e.target.value)} onBlur={() => requestSaveRef.current?.()} />
+                <div />
                 <button
-                  style={{ background: '#FBE8E8', color: '#C57878', border: 'none', borderRadius: '6px', padding: '4px 0', cursor: 'pointer', fontSize: '11px' }}
+                  style={{ background: '#FBE8E8', color: '#C57878', border: 'none', borderRadius: '6px', padding: 0, cursor: 'pointer', fontSize: '12px', fontWeight: 500, height: 32 }}
                   onClick={() => removeExercise(realIdx)}
                 >✕</button>
               </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 50px 50px', gap: '6px', marginBottom: '8px' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: '70px 1fr 32px 32px', gap: '6px', marginBottom: '8px' }}>
+                <div />
                 <input
                   style={{ ...inputBase, color: THEME.textSub }}
                   placeholder="특이사항 (예: 무릎 불편)"
@@ -1044,12 +1046,13 @@ export default function WorkoutLog({ user, selectedDate, setSelectedDate, exerci
                 <button
                   onClick={() => openFavModal(realIdx)}
                   style={{
-                    background: THEME.warningLight,
-                    border: `0.5px solid ${THEME.warningBorder}`,
-                    color: THEME.warning,
-                    padding: '7px 0',
+                    background: THEME.primaryLight,
+                    border: `0.5px solid ${THEME.primaryAccent}`,
+                    color: THEME.primary,
+                    padding: 0,
+                    height: 32,
                     borderRadius: '6px',
-                    fontSize: '14px',
+                    fontSize: '15px',
                     fontWeight: '500',
                     cursor: 'pointer',
                     fontFamily: 'inherit',
@@ -1063,12 +1066,13 @@ export default function WorkoutLog({ user, selectedDate, setSelectedDate, exerci
                   <button
                     onClick={() => handleRemoveFavorite(currentFav.id)}
                     style={{
-                      background: THEME.warning,
+                      background: THEME.primary,
                       color: '#FFF',
                       border: 'none',
                       borderRadius: '6px',
-                      padding: '7px 0',
-                      fontSize: '12px',
+                      padding: 0,
+                      height: 32,
+                      fontSize: '13px',
                       fontWeight: '500',
                       cursor: 'pointer',
                       fontFamily: 'inherit',
@@ -1081,17 +1085,18 @@ export default function WorkoutLog({ user, selectedDate, setSelectedDate, exerci
                     disabled={!canRegister}
                     style={{
                       background: canRegister ? '#FFF' : '#F5F5F0',
-                      color: canRegister ? THEME.warningText : THEME.textHint,
-                      border: `0.5px solid ${canRegister ? THEME.warningBorder : THEME.border}`,
+                      color: canRegister ? THEME.primary : THEME.textHint,
+                      border: `0.5px solid ${canRegister ? THEME.primaryAccent : THEME.border}`,
                       borderRadius: '6px',
-                      padding: '7px 0',
+                      padding: 0,
+                      height: 32,
                       fontSize: '11px',
                       fontWeight: '500',
                       cursor: canRegister ? 'pointer' : 'not-allowed',
                       fontFamily: 'inherit',
                     }}
                     title={canRegister ? '즐겨찾기 등록' : '부위·운동명 입력 후 등록'}
-                  >등록</button>
+                  >+</button>
                 )}
               </div>
 
