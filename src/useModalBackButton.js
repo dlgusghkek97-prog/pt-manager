@@ -23,6 +23,15 @@ export default function useModalBackButton(isOpen, onClose) {
     const myMarker = Date.now() + Math.random()
     window.history.pushState({ __modalBack: myMarker }, '')
 
+    // body scroll lock — 모달 뒤 배경이 같이 스크롤되는 것 방지.
+    // 중첩 모달 카운팅: data-modal-count 로 동시 마운트 추적.
+    const cnt = parseInt(document.body.dataset.modalCount || '0', 10) + 1
+    document.body.dataset.modalCount = String(cnt)
+    if (cnt === 1) {
+      document.body.dataset.prevOverflow = document.body.style.overflow
+      document.body.style.overflow = 'hidden'
+    }
+
     // 200ms 후부터 popstate 신뢰 — 마운트 직후 다른 useEffect 사이클이나
     // 잔여 popstate (브라우저별 차이) 가 모달을 즉시 닫는 케이스 차단.
     // 사용자가 모달 열자마자 200ms 내 system back 누를 가능성은 거의 없음.
@@ -44,9 +53,16 @@ export default function useModalBackButton(isOpen, onClose) {
 
     return () => {
       window.removeEventListener('popstate', handlePopState)
+
+      // body scroll lock 해제 — 중첩 카운트 -1, 0이면 원래 overflow 로
+      const nextCnt = Math.max(0, parseInt(document.body.dataset.modalCount || '1', 10) - 1)
+      document.body.dataset.modalCount = String(nextCnt)
+      if (nextCnt === 0) {
+        document.body.style.overflow = document.body.dataset.prevOverflow || ''
+        delete document.body.dataset.prevOverflow
+      }
+
       // X 버튼/외부 close 등으로 닫힘 → 본인 marker 가 stack top 일 때만 pop.
-      // (다른 모달이 위에 추가로 push 되어 있는 경우엔 stale 1개 잠시 leftover 되지만,
-      //  사용자의 system back 으로 자연 정리됨 — cascade close 가 가장 큰 문제라 이걸 우선.)
       if (closedByBack) return
       try {
         if (window.history.state?.__modalBack === myMarker) {

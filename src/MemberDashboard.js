@@ -124,6 +124,8 @@ export default function MemberDashboard({ user, onLogout }) {
   const [workoutSubTab, setWorkoutSubTab] = useState('log')
   const [dietSubTab, setDietSubTab] = useState('log')
   const [trainerSubTab, setTrainerSubTab] = useState('workout') // 트레이너 보기: 운동 / 식단 / 미디어
+  // 알림에서 'diet:YYYY-MM-DD' 클릭 시 DietLog 에 강제 동기화할 날짜
+  const [dietTargetDate, setDietTargetDate] = useState(null)
   const [trainerWorkoutMode, setTrainerWorkoutMode] = useState('log') // 운동 → 기록 / 통계
   const [trainerDietMode, setTrainerDietMode] = useState('log')       // 식단 → 기록 / 통계
   // 트레이너 보기 → 운동 기록 보기용 selectedDate (회원 본인 selectedDate 와 분리)
@@ -427,15 +429,14 @@ export default function MemberDashboard({ user, onLogout }) {
     if (link.startsWith('chat:')) {
       setChatOpen(true)
     } else if (link.startsWith('diet:')) {
-      // 식단 탭으로 이동 + 해당 날짜 자동 선택
       const date = link.split(':')[1]
       setMainTab('diet')
       setDietSubTab('log')
       if (date) {
-        // 식단의 selectedDate는 DietLog 내부 state라 직접 못 바꿈
-        // 일단 식단 탭으로만 이동 (날짜 동기화는 추후 개선)
+        // forcedDate 변경 — 같은 값이어도 useEffect 발화시키기 위해 한 번 null 거쳐 설정
+        setDietTargetDate(null)
+        setTimeout(() => setDietTargetDate(date), 0)
       }
-      // 화면 상단으로 스크롤
       window.scrollTo({ top: 0, behavior: 'smooth' })
     }
   }
@@ -893,7 +894,7 @@ export default function MemberDashboard({ user, onLogout }) {
         {mainTab === 'diet' && (
           <>
             <SubTabs value={dietSubTab} onChange={setDietSubTab} />
-            <DietLog user={user} onDietUpdate={loadTodayDiet} weight={weight} muscle={muscle} bodyFat={bodyFat} occupation={occupation} forcedTab={dietSubTab} macroResult={macroResult} goal={goal} intensity={intensity} ptIsZero={ptIsZero} />
+            <DietLog user={user} onDietUpdate={loadTodayDiet} weight={weight} muscle={muscle} bodyFat={bodyFat} occupation={occupation} forcedTab={dietSubTab} forcedDate={dietTargetDate} macroResult={macroResult} goal={goal} intensity={intensity} ptIsZero={ptIsZero} />
           </>
         )}
 

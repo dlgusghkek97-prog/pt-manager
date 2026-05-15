@@ -159,7 +159,7 @@ const MealRow = React.memo(function MealRow({ meal, onUpdate, onBlur, onRemove, 
   )
 })
 
-export default function DietLog({ user, onDietUpdate, tableOverride, trainerIdField, weight, muscle, bodyFat, occupation, workoutTable, workoutIdField, forcedTab, macroResult, goal, intensity, ptIsZero = false, readOnly = false }) {
+export default function DietLog({ user, onDietUpdate, tableOverride, trainerIdField, weight, muscle, bodyFat, occupation, workoutTable, workoutIdField, forcedTab, forcedDate, macroResult, goal, intensity, ptIsZero = false, readOnly = false }) {
   const TABLE = tableOverride || 'diet_logs'
   const ID_FIELD = trainerIdField || 'member_id'
   const W_TABLE = workoutTable || 'workout_logs'
@@ -170,7 +170,15 @@ export default function DietLog({ user, onDietUpdate, tableOverride, trainerIdFi
   const tab = forcedTab || internalTab
   const setTab = forcedTab ? () => {} : setInternalTab
 
-  const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0])
+  const [selectedDate, setSelectedDate] = useState(forcedDate || new Date().toISOString().split('T')[0])
+
+  // 외부에서 날짜 강제 변경 (알림 클릭으로 특정 날짜 진입)
+  useEffect(() => {
+    if (forcedDate && forcedDate !== selectedDate) {
+      setSelectedDate(forcedDate)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [forcedDate])
   const [statMode, setStatMode] = useState('week')
   const [statValue, setStatValue] = useState(() => {
     const d = new Date()
