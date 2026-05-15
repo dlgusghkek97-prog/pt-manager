@@ -52,7 +52,13 @@ export default function SubscriptionGate({ user, userType, onOpenPay, onLogout, 
         return
       }
       if (!data) {
-        setState({ loading: false, active: false, info: { state: 'none' } })
+        // 구독 row 자체 없음 — trigger 실패 등 비정상.
+        // 트레이너 본인이면 차단 (스스로 결제 진행 가능), 회원이면 통과 (트레이너 잘못으로 회원이 막히는 거 회피).
+        if (userType === 'trainer') {
+          setState({ loading: false, active: false, info: { state: 'none' } })
+        } else {
+          setState({ loading: false, active: true, info: { state: 'none' } })
+        }
         return
       }
 
