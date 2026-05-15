@@ -19,7 +19,7 @@ const MACRO_INPUT_STYLE = {
   border: 'none',
   fontSize: '16px',
   fontWeight: '500',
-  textAlign: 'right',
+  textAlign: 'center',
   padding: 0,
   boxSizing: 'border-box',
   outline: 'none',
@@ -87,6 +87,8 @@ const MacroCell = React.memo(function MacroCell({
     fontWeight: '500',
     lineHeight: 1,
     height: '11px',
+    textAlign: 'center',
+    width: '100%',
   }), [over, mid])
 
   return (
