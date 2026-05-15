@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react'
 import { supabase } from './supabase'
-import { THEME, loadConversationsForTrainer } from './utils'
+import { THEME, loadChatListForTrainer } from './utils'
 import useModalBackButton from './useModalBackButton'
 
 const ChatIcon = ({ color = THEME.text, size = 16 }) => (
@@ -83,7 +83,7 @@ export default function ChatList({ trainerId, isOpen, onClose, onSelectConversat
 
   const loadList = async () => {
     setLoading(true)
-    const data = await loadConversationsForTrainer(trainerId)
+    const data = await loadChatListForTrainer(trainerId)
     setConversations(data)
     setLoading(false)
   }
@@ -145,8 +145,8 @@ export default function ChatList({ trainerId, isOpen, onClose, onSelectConversat
             <p style={{ textAlign: 'center', color: THEME.textSub, fontSize: '12px', padding: '20px' }}>불러오는 중...</p>
           ) : conversations.length === 0 ? (
             <p style={{ textAlign: 'center', color: THEME.textSub, fontSize: '12px', padding: '40px 20px' }}>
-              아직 시작된 대화가 없습니다.<br/>
-              회원 상세 화면에서 채팅을 시작해보세요.
+              아직 등록된 회원이 없습니다.<br/>
+              회원 관리에서 회원을 먼저 추가해주세요.
             </p>
           ) : (
             conversations.map(c => {

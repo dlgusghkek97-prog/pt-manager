@@ -23,9 +23,10 @@ export default function useModalBackButton(isOpen, onClose) {
     const myMarker = Date.now() + Math.random()
     window.history.pushState({ __modalBack: myMarker }, '')
 
-    // 다음 task 부터 popstate 신뢰 — pushState 가 동기적으로 발생시키는
-    // 잠재적 잔여 popstate (브라우저별 차이) 차단
-    setTimeout(() => { armed = true }, 0)
+    // 200ms 후부터 popstate 신뢰 — 마운트 직후 다른 useEffect 사이클이나
+    // 잔여 popstate (브라우저별 차이) 가 모달을 즉시 닫는 케이스 차단.
+    // 사용자가 모달 열자마자 200ms 내 system back 누를 가능성은 거의 없음.
+    setTimeout(() => { armed = true }, 200)
 
     const handlePopState = (e) => {
       if (!armed) return

@@ -1128,7 +1128,7 @@ export const getOrCreateConversation = async (trainerId, memberId) => {
   return { success: true, data: created }
 }
 
-// 트레이너의 모든 대화방 (채팅 목록용)
+// 트레이너의 모든 대화방 (채팅 목록용) — 대화 시작된 회원만
 export const loadConversationsForTrainer = async (trainerId) => {
   if (!trainerId) return []
   const { data, error } = await supabase
@@ -1142,7 +1142,6 @@ export const loadConversationsForTrainer = async (trainerId) => {
   }
   if (!data || data.length === 0) return []
 
-  // 회원 정보 따로 가져와서 합치기
   const memberIds = data.map(c => c.member_id)
   const { data: mems } = await supabase
     .from('members')
@@ -1151,6 +1150,66 @@ export const loadConversationsForTrainer = async (trainerId) => {
   const memberMap = {}
   ;(mems || []).forEach(m => { memberMap[m.id] = m })
   return data.map(c => ({ ...c, members: memberMap[c.member_id] || null }))
+}
+
+// 트레이너의 모든 회원 + 대화방 합쳐서 채팅 목록 반환.
+// - 회원 전체 노출 (대화 시작 안 한 회원도 포함, '대화 시작' 안내로 표시)
+// - 정렬: 최신 메시지 있는 회원 우선 (last_message_at desc) → 없는 회원은 가입순(created_at desc)
+export const loadChatListForTrainer = async (trainerId) => {
+  if (!trainerId) return []
+
+  const [memRes, convRes] = await Promise.all([
+    supabase
+      .from('members')
+      .select('id, name, created_at')
+      .eq('trainer_id', trainerId)
+      .order('created_at', { ascending: false }),
+    supabase
+      .from('conversations')
+      .select('*')
+      .eq('trainer_id', trainerId),
+  ])
+
+  if (memRes.error) {
+    console.error('[loadChatListForTrainer] members error:', memRes.error)
+    return []
+  }
+
+  const members = memRes.data || []
+  const conversations = convRes.data || []
+
+  // member_id → conversation 매핑
+  const convByMember = {}
+  conversations.forEach(c => { convByMember[c.member_id] = c })
+
+  // 회원마다 conversation 합쳐서 행 생성
+  const items = members.map(m => {
+    const c = convByMember[m.id]
+    return {
+      // conversation 있으면 그 값, 없으면 가짜 row (id=null)
+      id: c?.id || null,
+      trainer_id: trainerId,
+      member_id: m.id,
+      last_message_at: c?.last_message_at || null,
+      last_message_preview: c?.last_message_preview || null,
+      trainer_unread_count: c?.trainer_unread_count || 0,
+      member_unread_count: c?.member_unread_count || 0,
+      members: { id: m.id, name: m.name },
+      _member_created_at: m.created_at,
+    }
+  })
+
+  // 정렬: 최신 메시지 → 가입순
+  items.sort((a, b) => {
+    if (a.last_message_at && b.last_message_at) {
+      return new Date(b.last_message_at) - new Date(a.last_message_at)
+    }
+    if (a.last_message_at) return -1
+    if (b.last_message_at) return 1
+    return new Date(b._member_created_at) - new Date(a._member_created_at)
+  })
+
+  return items
 }
 
 // 메시지 목록
