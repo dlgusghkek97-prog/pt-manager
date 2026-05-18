@@ -19,7 +19,7 @@ const getColorByKey = (colorKey) => {
   return COLOR_POOL.find(c => c.name === colorKey) || COLOR_POOL[0]
 }
 
-export default function MemberNotes({ member, onClose, onUpdate }) {
+export default function MemberNotes({ member, onClose, onUpdate, embedded = false }) {
   const [categories, setCategories] = useState([])
   const [notes, setNotes] = useState([])
   const [loading, setLoading] = useState(true)
@@ -162,22 +162,17 @@ export default function MemberNotes({ member, onClose, onUpdate }) {
     outline: 'none',
   }
 
-  return (
-    <div
-      style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.5)', zIndex: 1100, display: 'flex', alignItems: 'flex-end', justifyContent: 'center' }}
-      onClick={onClose}
-    >
-      <div
-        style={{ background: '#FFF', borderRadius: '20px 20px 0 0', padding: '20px', width: '100%', maxWidth: '480px', maxHeight: '90vh', overflowY: 'auto', boxSizing: 'border-box' }}
-        onClick={e => e.stopPropagation()}
-      >
-        {/* 헤더 */}
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px' }}>
-          <p style={{ fontSize: '15px', fontWeight: '500', color: THEME.text, margin: 0 }}>
-            {member.name} 회원 메모
-          </p>
-          <button onClick={onClose} style={{ background: 'none', border: 'none', fontSize: '20px', cursor: 'pointer', color: THEME.textSub, padding: 0 }}>✕</button>
-        </div>
+  const innerContent = (
+      <>
+        {/* 헤더 — embedded 모드에서는 닫기 버튼 없이 타이틀만 (또는 생략) */}
+        {!embedded && (
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px' }}>
+            <p style={{ fontSize: '15px', fontWeight: '500', color: THEME.text, margin: 0 }}>
+              {member.name} 회원 메모
+            </p>
+            <button onClick={onClose} style={{ background: 'none', border: 'none', fontSize: '20px', cursor: 'pointer', color: THEME.textSub, padding: 0 }}>✕</button>
+          </div>
+        )}
 
         {loading ? (
           <p style={{ textAlign: 'center', color: THEME.textSub, fontSize: '12px', padding: '20px 0' }}>불러오는 중...</p>
@@ -382,6 +377,27 @@ export default function MemberNotes({ member, onClose, onUpdate }) {
             )}
           </>
         )}
+      </>
+  )
+
+  if (embedded) {
+    return (
+      <div style={{ background: '#FFF', borderRadius: 14, padding: '14px 16px', marginBottom: 12 }}>
+        {innerContent}
+      </div>
+    )
+  }
+
+  return (
+    <div
+      style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.5)', zIndex: 1100, display: 'flex', alignItems: 'flex-end', justifyContent: 'center' }}
+      onClick={onClose}
+    >
+      <div
+        style={{ background: '#FFF', borderRadius: '20px 20px 0 0', padding: '20px', width: '100%', maxWidth: '480px', maxHeight: '90vh', overflowY: 'auto', boxSizing: 'border-box' }}
+        onClick={e => e.stopPropagation()}
+      >
+        {innerContent}
       </div>
     </div>
   )

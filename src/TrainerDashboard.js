@@ -14,6 +14,9 @@ import ChatRoom from './ChatRoom'
 import ChatUnreadBadge from './ChatUnreadBadge'
 import PushPromptModal from './PushPromptModal'
 import SubscriptionModal from './SubscriptionModal'
+import SettingsModal from './SettingsModal'
+import ScheduleModal from './ScheduleModal'
+import { getScheduleEnabled } from './utils'
 import SubscriptionGate from './SubscriptionGate'
 import useModalBackButton from './useModalBackButton'
 import useTabHistory from './useTabHistory'
@@ -372,6 +375,21 @@ export default function TrainerDashboard({ user, onLogout }) {
   // 구독 (SaaS 사용료) — 트라이얼/활성/만료
   const [showSubscription, setShowSubscription] = useState(false)
   const [subSummary, setSubSummary] = useState(null)
+  const [showSettings, setShowSettings] = useState(false)
+  const [showSchedule, setShowSchedule] = useState(false)
+  const [scheduleInitialSessionId, setScheduleInitialSessionId] = useState(null)
+  const [scheduleEnabled, setScheduleEnabledState] = useState(false)
+
+  useEffect(() => {
+    if (!user?.id) return
+    let alive = true
+    ;(async () => {
+      const v = await getScheduleEnabled(user.id, 'trainer')
+      if (alive) setScheduleEnabledState(v)
+    })()
+    return () => { alive = false }
+    // showSettings 가 닫힐 때마다 갱신 (설정에서 토글했을 경우)
+  }, [user?.id, showSettings])
 
   useEffect(() => {
     if (!user?.id) return
@@ -1010,6 +1028,13 @@ export default function TrainerDashboard({ user, onLogout }) {
         if (data) member = data
       }
       if (member) openMember(member)
+    } else if (link.startsWith('schedule:')) {
+      // schedule:<class_sessions.id> — 스케줄 모달 열고 해당 슬롯 편집 모달 자동 표시
+      const sessionId = link.split(':')[1]
+      if (sessionId) {
+        setScheduleInitialSessionId(sessionId)
+        setShowSchedule(true)
+      }
     }
   }
 
@@ -1350,9 +1375,38 @@ export default function TrainerDashboard({ user, onLogout }) {
             {view !== 'members' && (
               <button style={{ background: '#FFF', border: `0.5px solid ${THEME.border}`, color: THEME.primary, padding: '0 12px', borderRadius: '15px', cursor: 'pointer', fontSize: '11px', fontWeight: '500', height: '30px', display: 'flex', alignItems: 'center', flexShrink: 0, fontFamily: 'inherit' }} onClick={() => { setView('members'); setSelectedMember(null) }}>회원 목록</button>
             )}
-            <button style={{ background: '#FFF', border: `0.5px solid ${THEME.border}`, color: THEME.textSub, padding: '0 12px', borderRadius: '15px', cursor: 'pointer', fontSize: '11px', fontWeight: '500', height: '30px', display: 'flex', alignItems: 'center', flexShrink: 0, fontFamily: 'inherit' }} onClick={onLogout}>로그아웃</button>
+            <button
+              onClick={() => setShowSettings(true)}
+              title="설정"
+              aria-label="설정"
+              style={{ background: '#FFF', border: `0.5px solid ${THEME.border}`, color: THEME.textSub, width: '30px', height: '30px', borderRadius: '50%', cursor: 'pointer', padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, fontFamily: 'inherit' }}
+            >
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
+                <circle cx="12" cy="12" r="3" />
+                <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
+              </svg>
+            </button>
           </div>
         </div>
+
+        {showSettings && (
+          <SettingsModal
+            user={user}
+            userType="trainer"
+            onClose={() => setShowSettings(false)}
+            onLogout={onLogout}
+          />
+        )}
+
+        {showSchedule && (
+          <ScheduleModal
+            user={user}
+            userType="trainer"
+            trainerId={user.id}
+            initialOpenSessionId={scheduleInitialSessionId}
+            onClose={() => { setShowSchedule(false); setScheduleInitialSessionId(null) }}
+          />
+        )}
 
         {showHelp && <HelpModal type="trainer" onClose={() => setShowHelp(false)} />}
 
@@ -1854,9 +1908,39 @@ export default function TrainerDashboard({ user, onLogout }) {
               onCommit={commitTrainerMacroField}
             />
 
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px', marginBottom: '10px' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '6px', marginBottom: '10px' }}>
               <MainTabBtn active={trainerMainTab === 'workout'} onClick={() => setTrainerMainTab('workout')} label="운동" />
               <MainTabBtn active={trainerMainTab === 'diet'} onClick={() => setTrainerMainTab('diet')} label="식단" />
+              <button
+                onClick={() => {
+                  if (scheduleEnabled) {
+                    setShowSchedule(true)
+                  } else {
+                    if (window.confirm('스케줄 기능이 꺼져있어요.\n설정에서 켤까요?')) setShowSettings(true)
+                  }
+                }}
+                style={{
+                  background: '#FFF',
+                  color: scheduleEnabled ? THEME.textSub : THEME.textHint,
+                  border: 'none',
+                  borderRadius: RADIUS.lg,
+                  padding: SPACING.md,
+                  fontSize: `${FONT.lg}px`,
+                  fontWeight: 400,
+                  cursor: 'pointer', fontFamily: 'inherit',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5,
+                  opacity: scheduleEnabled ? 1 : 0.75,
+                }}
+                title={scheduleEnabled ? '스케줄' : '스케줄 OFF — 설정에서 켜기'}
+              >
+                {!scheduleEnabled && (
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <rect x="3" y="11" width="18" height="11" rx="2" />
+                    <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+                  </svg>
+                )}
+                스케줄
+              </button>
             </div>
 
             {trainerMainTab === 'workout' && (
@@ -1897,11 +1981,6 @@ export default function TrainerDashboard({ user, onLogout }) {
                     <ChatBubbleIcon color={THEME.primary} size={11} />
                     채팅
                   </button>
-                  <button onClick={() => setShowNotesMember(selectedMember)} style={memberActionBtn}>
-                    <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke={THEME.primary} strokeWidth="2" strokeLinecap="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
-                    메모
-                  </button>
-                  <button onClick={() => { setInbodyDefaultView('input'); setInbodyOpen(true) }} style={memberActionBtn}>인바디</button>
                 </div>
               </div>
 
@@ -1952,9 +2031,11 @@ export default function TrainerDashboard({ user, onLogout }) {
               onCommit={commitMemberMacroField}
             />
 
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px', marginBottom: '10px' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: '6px', marginBottom: '10px' }}>
               <MainTabBtn active={memberMainTab === 'workout'} onClick={() => setMemberMainTab('workout')} label="운동" />
               <MainTabBtn active={memberMainTab === 'diet'} onClick={() => setMemberMainTab('diet')} label="식단" />
+              <MainTabBtn active={memberMainTab === 'inbody'} onClick={() => setMemberMainTab('inbody')} label="인바디" />
+              <MainTabBtn active={memberMainTab === 'memo'} onClick={() => setMemberMainTab('memo')} label="메모" />
             </div>
 
             {memberMainTab === 'workout' && (
@@ -1976,6 +2057,28 @@ export default function TrainerDashboard({ user, onLogout }) {
                 <SubTabs value={memberSubTab} onChange={setMemberSubTab} />
                 <DietLog user={selectedMember} onDietUpdate={() => loadMemberTodayDiet(selectedMember.id)} weight={memberWeight} muscle={memberMuscle} bodyFat={memberBodyFat} occupation={memberOccupation} forcedTab={memberSubTab} macroResult={memberMacro} goal={memberGoal} intensity={memberIntensity} ptIsZero={(() => { const r = calcPtRemaining(selectedMember); return r.hasNoPt || r.remaining <= 0 })()} />
               </>
+            )}
+
+            {memberMainTab === 'inbody' && (
+              <InbodyModal
+                user={user}
+                memberId={selectedMember.id}
+                isOpen={true}
+                defaultView="input"
+                onClose={() => {}}
+                table="trainer_inbody"
+                idField="trainer_id"
+                embedded
+              />
+            )}
+
+            {memberMainTab === 'memo' && (
+              <MemberNotes
+                member={selectedMember}
+                onClose={() => {}}
+                onUpdate={() => loadMemberNotes(selectedMember.id)}
+                embedded
+              />
             )}
           </>
         )}

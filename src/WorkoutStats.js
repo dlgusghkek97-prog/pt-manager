@@ -7,6 +7,7 @@ export default function WorkoutStats({
   memberId,
   bigPrTable = 'personal_records',
   bigPrIdField = 'member_id',
+  readOnly = false,
   onJumpToLog,  // (dateStr) => void — 캘린더 셀 클릭 시 운동 기록 탭으로 이동
 }) {
   const [statsTab, setStatsTab] = useState('daily')
@@ -547,7 +548,9 @@ export default function WorkoutStats({
             <div style={{ ...S.card, padding: '12px' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
                 <p style={{ ...S.cardTitle, margin: 0 }}>4대 종목 PR</p>
-                <span style={{ fontSize: '10px', color: THEME.textHint }}>탭하여 직접 수정</span>
+                <span style={{ fontSize: '10px', color: THEME.textHint }}>
+                  {readOnly ? '참고용 (편집 불가)' : '탭하여 직접 수정'}
+                </span>
               </div>
 
               {/* 3대 중량 합계 배너 */}
@@ -600,7 +603,7 @@ export default function WorkoutStats({
                     }}>
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
                         <div style={{ fontSize: '11px', color: THEME.primary, fontWeight: '500' }}>{label}</div>
-                        {mediaUrl && (
+                        {!readOnly && mediaUrl && (
                           <button
                             onClick={() => handlePRMediaRemove(key)}
                             style={{ background: 'none', border: 'none', color: THEME.danger, fontSize: '10px', cursor: 'pointer', padding: 0 }}
@@ -610,27 +613,43 @@ export default function WorkoutStats({
                       </div>
 
                       <div style={{ display: 'flex', alignItems: 'baseline', gap: '4px', whiteSpace: 'nowrap', marginBottom: '6px' }}>
-                        <input
-                          type="number"
-                          inputMode="decimal"
-                          placeholder="0"
-                          value={draft.weight}
-                          onChange={e => handleBig4Change(key, 'weight', e.target.value)}
-                          onBlur={() => handleBig4Save(key)}
-                          style={big4Input}
-                        />
-                        <span style={{ fontSize: '10px', color: THEME.textSub }}>kg</span>
-                        <span style={{ fontSize: '11px', color: THEME.textSub, margin: '0 2px' }}>×</span>
-                        <input
-                          type="number"
-                          inputMode="numeric"
-                          placeholder="0"
-                          value={draft.reps}
-                          onChange={e => handleBig4Change(key, 'reps', e.target.value)}
-                          onBlur={() => handleBig4Save(key)}
-                          style={big4InputReps}
-                        />
-                        <span style={{ fontSize: '10px', color: THEME.textSub }}>회</span>
+                        {readOnly ? (
+                          <>
+                            <span style={{ ...big4Input, display: 'inline-block' }}>
+                              {draft.weight || '—'}
+                            </span>
+                            <span style={{ fontSize: '10px', color: THEME.textSub }}>kg</span>
+                            <span style={{ fontSize: '11px', color: THEME.textSub, margin: '0 2px' }}>×</span>
+                            <span style={{ ...big4InputReps, display: 'inline-block' }}>
+                              {draft.reps || '—'}
+                            </span>
+                            <span style={{ fontSize: '10px', color: THEME.textSub }}>회</span>
+                          </>
+                        ) : (
+                          <>
+                            <input
+                              type="number"
+                              inputMode="decimal"
+                              placeholder="0"
+                              value={draft.weight}
+                              onChange={e => handleBig4Change(key, 'weight', e.target.value)}
+                              onBlur={() => handleBig4Save(key)}
+                              style={big4Input}
+                            />
+                            <span style={{ fontSize: '10px', color: THEME.textSub }}>kg</span>
+                            <span style={{ fontSize: '11px', color: THEME.textSub, margin: '0 2px' }}>×</span>
+                            <input
+                              type="number"
+                              inputMode="numeric"
+                              placeholder="0"
+                              value={draft.reps}
+                              onChange={e => handleBig4Change(key, 'reps', e.target.value)}
+                              onBlur={() => handleBig4Save(key)}
+                              style={big4InputReps}
+                            />
+                            <span style={{ fontSize: '10px', color: THEME.textSub }}>회</span>
+                          </>
+                        )}
                       </div>
 
                       {/* 영상/사진 슬롯 — 한 달 자동삭제 예외 (영구 보존) */}
@@ -654,6 +673,13 @@ export default function WorkoutStats({
                             <div style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', width: 26, height: 26, borderRadius: '50%', background: 'rgba(0,0,0,0.55)', color: '#FFF', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11 }}>▶</div>
                           )}
                         </div>
+                      ) : readOnly ? (
+                        <div style={{
+                          display: 'flex', alignItems: 'center', justifyContent: 'center',
+                          height: 30, borderRadius: 6,
+                          background: THEME.borderLight, color: THEME.textHint,
+                          fontSize: 10, marginBottom: 4,
+                        }}>영상/사진 없음</div>
                       ) : (
                         <label style={{
                           display: 'flex', alignItems: 'center', justifyContent: 'center',

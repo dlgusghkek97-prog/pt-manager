@@ -23,6 +23,13 @@ const TOSS_ENABLED = TOSS_CLIENT_KEY && !TOSS_CLIENT_KEY.includes('PLACEHOLDER')
 export default function SubscriptionModal({ trainerId, trainerEmail, onClose }) {
   useModalBackButton(true, onClose)
 
+  // ghost-click 가드 — 부모 모달의 row 클릭이 이 모달로 전파되어 즉시 닫히는 사고 방지
+  const [armed, setArmed] = useState(false)
+  useEffect(() => {
+    const t = setTimeout(() => setArmed(true), 400)
+    return () => clearTimeout(t)
+  }, [])
+
   const [sub, setSub] = useState(null)
   const [loading, setLoading] = useState(true)
   const [working, setWorking] = useState(false)
@@ -125,13 +132,15 @@ export default function SubscriptionModal({ trainerId, trainerEmail, onClose }) 
     <>
       <div style={{
         position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
-        background: 'rgba(0,0,0,0.5)', zIndex: 1100,
+        background: 'rgba(0,0,0,0.5)', zIndex: 1700,
         display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '16px',
+        pointerEvents: armed ? 'auto' : 'none',
       }}>
         <div style={{
           background: '#FFF', borderRadius: '14px',
           width: '100%', maxWidth: '420px', maxHeight: '85vh',
           display: 'flex', flexDirection: 'column', overflow: 'hidden', boxSizing: 'border-box',
+          pointerEvents: 'auto',
         }}>
           <div style={{
             display: 'flex', justifyContent: 'space-between', alignItems: 'center',

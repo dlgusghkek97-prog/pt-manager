@@ -1585,3 +1585,197 @@ export const shouldShowPushPrompt = async (userId) => {
 export const dismissPushPrompt = (userId) => {
   localStorage.setItem(`push_prompt_dismissed_${userId}`, String(Date.now()))
 }
+
+// ─── 일지 피드 알림 토글 (trainers/members.notif_feed_enabled) ───
+export const getFeedNotifEnabled = async (userId, userType) => {
+  if (!userId || !userType) return true
+  const table = userType === 'trainer' ? 'trainers' : 'members'
+  const { data, error } = await supabase
+    .from(table)
+    .select('notif_feed_enabled')
+    .eq('id', userId)
+    .maybeSingle()
+  if (error || !data) return true  // 컬럼이 없거나 row 없으면 기본 ON
+  return data.notif_feed_enabled !== false
+}
+
+export const setFeedNotifEnabled = async (userId, userType, enabled) => {
+  if (!userId || !userType) return { success: false, error: '사용자 정보 없음' }
+  const table = userType === 'trainer' ? 'trainers' : 'members'
+  const { error } = await supabase
+    .from(table)
+    .update({ notif_feed_enabled: !!enabled })
+    .eq('id', userId)
+  if (error) return { success: false, error: error.message }
+  return { success: true }
+}
+
+// 1:1 카카오톡 상담 오픈채팅 URL — 미설정 시 안내
+export const KAKAO_SUPPORT_URL = process.env.REACT_APP_KAKAO_OPENCHAT_URL || ''
+
+// ─── 스케줄 ON/OFF 토글 (trainers/members.schedule_enabled) ───
+export const getScheduleEnabled = async (userId, userType) => {
+  if (!userId || !userType) return false
+  const table = userType === 'trainer' ? 'trainers' : 'members'
+  const { data, error } = await supabase
+    .from(table)
+    .select('schedule_enabled')
+    .eq('id', userId)
+    .maybeSingle()
+  if (error || !data) return false
+  return data.schedule_enabled === true
+}
+
+export const setScheduleEnabled = async (userId, userType, enabled) => {
+  if (!userId || !userType) return { success: false, error: '사용자 정보 없음' }
+  const table = userType === 'trainer' ? 'trainers' : 'members'
+  const { error } = await supabase
+    .from(table)
+    .update({ schedule_enabled: !!enabled })
+    .eq('id', userId)
+  if (error) return { success: false, error: error.message }
+  return { success: true }
+}
+
+// 회원이 본인 담당 트레이너의 schedule_enabled 를 조회 (RLS 통과)
+export const getTrainerScheduleEnabled = async (trainerId) => {
+  if (!trainerId) return false
+  const { data } = await supabase
+    .from('trainers')
+    .select('schedule_enabled')
+    .eq('id', trainerId)
+    .maybeSingle()
+  return data?.schedule_enabled === true
+}
+
+// ─── 운영시간 (trainers.business_hours) ───
+// 구조: { "0": null, "1": [9,22], ..., "6": [10,18] }  / NULL = 제약 없음
+export const getBusinessHours = async (trainerId) => {
+  if (!trainerId) return null
+  const { data } = await supabase
+    .from('trainers')
+    .select('business_hours')
+    .eq('id', trainerId)
+    .maybeSingle()
+  return data?.business_hours ?? null
+}
+
+export const setBusinessHours = async (trainerId, businessHours) => {
+  if (!trainerId) return { success: false, error: '트레이너 ID 없음' }
+  const { error } = await supabase
+    .from('trainers')
+    .update({ business_hours: businessHours })
+    .eq('id', trainerId)
+  if (error) return { success: false, error: error.message }
+  return { success: true }
+}
+
+// 주어진 Date(로컬)가 운영시간 안인지 — true / false
+// bh 가 null/undefined 이면 항상 true (제약 없음).
+export const isWithinBusinessHours = (bh, dateObj) => {
+  if (!bh) return true
+  const day = dateObj.getDay()
+  const range = bh[String(day)]
+  if (range == null) return false
+  const hour = dateObj.getHours()
+  return hour >= range[0] && hour < range[1]
+}
+
+// ─── class_sessions ───
+// fromISO, toISO 범위 내 트레이너의 모든 슬롯 (회원/트레이너 양쪽 RLS 통과)
+export const loadClassSessions = async (trainerId, fromISO, toISO) => {
+  if (!trainerId) return []
+  const { data, error } = await supabase
+    .from('class_sessions')
+    .select('*, members!class_sessions_member_id_fkey(id,name)')
+    .eq('trainer_id', trainerId)
+    .gte('start_at', fromISO)
+    .lt('start_at', toISO)
+    .order('start_at')
+  if (error) {
+    console.error('[loadClassSessions]', error)
+    return []
+  }
+  return data || []
+}
+
+export const createClassSession = async ({ trainerId, memberId, startAt, endAt, status, note, createdBy }) => {
+  const payload = {
+    trainer_id: trainerId,
+    member_id: memberId || null,
+    start_at: startAt,
+    end_at: endAt,
+    status: status || 'scheduled',
+    note: note || null,
+    created_by: createdBy,
+  }
+  const { data, error } = await supabase
+    .from('class_sessions')
+    .insert(payload)
+    .select()
+    .single()
+  if (error) return { success: false, error: error.message }
+  return { success: true, data }
+}
+
+export const updateClassSession = async (id, patch) => {
+  const { data, error } = await supabase
+    .from('class_sessions')
+    .update(patch)
+    .eq('id', id)
+    .select()
+    .single()
+  if (error) return { success: false, error: error.message }
+  return { success: true, data }
+}
+
+export const deleteClassSession = async (id) => {
+  const { error } = await supabase
+    .from('class_sessions')
+    .delete()
+    .eq('id', id)
+  if (error) return { success: false, error: error.message }
+  return { success: true }
+}
+
+// 회원이 본인의 다가오는 PT 일정만 조회 — 상단 카드용
+export const loadMyUpcomingSessions = async (memberId, limit = 3) => {
+  if (!memberId) return []
+  const { data, error } = await supabase
+    .from('class_sessions')
+    .select('id, start_at, end_at, status')
+    .eq('member_id', memberId)
+    .gte('start_at', new Date().toISOString())
+    .in('status', ['scheduled', 'requested', 'changed'])
+    .order('start_at')
+    .limit(limit)
+  if (error) {
+    console.warn('[loadMyUpcomingSessions]', error)
+    return []
+  }
+  return data || []
+}
+
+// 회원: 슬롯 신청 — RPC 로 처리 (RLS 매칭 우회. 서버에서 본인 members.trainer_id 자동 사용)
+export const requestClassSession = async ({ startAt, endAt, note }) => {
+  const { data, error } = await supabase.rpc('member_request_class', {
+    p_start_at: startAt,
+    p_end_at: endAt,
+    p_note: note || null,
+  })
+  if (error) {
+    console.error('[requestClassSession RPC]', error)
+    return { success: false, error: error.message }
+  }
+  return { success: true, data: { id: data } }
+}
+
+// 트레이너: 신청 승인 → status='scheduled'
+export const approveClassRequest = async (id) => {
+  return updateClassSession(id, { status: 'scheduled' })
+}
+
+// 트레이너: 신청 거절 → 삭제
+export const rejectClassRequest = async (id) => {
+  return deleteClassSession(id)
+}

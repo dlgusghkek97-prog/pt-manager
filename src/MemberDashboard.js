@@ -13,6 +13,9 @@ import useModalBackButton from './useModalBackButton'
 import useTabHistory from './useTabHistory'
 import PushPromptModal from './PushPromptModal'
 import SubscriptionGate from './SubscriptionGate'
+import SettingsModal from './SettingsModal'
+import ScheduleModal from './ScheduleModal'
+import { getTrainerScheduleEnabled, loadMyUpcomingSessions } from './utils'
 
 const MACRO_INPUT_STYLE = {
   background: 'transparent',
@@ -162,6 +165,33 @@ export default function MemberDashboard({ user, onLogout }) {
   useModalBackButton(showCalcModal, () => setShowCalcModal(false))
   const [todayDiet, setTodayDiet] = useState([])
   const [showHelp, setShowHelp] = useState(false)
+  const [showSettings, setShowSettings] = useState(false)
+  const [showSchedule, setShowSchedule] = useState(false)
+  const [scheduleVisible, setScheduleVisible] = useState(false)
+  const [upcomingPT, setUpcomingPT] = useState([])
+
+  // 회원의 스케줄 표시 여부 — 담당 트레이너의 schedule_enabled 만 의존.
+  // 트레이너가 OFF 하면 회원도 자동 잠금 (캘린더 아이콘/카드/모달 모두 숨김).
+  useEffect(() => {
+    if (!user?.id || !user.trainer_id) { setScheduleVisible(false); return }
+    let alive = true
+    ;(async () => {
+      const trainerOn = await getTrainerScheduleEnabled(user.trainer_id)
+      if (alive) setScheduleVisible(trainerOn)
+    })()
+    return () => { alive = false }
+  }, [user?.id, user?.trainer_id, showSettings])
+
+  // 내 다가오는 PT 일정 — 상단 카드용. 스케줄 모달 닫힐 때마다 갱신.
+  useEffect(() => {
+    if (!user?.id || !scheduleVisible) { setUpcomingPT([]); return }
+    let alive = true
+    ;(async () => {
+      const data = await loadMyUpcomingSessions(user.id, 3)
+      if (alive) setUpcomingPT(data)
+    })()
+    return () => { alive = false }
+  }, [user?.id, scheduleVisible, showSchedule])
 
   // 인바디는 메인 탭 [인바디] 로 이동 (embedded)
 
@@ -501,7 +531,7 @@ export default function MemberDashboard({ user, onLogout }) {
 
   const MainTabBtn = ({ tabKey, label }) => {
     const active = mainTab === tabKey
-    const longLabel = (label || '').length > 6
+    const longLabel = (label || '').length > 5
     return (
       <button
         onClick={() => setMainTab(tabKey)}
@@ -509,9 +539,9 @@ export default function MemberDashboard({ user, onLogout }) {
           background: active ? THEME.primaryAccent : '#FFF',
           color: active ? THEME.primaryDark : THEME.textSub,
           border: 'none',
-          borderRadius: RADIUS.lg,
-          padding: `${SPACING.md}px ${SPACING.xs + 2}px`,
-          fontSize: longLabel ? `${FONT.sm}px` : `${FONT.lg}px`,
+          borderRadius: RADIUS.md,
+          padding: '9px 4px',
+          fontSize: longLabel ? `${FONT.sm}px` : `${FONT.md}px`,
           fontWeight: active ? 500 : 400,
           cursor: 'pointer',
           overflow: 'hidden',
@@ -526,7 +556,7 @@ export default function MemberDashboard({ user, onLogout }) {
   }
 
   const SubTabs = ({ value, onChange }) => (
-    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: SPACING.xs, marginBottom: SPACING.md, background: THEME.borderLight, padding: SPACING.xs, borderRadius: RADIUS.md }}>
+    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 3, marginBottom: SPACING.sm, background: THEME.borderLight, padding: 3, borderRadius: RADIUS.sm }}>
       {[
         { key: 'log', label: '기록' },
         { key: 'stats', label: '통계' },
@@ -540,9 +570,9 @@ export default function MemberDashboard({ user, onLogout }) {
               background: active ? '#FFF' : 'transparent',
               color: active ? THEME.text : THEME.textSub,
               border: 'none',
-              borderRadius: RADIUS.sm,
-              padding: SPACING.sm,
-              fontSize: `${FONT.md}px`,
+              borderRadius: 5,
+              padding: '5px 0',
+              fontSize: `${FONT.sm}px`,
               fontWeight: active ? 500 : 400,
               cursor: 'pointer',
               fontFamily: 'inherit',
@@ -641,8 +671,8 @@ export default function MemberDashboard({ user, onLogout }) {
           </div>
         </div>
 
-        {/* 헤더 다음 줄: [🔔] [💬] [?] 3칸 균등 캡슐 — 인바디는 메인 탭으로 이동 */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '6px', marginBottom: '10px' }}>
+        {/* 헤더 다음 줄: [🔔] [💬] [?] (📅) [⚙] 캡슐 — 스케줄은 양쪽 토글 ON 일 때만 */}
+        <div style={{ display: 'grid', gridTemplateColumns: `repeat(${scheduleVisible ? 5 : 4}, 1fr)`, gap: '6px', marginBottom: '10px' }}>
           <NotificationBell userId={user.id} userType="member" onNavigate={handleNavigate} size={36} wide />
           <button
             onClick={() => setChatOpen(true)}
@@ -657,7 +687,51 @@ export default function MemberDashboard({ user, onLogout }) {
             style={{ background: '#FFF', border: `0.5px solid ${THEME.border}`, color: THEME.textSub, width: '100%', height: '36px', borderRadius: '18px', cursor: 'pointer', fontSize: '15px', fontWeight: '500', padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', boxSizing: 'border-box', fontFamily: 'inherit' }}
             title="도움말"
           >?</button>
+          {scheduleVisible && (
+            <button
+              onClick={() => setShowSchedule(true)}
+              style={{ background: '#FFF', border: `0.5px solid ${THEME.border}`, color: THEME.textSub, width: '100%', height: '36px', borderRadius: '18px', cursor: 'pointer', padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', boxSizing: 'border-box', fontFamily: 'inherit' }}
+              title="스케줄"
+              aria-label="스케줄"
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                <rect x="3" y="4" width="18" height="18" rx="2" />
+                <line x1="16" y1="2" x2="16" y2="6" />
+                <line x1="8" y1="2" x2="8" y2="6" />
+                <line x1="3" y1="10" x2="21" y2="10" />
+              </svg>
+            </button>
+          )}
+          <button
+            onClick={() => setShowSettings(true)}
+            style={{ background: '#FFF', border: `0.5px solid ${THEME.border}`, color: THEME.textSub, width: '100%', height: '36px', borderRadius: '18px', cursor: 'pointer', padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', boxSizing: 'border-box', fontFamily: 'inherit' }}
+            title="설정"
+            aria-label="설정"
+          >
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
+              <circle cx="12" cy="12" r="3" />
+              <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
+            </svg>
+          </button>
         </div>
+
+        {showSettings && (
+          <SettingsModal
+            user={user}
+            userType="member"
+            onClose={() => setShowSettings(false)}
+            onLogout={onLogout}
+          />
+        )}
+
+        {showSchedule && user.trainer_id && (
+          <ScheduleModal
+            user={user}
+            userType="member"
+            trainerId={user.trainer_id}
+            onClose={() => setShowSchedule(false)}
+          />
+        )}
 
         {showHelp && <HelpModal type="member" onClose={() => setShowHelp(false)} />}
 
@@ -858,6 +932,67 @@ export default function MemberDashboard({ user, onLogout }) {
           </div>
         )}
 
+        {scheduleVisible && (
+          <div
+            onClick={() => setShowSchedule(true)}
+            style={{
+              background: '#FFF', borderRadius: RADIUS.lg,
+              padding: '12px 14px', marginBottom: 10,
+              cursor: 'pointer',
+              border: `0.5px solid ${THEME.border}`,
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={THEME.primary} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <rect x="3" y="4" width="18" height="18" rx="2" />
+                  <line x1="16" y1="2" x2="16" y2="6" />
+                  <line x1="8" y1="2" x2="8" y2="6" />
+                  <line x1="3" y1="10" x2="21" y2="10" />
+                </svg>
+                <span style={{ fontSize: 13, fontWeight: 500, color: THEME.text }}>내 PT 일정</span>
+              </div>
+              <span style={{ fontSize: 10, color: THEME.textHint }}>탭하면 전체 일정</span>
+            </div>
+            {upcomingPT.length === 0 ? (
+              <p style={{ fontSize: 11, color: THEME.textSub, margin: 0 }}>
+                예정된 PT가 없어요. 스케줄에서 신청해보세요.
+              </p>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
+                {upcomingPT.map(s => {
+                  const dt = new Date(s.start_at)
+                  const dtEnd = new Date(s.end_at)
+                  const wd = ['일', '월', '화', '수', '목', '금', '토'][dt.getDay()]
+                  const isToday = dt.toDateString() === new Date().toDateString()
+                  const isReq = s.status === 'requested' || s.status === 'changed'
+                  const fmtHM = d => `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`
+                  return (
+                    <div key={s.id} style={{
+                      display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                      padding: '6px 10px',
+                      background: isReq ? '#FBD8CE' : (isToday ? THEME.primaryLight : THEME.cardAlt),
+                      borderRadius: 6,
+                    }}>
+                      <span style={{ fontSize: 12, color: isReq ? '#7A2E1A' : THEME.text, fontWeight: isToday ? 500 : 400 }}>
+                        {isToday ? '오늘' : `${dt.getMonth() + 1}/${dt.getDate()}(${wd})`} {fmtHM(dt)}~{fmtHM(dtEnd)}
+                      </span>
+                      <span style={{
+                        fontSize: 10, fontWeight: 500,
+                        padding: '2px 7px', borderRadius: 4,
+                        background: isReq ? '#E08A6E' : THEME.primary,
+                        color: '#FFF',
+                      }}>
+                        {isReq ? '대기' : '확정'}
+                      </span>
+                    </div>
+                  )
+                })}
+              </div>
+            )}
+          </div>
+        )}
+
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '5px', marginBottom: '10px' }}>
           <MainTabBtn tabKey="workout" label="운동" />
           <MainTabBtn tabKey="diet" label="식단" />
@@ -907,7 +1042,7 @@ export default function MemberDashboard({ user, onLogout }) {
             ) : (
               <>
                 {/* 운동 / 식단 */}
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px', marginBottom: '12px', background: THEME.borderLight, padding: '4px', borderRadius: '12px' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 3, marginBottom: 8, background: THEME.borderLight, padding: 3, borderRadius: 6 }}>
                   {[
                     { key: 'workout', label: '운동' },
                     { key: 'diet', label: '식단' },
@@ -919,35 +1054,36 @@ export default function MemberDashboard({ user, onLogout }) {
                         onClick={() => setTrainerSubTab(key)}
                         style={{
                           background: active ? '#FFF' : 'transparent',
-                          color: active ? THEME.primaryDark : THEME.textSub,
+                          color: active ? THEME.text : THEME.textSub,
                           border: 'none',
-                          borderRadius: '10px',
-                          padding: '8px',
-                          fontSize: '12px',
-                          fontWeight: active ? '500' : '400',
+                          borderRadius: 5,
+                          padding: '5px 0',
+                          fontSize: 11,
+                          fontWeight: active ? 500 : 400,
                           cursor: 'pointer',
+                          fontFamily: 'inherit',
                         }}
                       >{label}</button>
                     )
                   })}
                 </div>
 
-                <div style={{ background: THEME.primaryLight, borderRadius: '10px', padding: '8px 12px', marginBottom: '10px', fontSize: '11px', color: THEME.primaryDark }}>
-                  {trainerName} 트레이너의 기록 — 참고용 (편집 불가)
+                <div style={{ background: THEME.primaryLight, borderRadius: 6, padding: '5px 10px', marginBottom: 8, fontSize: 10, color: THEME.primaryDark, textAlign: 'center' }}>
+                  {trainerName} 트레이너의 기록 · 참고용 (편집 불가)
                 </div>
 
                 {trainerSubTab === 'workout' && (
                   <>
                     {/* 기록 / 통계 sub-sub-tab */}
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px', marginBottom: '10px' }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 3, marginBottom: 8, background: THEME.borderLight, padding: 3, borderRadius: 6 }}>
                       {[{ k: 'log', l: '기록' }, { k: 'stats', l: '통계' }].map(({ k, l }) => {
                         const active = trainerWorkoutMode === k
                         return (
                           <button key={k} onClick={() => setTrainerWorkoutMode(k)} style={{
-                            background: active ? THEME.primaryAccent : '#FFF',
-                            color: active ? THEME.primaryDark : THEME.textSub,
-                            border: 'none', borderRadius: '10px', padding: '7px',
-                            fontSize: '11px', fontWeight: active ? '500' : '400', cursor: 'pointer',
+                            background: active ? '#FFF' : 'transparent',
+                            color: active ? THEME.text : THEME.textSub,
+                            border: 'none', borderRadius: 5, padding: '5px 0',
+                            fontSize: 11, fontWeight: active ? 500 : 400, cursor: 'pointer', fontFamily: 'inherit',
                           }}>{l}</button>
                         )
                       })}
@@ -971,22 +1107,28 @@ export default function MemberDashboard({ user, onLogout }) {
                       />
                     )}
                     {trainerWorkoutMode === 'stats' && (
-                      <WorkoutStats allLogs={trainerLogs} memberId={null} />
+                      <WorkoutStats
+                        allLogs={trainerLogs}
+                        memberId={user.trainer_id}
+                        bigPrTable="trainer_personal_records"
+                        bigPrIdField="trainer_id"
+                        readOnly
+                      />
                     )}
                   </>
                 )}
 
                 {trainerSubTab === 'diet' && (
                   <>
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px', marginBottom: '10px' }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 3, marginBottom: 8, background: THEME.borderLight, padding: 3, borderRadius: 6 }}>
                       {[{ k: 'log', l: '기록' }, { k: 'stats', l: '통계' }].map(({ k, l }) => {
                         const active = trainerDietMode === k
                         return (
                           <button key={k} onClick={() => setTrainerDietMode(k)} style={{
-                            background: active ? THEME.primaryAccent : '#FFF',
-                            color: active ? THEME.primaryDark : THEME.textSub,
-                            border: 'none', borderRadius: '10px', padding: '7px',
-                            fontSize: '11px', fontWeight: active ? '500' : '400', cursor: 'pointer',
+                            background: active ? '#FFF' : 'transparent',
+                            color: active ? THEME.text : THEME.textSub,
+                            border: 'none', borderRadius: 5, padding: '5px 0',
+                            fontSize: 11, fontWeight: active ? 500 : 400, cursor: 'pointer', fontFamily: 'inherit',
                           }}>{l}</button>
                         )
                       })}
@@ -1015,7 +1157,6 @@ export default function MemberDashboard({ user, onLogout }) {
           </>
         )}
 
-        <button style={{ background: '#FFF', color: THEME.textSub, border: `0.5px solid ${THEME.border}`, padding: '12px', borderRadius: '12px', cursor: 'pointer', fontSize: '12px', width: '100%', marginTop: '12px' }} onClick={onLogout}>로그아웃</button>
       </div>
     </div>
     </SubscriptionGate>

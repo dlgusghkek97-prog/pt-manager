@@ -1,4 +1,4 @@
-import React from 'react'
+import React, { useEffect, useState } from 'react'
 import { THEME } from './utils'
 import { TERMS_OF_SERVICE, PRIVACY_POLICY, REFUND_POLICY, TERMS_VERSION } from './legal'
 import useModalBackButton from './useModalBackButton'
@@ -8,6 +8,13 @@ import CloseButton from './CloseButton'
 // kind: 'terms' | 'privacy' | 'refund'
 export default function LegalModal({ kind, onClose }) {
   useModalBackButton(true, onClose)
+
+  // ghost-click 가드 — 부모 모달의 row 클릭이 이 모달로 전파되어 즉시 닫히는 사고 방지
+  const [armed, setArmed] = useState(false)
+  useEffect(() => {
+    const t = setTimeout(() => setArmed(true), 400)
+    return () => clearTimeout(t)
+  }, [])
 
   const title = kind === 'terms' ? '서비스 이용약관'
               : kind === 'privacy' ? '개인정보 처리방침'
@@ -22,9 +29,10 @@ export default function LegalModal({ kind, onClose }) {
     <div
       style={{
         position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
-        background: 'rgba(0,0,0,0.5)', zIndex: 1200,
+        background: 'rgba(0,0,0,0.5)', zIndex: 1700,
         display: 'flex', alignItems: 'center', justifyContent: 'center',
         padding: '16px',
+        pointerEvents: armed ? 'auto' : 'none',
       }}
     >
       <div
@@ -38,6 +46,7 @@ export default function LegalModal({ kind, onClose }) {
           flexDirection: 'column',
           overflow: 'hidden',
           boxSizing: 'border-box',
+          pointerEvents: 'auto',
         }}
       >
         <div style={{
