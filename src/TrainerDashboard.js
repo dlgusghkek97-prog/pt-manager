@@ -2069,6 +2069,19 @@ export default function TrainerDashboard({ user, onLogout }) {
                 table="trainer_inbody"
                 idField="trainer_id"
                 embedded
+                onSaved={async ({ weight: w, muscle: m, bodyFat: bf }) => {
+                  // 회원 인바디 저장 즉시 회원 상세 소비량/그래프 반영
+                  if (w) setMemberWeight(String(w))
+                  if (m) setMemberMuscle(String(m))
+                  if (bf) setMemberBodyFat(String(bf))
+                  const patch = {}
+                  if (w) patch.macro_weight = parseFloat(w) || null
+                  if (m) patch.macro_muscle = parseFloat(m) || null
+                  if (bf) patch.macro_body_fat = parseFloat(bf) || null
+                  if (Object.keys(patch).length && selectedMember) {
+                    await supabase.from('members').update(patch).eq('id', selectedMember.id)
+                  }
+                }}
               />
             )}
 

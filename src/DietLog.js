@@ -189,6 +189,12 @@ export default function DietLog({ user, onDietUpdate, tableOverride, trainerIdFi
     return `${y}-${String(m).padStart(2, '0')}-W${w}`
   })
   const [activeNutrient, setActiveNutrient] = useState('calories')
+  // 소비 탭 — 하루 단위 보기. 기본 오늘.
+  const [consumptionDay, setConsumptionDay] = useState(() => {
+    const d = new Date()
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+  })
+  const [dayWorkouts, setDayWorkouts] = useState([])
 
   // 식사: 가변 배열. 각 항목에 slot(순서) / name(자유 라벨) / id(DB row id) 포함.
   const emptyMealAt = (slot) => ({
@@ -231,6 +237,22 @@ export default function DietLog({ user, onDietUpdate, tableOverride, trainerIdFi
 
   useEffect(() => { loadLogs(selectedDate); loadFeedback(selectedDate) }, [selectedDate, user.id])
   useEffect(() => { if (tab === 'stats') loadStatsLogs() }, [tab, statMode, statValue])
+
+  // 소비 탭 하루 보기 — 선택 날짜의 운동 기록 단독 조회
+  useEffect(() => {
+    if (tab !== 'stats' || activeNutrient !== 'consumption') return
+    let alive = true
+    ;(async () => {
+      const { data } = await supabase
+        .from(W_TABLE)
+        .select('*')
+        .eq(W_ID_FIELD, user.id)
+        .eq('log_date', consumptionDay)
+      if (alive) setDayWorkouts(data || [])
+    })()
+    return () => { alive = false }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tab, activeNutrient, consumptionDay, user.id])
 
   // unmount 시 미실행 retry timer 정리 — 탭 전환·언로드 후 잔존 호출 방지
   useEffect(() => () => {
@@ -651,7 +673,21 @@ export default function DietLog({ user, onDietUpdate, tableOverride, trainerIdFi
   const fallbackTDEE = calcTDEE(macroResult, goal, intensity)
   const hasFallbackTDEE = fallbackTDEE !== null && fallbackTDEE > 0
 
-  const burnMode = (parseFloat(muscle) || 0) > 0
+  // 로컬 기준 오늘 — 미래 날짜에는 소비(BMR 등) 반영 안 함
+  const _now = new Date()
+  const todayLocal = `${_now.getFullYear()}-${String(_now.getMonth() + 1).padStart(2, '0')}-${String(_now.getDate()).padStart(2, '0')}`
+
+  const consumptionDayLabel = (() => {
+    const [y, m, d] = consumptionDay.split('-').map(Number)
+    const dt = new Date(y, m - 1, d)
+    const wd = ['일', '월', '화', '수', '목', '금', '토'][dt.getDay()]
+    const isToday = consumptionDay === todayLocal
+    return `${m}월 ${d}일 (${wd})${isToday ? ' · 오늘' : ''}`
+  })()
+
+  // muscle 없어도 체지방률+체중으로 LBM 계산 가능하면 'daily'(기초대사 포함) 모드
+  const canDailyBurn = calcDailyBurn({ muscle, occupation, weight, bodyFat, weightCal: 0, cardioCal: 0 }) !== null
+  const burnMode = canDailyBurn
     ? 'daily'
     : (hasFallbackTDEE ? 'tdee' : 'burned')
 
@@ -665,6 +701,15 @@ export default function DietLog({ user, onDietUpdate, tableOverride, trainerIdFi
     const endDay = Math.min(startDay + 6, new Date(y, mo, 0).getDate())
     for (let d = startDay; d <= endDay; d++) {
       const dateStr = `${y}-${String(mo).padStart(2, '0')}-${String(d).padStart(2, '0')}`
+      if (dateStr > todayLocal) {
+        // 미래 날짜 — 아직 소비 없음 (BMR 미반영)
+        map[dateStr] = {
+          calories: 0, carbs: 0, protein: 0, fat: 0,
+          weightCal: 0, cardioCal: 0, burned: 0, consumption: 0,
+          future: true,
+        }
+        continue
+      }
       const { weightCal, cardioCal, total: burned, dailyBurn } = calcDailyBurnByDate(dateStr)
       const consumption = dailyBurn !== null
         ? dailyBurn
@@ -770,9 +815,11 @@ export default function DietLog({ user, onDietUpdate, tableOverride, trainerIdFi
 
   const weekCalIntakeTotal = weekDates.reduce((s, d) => s + weekDailyTotals[d].calories, 0)
   const weekConsumptionTotal = weekDates.reduce((s, d) => s + weekDailyTotals[d].consumption, 0)
+  // 섭취 평균 분모 = 식단 기록한 날. 소비 평균 분모 = 경과한 날 (소비는 매일 발생).
   const recordedDays = weekDates.filter(d => weekDailyTotals[d].calories > 0).length
+  const elapsedWeekDays = weekDates.filter(d => !weekDailyTotals[d].future && d <= todayLocal).length
   const weekAvgIntake = recordedDays > 0 ? Math.round(weekCalIntakeTotal / recordedDays) : 0
-  const weekAvgConsumption = recordedDays > 0 ? Math.round(weekConsumptionTotal / recordedDays) : 0
+  const weekAvgConsumption = elapsedWeekDays > 0 ? Math.round(weekConsumptionTotal / elapsedWeekDays) : 0
   const weekAvgNet = weekAvgIntake - weekAvgConsumption
 
   const recordedMonths = Object.values(yearMonthlyAvg).filter(v => v.days > 0).length
@@ -780,36 +827,19 @@ export default function DietLog({ user, onDietUpdate, tableOverride, trainerIdFi
   const yearAvgConsumption = recordedMonths > 0 ? Math.round(Object.values(yearMonthlyAvg).reduce((s, v) => s + v.consumption, 0) / recordedMonths) : 0
   const yearAvgNet = yearAvgIntake - yearAvgConsumption
 
-  // 소비 분해 — 기초대사(BMR) / 생활활동(NEAT) / 웨이트 / 유산소 1일 평균
-  const consumptionBreakdown = (() => {
-    if (!(parseFloat(muscle) > 0)) return null
-    let dates = []
-    if (statMode === 'week') {
-      dates = weekDates
-    } else if (statMode === 'year') {
-      const dateSet = new Set()
-      statsWorkouts.forEach(r => dateSet.add(r.log_date))
-      statsLogs.forEach(r => { if ((r.calories || 0) > 0) dateSet.add(r.log_date) })
-      dates = Array.from(dateSet)
-    }
-    if (dates.length === 0) return null
-    let sumBmr = 0, sumNeat = 0, sumWeight = 0, sumCardio = 0, dayCount = 0
-    for (const d of dates) {
-      const { weightCal, cardioCal } = calcBurnedByDate(d)
-      const bd = calcDailyBurnBreakdown({ muscle, occupation, weight, bodyFat, weightCal, cardioCal })
-      if (!bd) continue
-      sumBmr += bd.bmr
-      sumNeat += bd.neat
-      sumWeight += bd.weight
-      sumCardio += bd.cardio
-      dayCount++
-    }
-    if (dayCount === 0) return null
-    const bmr = Math.round(sumBmr / dayCount)
-    const neat = Math.round(sumNeat / dayCount)
-    const weightAvg = Math.round(sumWeight / dayCount)
-    const cardioAvg = Math.round(sumCardio / dayCount)
-    return { bmr, neat, weight: weightAvg, cardio: cardioAvg, total: bmr + neat + weightAvg + cardioAvg, days: dayCount }
+  // 소비 탭 — 선택한 하루의 소비 분해
+  const dayBreakdown = (() => {
+    const probe = calcDailyBurnBreakdown({ muscle, occupation, weight, bodyFat, weightCal: 0, cardioCal: 0 })
+    if (!probe) return null
+    if (consumptionDay > todayLocal) return { future: true }
+    let cardioCal = 0, volume = 0, sets = 0
+    dayWorkouts.forEach(r => {
+      if (r.exercise_type === 'cardio') cardioCal += r.calories_burned || 0
+      else { volume += r.volume || 0; sets += 1 }
+    })
+    const weightCal = calcWeightCalories({ volume, totalSets: sets, weight, muscle })
+    const bd = calcDailyBurnBreakdown({ muscle, occupation, weight, bodyFat, weightCal, cardioCal })
+    return bd
   })()
 
   const CHART_VIEWBOX = "0 0 320 170"
@@ -1363,49 +1393,55 @@ export default function DietLog({ user, onDietUpdate, tableOverride, trainerIdFi
             </div>
           </div>
 
-          {/* 소비 분해 표 — 활성 탭이 '소비'일 때만 노출 */}
+          {/* 소비 분해 표 — 날짜별 (그래프와 별개로 하루 단위) */}
           {activeNutrient === 'consumption' && (
-            consumptionBreakdown ? (
-              <div style={{ background: THEME.cardAlt, borderRadius: '12px', padding: '14px 12px', marginBottom: '10px' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: '12px' }}>
-                  <p style={{ fontSize: '12px', color: THEME.primaryDark, fontWeight: '500', margin: 0 }}>소비 분해</p>
-                  <p style={{ fontSize: '10px', color: THEME.textHint, margin: 0 }}>
-                    1일 평균 · 합계 {consumptionBreakdown.total} kcal
-                  </p>
-                </div>
-                {[
-                  { key: 'bmr', label: '기초대사', color: THEME.primary },
-                  { key: 'neat', label: '생활활동', color: THEME.primaryAccent },
-                  { key: 'weight', label: '웨이트', color: THEME.nutProtein },
-                  { key: 'cardio', label: '유산소', color: THEME.danger },
-                ].map(({ key, label, color }) => {
-                  const val = consumptionBreakdown[key] || 0
-                  const pct = consumptionBreakdown.total > 0
-                    ? Math.round(val / consumptionBreakdown.total * 100)
-                    : 0
-                  return (
-                    <div key={key} style={{ marginBottom: '8px' }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
-                        <span style={{ fontSize: '11px', color: THEME.text, fontWeight: '500' }}>{label}</span>
-                        <span style={{ fontSize: '11px', color: THEME.textSub }}>
-                          {val} kcal · {pct}%
-                        </span>
-                      </div>
-                      <div style={{ background: '#FFF', borderRadius: '4px', height: '8px', overflow: 'hidden', border: `0.5px solid ${THEME.borderLight}` }}>
-                        <div style={{ width: `${pct}%`, height: '100%', background: color, borderRadius: '4px' }} />
-                      </div>
-                    </div>
-                  )
-                })}
-                <p style={{ fontSize: '9px', color: THEME.textHint, margin: '4px 0 0', textAlign: 'right' }}>
-                  기록 {consumptionBreakdown.days}일 기준
+            <div style={{ background: THEME.cardAlt, borderRadius: '12px', padding: '14px 12px', marginBottom: '10px' }}>
+              <div style={{ marginBottom: '12px' }}>
+                <DatePicker value={consumptionDay} onChange={setConsumptionDay} mode="day" />
+              </div>
+
+              {!dayBreakdown ? (
+                <p style={{ fontSize: '11px', color: THEME.textSub, textAlign: 'center', padding: '14px 0', margin: 0 }}>
+                  체지방률+체중 또는 골격근량을 입력하면<br />기초대사·생활활동을 포함한 소비 분해가 표시됩니다.
                 </p>
-              </div>
-            ) : (
-              <div style={{ background: THEME.cardAlt, borderRadius: '12px', padding: '14px 12px', marginBottom: '10px', fontSize: '11px', color: THEME.textSub, textAlign: 'center' }}>
-                골격근량을 입력하면 기초대사·생활활동을 포함한 소비 분해가 표시됩니다.
-              </div>
-            )
+              ) : dayBreakdown.future ? (
+                <p style={{ fontSize: '11px', color: THEME.textHint, textAlign: 'center', padding: '14px 0', margin: 0 }}>
+                  아직 지나지 않은 날입니다.
+                </p>
+              ) : (
+                <>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: '12px' }}>
+                    <p style={{ fontSize: '12px', color: THEME.primaryDark, fontWeight: '500', margin: 0 }}>소비 분해</p>
+                    <p style={{ fontSize: '13px', color: THEME.text, fontWeight: '500', margin: 0 }}>
+                      합계 {dayBreakdown.total} kcal
+                    </p>
+                  </div>
+                  {[
+                    { key: 'bmr', label: '기초대사', color: THEME.primary },
+                    { key: 'neat', label: '생활활동', color: THEME.primaryAccent },
+                    { key: 'weight', label: '웨이트', color: THEME.nutProtein },
+                    { key: 'cardio', label: '유산소', color: THEME.danger },
+                  ].map(({ key, label, color }) => {
+                    const val = dayBreakdown[key] || 0
+                    const pct = dayBreakdown.total > 0 ? Math.round(val / dayBreakdown.total * 100) : 0
+                    return (
+                      <div key={key} style={{ marginBottom: '8px' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
+                          <span style={{ fontSize: '11px', color: THEME.text, fontWeight: '500' }}>{label}</span>
+                          <span style={{ fontSize: '11px', color: THEME.textSub }}>{val} kcal · {pct}%</span>
+                        </div>
+                        <div style={{ background: '#FFF', borderRadius: '4px', height: '8px', overflow: 'hidden', border: `0.5px solid ${THEME.borderLight}` }}>
+                          <div style={{ width: `${pct}%`, height: '100%', background: color, borderRadius: '4px' }} />
+                        </div>
+                      </div>
+                    )
+                  })}
+                  <p style={{ fontSize: '9px', color: THEME.textHint, margin: '4px 0 0', textAlign: 'right' }}>
+                    {consumptionDayLabel} 하루 소비
+                  </p>
+                </>
+              )}
+            </div>
           )}
 
         </div>

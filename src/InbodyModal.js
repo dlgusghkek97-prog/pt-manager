@@ -222,6 +222,7 @@ export default function InbodyModal({
   user, memberId, isOpen, defaultView = 'input', onClose,
   table = 'member_inbody', idField = 'member_id',
   embedded = false,  // true 면 모달 overlay 없이 인라인 카드처럼 렌더 (메인 탭 안에서 사용)
+  onSaved,  // (record) => void — 저장 성공 시 최신 { weight, muscle, bodyFat } 전달
 }) {
   useModalBackButton(!embedded && isOpen, onClose)
 
@@ -301,6 +302,13 @@ export default function InbodyModal({
         link: 'inbody',
       })
     }
+
+    // 저장 직전 form 값으로 부모에 최신 인바디 통지 (소비량/그래프 즉시 반영용)
+    onSaved?.({
+      weight: form.weight,
+      muscle: form.muscle_mass,
+      bodyFat: form.body_fat_percent,
+    })
 
     setEditId(null); setEditTable(null)
     setForm({ measured_date: today(), weight: '', muscle_mass: '', body_fat_mass: '', body_fat_percent: '' })

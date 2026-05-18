@@ -1009,6 +1009,19 @@ export default function MemberDashboard({ user, onLogout }) {
             table="member_inbody"
             idField="member_id"
             embedded
+            onSaved={async ({ weight: w, muscle: m, bodyFat: bf }) => {
+              // 인바디 저장 즉시 소비량/그래프 반영 — state + localStorage + DB
+              if (w) { setWeight(String(w)); localStorage.setItem(`macro_weight_${user.id}`, String(w)) }
+              if (m) { setMuscle(String(m)); localStorage.setItem(`macro_muscle_${user.id}`, String(m)) }
+              if (bf) { setBodyFat(String(bf)); localStorage.setItem(`macro_body_fat_${user.id}`, String(bf)) }
+              const patch = {}
+              if (w) patch.macro_weight = parseFloat(w) || null
+              if (m) patch.macro_muscle = parseFloat(m) || null
+              if (bf) patch.macro_body_fat = parseFloat(bf) || null
+              if (Object.keys(patch).length) {
+                await supabase.from('members').update(patch).eq('id', user.id)
+              }
+            }}
           />
         )}
 

@@ -74,16 +74,24 @@ export function calcWeightCalories({ volume = 0, totalSets = 0, weight, muscle }
   return Math.round(metKcal + volumeKcal)
 }
 
-// LBM (제지방량) 추산 — bodyFat·weight 가 있으면 그게 더 정확.
-// 없으면 골격근량 × 1.4 fallback. 둘 다 없으면 0.
+// LBM (제지방량) 추산.
+// · 골격근량 + (체지방률·체중) 둘 다 있으면 → 두 추정의 평균
+// · 한쪽만 있으면 그 값. 둘 다 없으면 0.
+//   골격근량 추정: muscle × 1.4
+//   체지방률 추정: weight × (1 − bodyFat/100)
 const estimateLBM = ({ weight, bodyFat, muscle }) => {
+  const m = parseFloat(muscle)
   const bf = parseFloat(bodyFat)
   const w = parseFloat(weight)
-  if (!isNaN(bf) && bf > 0 && bf < 100 && !isNaN(w) && w > 0) {
-    return w * (1 - bf / 100)
-  }
-  const m = parseFloat(muscle)
-  if (!isNaN(m) && m > 0) return m * 1.4
+
+  const lbmMuscle = (!isNaN(m) && m > 0) ? m * 1.4 : null
+  const lbmBodyFat = (!isNaN(bf) && bf > 0 && bf < 100 && !isNaN(w) && w > 0)
+    ? w * (1 - bf / 100)
+    : null
+
+  if (lbmMuscle != null && lbmBodyFat != null) return (lbmMuscle + lbmBodyFat) / 2
+  if (lbmMuscle != null) return lbmMuscle
+  if (lbmBodyFat != null) return lbmBodyFat
   return 0
 }
 
