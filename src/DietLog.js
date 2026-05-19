@@ -287,7 +287,10 @@ export default function DietLog({ user, onDietUpdate, tableOverride, trainerIdFi
         const calories = row.calories != null ? String(row.calories) : ''
         const autoCalc = computeCal(carbs, protein, fat)
         const savedCal = parseFloat(calories) || 0
-        const isManual = savedCal > 0 && autoCalc > 0 && Math.abs(savedCal - autoCalc) > 1
+        // 수동 판별: 저장 칼로리가 탄단지 자동계산과 1kcal 넘게 다르면 수동.
+        // (탄단지가 비어 autoCalc=0 이어도 수동값은 보존해야 함 — autoCalc>0 조건 빼면
+        //  탄단지 없이 칼로리만 넣은 식사가 재로드 후 0으로 덮어써지는 버그가 사라짐)
+        const isManual = savedCal > 0 && Math.abs(savedCal - autoCalc) > 1
         return {
           slot,
           name: row.meal_type || `식사 ${slot}`,
@@ -506,7 +509,13 @@ export default function DietLog({ user, onDietUpdate, tableOverride, trainerIdFi
       const protein = parseFloat(meal.protein) || 0
       const fat = parseFloat(meal.fat) || 0
       let calories = parseFloat(meal.calories) || 0
-      if (!calories && (carbs || protein || fat)) calories = computeCal(carbs, protein, fat)
+      // 자동 모드(수동 입력 아님)면 탄단지로 항상 재계산 — 옛 저장 칼로리가
+      // 남아 탄단지 변경이 칼로리에 반영 안 되던 문제 방지. 수동이면 입력값 유지.
+      if (!meal.calorieManual && (carbs || protein || fat)) {
+        calories = computeCal(carbs, protein, fat)
+      } else if (!calories && (carbs || protein || fat)) {
+        calories = computeCal(carbs, protein, fat)
+      }
       const media_url = meal.media_url || null
       const hasContent = !!(carbs || protein || fat || calories || media_url)
 

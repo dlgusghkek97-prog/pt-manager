@@ -4,6 +4,7 @@ import {
   loadClassSessions, createClassSession, updateClassSession, deleteClassSession,
   requestClassSession, approveClassRequest, rejectClassRequest,
   getBusinessHours, setBusinessHours, isWithinBusinessHours,
+  usePtSession, refundPtSession,
 } from './utils'
 import { supabase } from './supabase'
 import useModalBackButton from './useModalBackButton'
@@ -616,6 +617,67 @@ function SessionEditModal({ user, userType, trainerId, target, members, onClose,
     onSaved()
   }
 
+  // 출석/결석/취소 — PT 차감·복구 동반. target.pt_charged 로 중복 차감/복구 방지.
+  const [acting, setActing] = useState(false)
+  const mid = target.member_id
+
+  // 출석 처리 → completed + (아직 차감 안 됐으면) PT 1회 차감
+  const handleAttend = async () => {
+    if (acting) return
+    if (!mid) { alert('회원이 지정된 슬롯만 출석 처리할 수 있어요.'); return }
+    setActing(true)
+    let charged = !!target.pt_charged
+    if (!charged) {
+      // eslint-disable-next-line react-hooks/rules-of-hooks
+      const r = await usePtSession(mid)
+      if (!r.success) { alert('출석 차감 실패: ' + r.error); setActing(false); return }
+      charged = true
+    }
+    const res = await updateClassSession(target.id, { status: 'completed', pt_charged: charged })
+    setActing(false)
+    if (!res.success) { alert('처리 실패: ' + res.error); return }
+    onSaved()
+  }
+
+  // 결석 처리 → no_show. 차감 여부는 트레이너가 매번 선택.
+  const handleNoShow = async () => {
+    if (acting) return
+    if (!mid) { alert('회원이 지정된 슬롯만 결석 처리할 수 있어요.'); return }
+    const wantCharge = window.confirm('결석 처리합니다.\n\n[확인] PT 1회 차감\n[취소] 차감 없이 결석만 기록')
+    setActing(true)
+    let charged = !!target.pt_charged
+    if (wantCharge && !charged) {
+      // eslint-disable-next-line react-hooks/rules-of-hooks
+      const r = await usePtSession(mid)
+      if (!r.success) { alert('차감 실패: ' + r.error); setActing(false); return }
+      charged = true
+    } else if (!wantCharge && charged) {
+      // 이미 차감돼 있었는데 이번엔 차감 안 함 → 복구
+      const r = await refundPtSession(mid)
+      if (!r.success) { alert('복구 실패: ' + r.error); setActing(false); return }
+      charged = false
+    }
+    const res = await updateClassSession(target.id, { status: 'no_show', pt_charged: charged })
+    setActing(false)
+    if (!res.success) { alert('처리 실패: ' + res.error); return }
+    onSaved()
+  }
+
+  // 취소 → cancelled. 차감돼 있었으면 복구.
+  const handleCancelSession = async () => {
+    if (acting) return
+    if (!window.confirm('이 수업을 취소할까요?' + (target.pt_charged ? '\n차감된 PT 1회가 복구됩니다.' : ''))) return
+    setActing(true)
+    if (target.pt_charged && mid) {
+      const r = await refundPtSession(mid)
+      if (!r.success) { alert('복구 실패: ' + r.error); setActing(false); return }
+    }
+    const res = await updateClassSession(target.id, { status: 'cancelled', pt_charged: false })
+    setActing(false)
+    if (!res.success) { alert('취소 실패: ' + res.error); return }
+    onSaved()
+  }
+
   const inp = {
     width: '100%', padding: '8px 10px', borderRadius: RADIUS.sm,
     border: `0.5px solid ${THEME.border}`, fontSize: FONT.md,
@@ -748,7 +810,15 @@ function SessionEditModal({ user, userType, trainerId, target, members, onClose,
                     }}>
                       <span style={{ fontSize: FONT.md, color: THEME.primaryDark, fontWeight: 500 }}>
                         {selectedMember.name}
-                        {selectedMember.phone && <span style={{ fontSize: FONT.xs, color: THEME.textSub, marginLeft: 6 }}>{selectedMember.phone}</span>}
+                        {(() => {
+                          const tot = selectedMember.pt_total_sessions || 0
+                          const rem = tot - (selectedMember.pt_used_sessions || 0)
+                          return (
+                            <span style={{ fontSize: FONT.xs, marginLeft: 8, color: tot <= 0 ? THEME.textHint : (rem > 0 ? THEME.primary : THEME.danger) }}>
+                              {tot <= 0 ? 'PT 미등록' : `잔여 ${rem} / 총 ${tot}회`}
+                            </span>
+                          )
+                        })()}
                       </span>
                       <button
                         onClick={() => { setMemberId(''); setMemberQuery(''); setShowMemberList(true) }}
@@ -820,6 +890,36 @@ function SessionEditModal({ user, userType, trainerId, target, members, onClose,
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
               <button onClick={handleApprove} style={{ ...btnPrimary, background: THEME.primary }}>승인</button>
               <button onClick={handleReject} style={{ ...btnPrimary, background: THEME.danger }}>거절</button>
+            </div>
+          )}
+
+          {/* 트레이너 — 회원 확정 슬롯 출석/결석/취소 (+PT 차감·복구) */}
+          {!isNew && isTrainer && mid && ['scheduled','changed','completed','no_show','cancelled'].includes(target.status) && (
+            <div>
+              <div style={{ ...lbl, display: 'flex', justifyContent: 'space-between' }}>
+                <span>출결</span>
+                <span style={{ color: target.pt_charged ? THEME.danger : THEME.textHint }}>
+                  {target.status === 'completed' ? '현재: 출석'
+                    : target.status === 'no_show' ? '현재: 결석'
+                    : target.status === 'cancelled' ? '현재: 취소'
+                    : '현재: 예정'}
+                  {target.pt_charged ? ' · PT 차감됨' : ''}
+                </span>
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8 }}>
+                <button onClick={handleAttend} disabled={acting || target.status === 'completed'}
+                  style={{ ...btnPrimary, background: target.status === 'completed' ? THEME.borderLight : THEME.primary, color: target.status === 'completed' ? THEME.textHint : '#FFF' }}>
+                  출석
+                </button>
+                <button onClick={handleNoShow} disabled={acting || target.status === 'no_show'}
+                  style={{ ...btnPrimary, background: target.status === 'no_show' ? THEME.borderLight : THEME.warning, color: target.status === 'no_show' ? THEME.textHint : '#FFF' }}>
+                  결석
+                </button>
+                <button onClick={handleCancelSession} disabled={acting || target.status === 'cancelled'}
+                  style={{ ...btnPrimary, background: '#FFF', color: THEME.danger, border: `0.5px solid ${THEME.border}` }}>
+                  취소
+                </button>
+              </div>
             </div>
           )}
 

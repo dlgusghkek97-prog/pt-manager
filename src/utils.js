@@ -1042,6 +1042,36 @@ export const usePtSession = async (memberId) => {
   return { success: true, remaining, total, used: newUsed }
 }
 
+// PT 1회 복구(되돌리기). 잘못된 출석/결석 차감 취소용. 0 미만으로 안 내려감.
+// 반환: { success, remaining, total } 또는 { success: false, error }
+export const refundPtSession = async (memberId) => {
+  if (!memberId) return { success: false, error: 'memberId 누락' }
+  const { data: member, error: memErr } = await supabase
+    .from('members')
+    .select('pt_total_sessions, pt_used_sessions')
+    .eq('id', memberId)
+    .single()
+  if (memErr || !member) {
+    console.error('[refundPtSession] member load error:', memErr)
+    return { success: false, error: '회원 정보 조회 실패' }
+  }
+  const total = member.pt_total_sessions || 0
+  const used = member.pt_used_sessions || 0
+  const newUsed = Math.max(0, used - 1)
+  if (newUsed === used) {
+    return { success: true, remaining: total - used, total, used }  // 이미 0, 변화 없음
+  }
+  const { error: updErr } = await supabase
+    .from('members')
+    .update({ pt_used_sessions: newUsed })
+    .eq('id', memberId)
+  if (updErr) {
+    console.error('[refundPtSession] update error:', updErr)
+    return { success: false, error: '복구 실패: ' + updErr.message }
+  }
+  return { success: true, remaining: total - newUsed, total, used: newUsed }
+}
+
 // PT 횟수 충전. 충전 시 알림 플래그 리셋해서 다음 10/5회 도달 시 다시 알림.
 export const addPtSessions = async (memberId, count) => {
   if (!memberId || !count || count <= 0) {
