@@ -6,7 +6,6 @@ import {
 } from './utils'
 import useModalBackButton from './useModalBackButton'
 import CloseButton from './CloseButton'
-import HelpDot from './HelpDot'
 
 // ─── 통합 인바디 모달 — [입력] / [추이] 탭 ───
 // props:
@@ -376,13 +375,6 @@ export default function InbodyModal({
         <div style={headerStyle}>
           <div style={{ display: 'flex', alignItems: 'center' }}>
             <h3 style={titleStyle}>인바디</h3>
-            <HelpDot title="인바디 사용법" items={[
-              '[입력] — 측정일 + 체중·골격근량·체지방량·체지방률 4가지 입력.',
-              '[추이] — 측정 이력을 시계열 차트로. 전체 / 체중 / 골격근량 / 체지방량 / 체지방률 탭.',
-              '회원 입력 ● vs 트레이너 측정 ■ 마커로 구분.',
-              '기록 카드 탭 → 수정 가능. 삭제도 동일 모달에서.',
-              '체지방률 입력하면 기초대사량(BMR) 계산이 정확해짐. 안 넣으면 골격근량 × 1.4로 추정.',
-            ]} />
           </div>
           {!embedded && <CloseButton onClick={onClose} />}
         </div>

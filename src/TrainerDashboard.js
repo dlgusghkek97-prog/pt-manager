@@ -20,7 +20,6 @@ import { getScheduleEnabled } from './utils'
 import SubscriptionGate from './SubscriptionGate'
 import useModalBackButton from './useModalBackButton'
 import useTabHistory from './useTabHistory'
-import HelpDot from './HelpDot'
 import { loadSubscription, summarizeSubscription, canAddMember } from './utils'
 
 const NOTE_COLOR_POOL = [
@@ -37,23 +36,23 @@ const NOTE_COLOR_POOL = [
 const MACRO_INPUT_STYLE = {
   background: 'transparent',
   border: 'none',
-  fontSize: '16px',
-  fontWeight: '500',
-  textAlign: 'right',
+  fontSize: '24px',
+  fontWeight: '700',
+  textAlign: 'center',
   padding: 0,
   boxSizing: 'border-box',
   outline: 'none',
-  width: '52px',
-  letterSpacing: '-0.3px',
+  width: '100%',
+  letterSpacing: '-0.5px',
   fontFamily: 'inherit',
 }
 
 const MACRO_BAR_BG_STYLE = {
-  height: '3px',
+  height: '8px',
   background: '#FFF',
-  borderRadius: '2px',
+  borderRadius: '5px',
   width: '100%',
-  marginBottom: '4px',
+  marginBottom: '6px',
   overflow: 'hidden',
 }
 
@@ -74,15 +73,15 @@ const MacroCell = React.memo(function MacroCell({
   const containerStyle = React.useMemo(() => ({
     background: bg,
     borderRadius: '12px',
-    padding: '10px 6px',
+    padding: '12px 6px 10px',
     display: 'flex',
     flexDirection: 'column',
     alignItems: 'center',
-    minHeight: '105px',
+    minHeight: '124px',
   }), [bg])
 
   const labelStyle = React.useMemo(() => ({
-    fontSize: '10px', color: mid, lineHeight: 1, height: '12px',
+    fontSize: '11px', color: mid, lineHeight: 1, height: '13px', fontWeight: '500',
   }), [mid])
 
   const inputStyle = React.useMemo(() => ({
@@ -90,50 +89,45 @@ const MacroCell = React.memo(function MacroCell({
     color: dark,
   }), [dark])
 
-  const unitStyle = React.useMemo(() => ({
-    fontSize: '8px', color: mid, opacity: 0.85,
-  }), [mid])
-
   const barFillStyle = React.useMemo(() => ({
     width: `${pct}%`,
     background: over ? THEME.danger : accent,
-    height: '3px',
-    borderRadius: '2px',
+    height: '8px',
+    borderRadius: '5px',
   }), [pct, over, accent])
 
   const footStyle = React.useMemo(() => ({
-    fontSize: '9px',
+    fontSize: '10px',
     color: over ? THEME.danger : mid,
     fontWeight: '500',
     lineHeight: 1,
-    height: '11px',
+    height: '13px',
+    textAlign: 'center',
+    width: '100%',
   }), [over, mid])
 
   return (
     <div style={containerStyle}>
       <div style={labelStyle}>{label}</div>
       <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', width: '100%' }}>
-        <div style={{ display: 'flex', alignItems: 'baseline', gap: '2px', justifyContent: 'center' }}>
-          <input
-            type="text"
-            inputMode="numeric"
-            autoComplete="off"
-            autoCorrect="off"
-            autoCapitalize="off"
-            spellCheck="false"
-            value={value}
-            onChange={e => onChangeLocal(field, e.target.value)}
-            onBlur={onCommit}
-            style={inputStyle}
-          />
-          <span style={unitStyle}>{unit}</span>
-        </div>
+        <input
+          type="text"
+          inputMode="numeric"
+          autoComplete="off"
+          autoCorrect="off"
+          autoCapitalize="off"
+          spellCheck="false"
+          value={value}
+          onChange={e => onChangeLocal(field, e.target.value)}
+          onBlur={onCommit}
+          style={inputStyle}
+        />
       </div>
       <div style={MACRO_BAR_BG_STYLE}>
         <div style={barFillStyle} />
       </div>
       <div style={footStyle}>
-        {Math.round(current)}{unit} ({pct}%)
+        {Math.round(current)}/{value || 0}{unit} ({pct}%)
       </div>
     </div>
   )
@@ -1821,14 +1815,6 @@ export default function TrainerDashboard({ user, onLogout }) {
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px' }}>
               <div style={{ display: 'flex', alignItems: 'center' }}>
                 <p style={{ ...S.cardTitle, margin: 0 }}>회원 관리</p>
-                <HelpDot title="회원 관리" items={[
-                  '[+ 회원 추가] — 이름·성별·목표·PT 시작일 입력 → 6자리 코드 자동 발급.',
-                  '회원 카드의 [전송] 버튼 — 카톡으로 코드 공유.',
-                  '회원 카드 탭 → 상세 화면. 운동·식단·인바디·채팅·메모 모두 관리.',
-                  'PT 잔여 횟수 카드 탭 → 충전 / 회수 가능.',
-                  '시작일 카드 탭 → 수정 가능.',
-                  '회원 이름 옆 노란 점 = 직업 활동량 미설정 (식단 설정 안내 필요).',
-                ]} />
               </div>
               <button style={S.addBtn} onClick={() => { setShowAddMember(!showAddMember); setGeneratedCode('') }}>+ 회원 추가</button>
             </div>

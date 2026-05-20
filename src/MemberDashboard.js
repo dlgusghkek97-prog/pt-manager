@@ -20,23 +20,23 @@ import { getTrainerScheduleEnabled, loadMyUpcomingSessions } from './utils'
 const MACRO_INPUT_STYLE = {
   background: 'transparent',
   border: 'none',
-  fontSize: '16px',
-  fontWeight: '500',
+  fontSize: '24px',
+  fontWeight: '700',
   textAlign: 'center',
   padding: 0,
   boxSizing: 'border-box',
   outline: 'none',
-  width: '52px',
-  letterSpacing: '-0.3px',
+  width: '100%',
+  letterSpacing: '-0.5px',
   fontFamily: 'inherit',
 }
 
 const MACRO_BAR_BG_STYLE = {
-  height: '3px',
+  height: '8px',
   background: '#FFF',
-  borderRadius: '2px',
+  borderRadius: '5px',
   width: '100%',
-  marginBottom: '4px',
+  marginBottom: '6px',
   overflow: 'hidden',
 }
 
@@ -57,15 +57,15 @@ const MacroCell = React.memo(function MacroCell({
   const containerStyle = React.useMemo(() => ({
     background: bg,
     borderRadius: '12px',
-    padding: '10px 6px',
+    padding: '12px 6px 10px',
     display: 'flex',
     flexDirection: 'column',
     alignItems: 'center',
-    minHeight: '105px',
+    minHeight: '124px',
   }), [bg])
 
   const labelStyle = React.useMemo(() => ({
-    fontSize: '10px', color: mid, lineHeight: 1, height: '12px',
+    fontSize: '11px', color: mid, lineHeight: 1, height: '13px', fontWeight: '500',
   }), [mid])
 
   const inputStyle = React.useMemo(() => ({
@@ -73,23 +73,19 @@ const MacroCell = React.memo(function MacroCell({
     color: dark,
   }), [dark])
 
-  const unitStyle = React.useMemo(() => ({
-    fontSize: '8px', color: mid, opacity: 0.85,
-  }), [mid])
-
   const barFillStyle = React.useMemo(() => ({
     width: `${pct}%`,
     background: over ? THEME.danger : accent,
-    height: '3px',
-    borderRadius: '2px',
+    height: '8px',
+    borderRadius: '5px',
   }), [pct, over, accent])
 
   const footStyle = React.useMemo(() => ({
-    fontSize: '9px',
+    fontSize: '10px',
     color: over ? THEME.danger : mid,
     fontWeight: '500',
     lineHeight: 1,
-    height: '11px',
+    height: '13px',
     textAlign: 'center',
     width: '100%',
   }), [over, mid])
@@ -98,27 +94,24 @@ const MacroCell = React.memo(function MacroCell({
     <div style={containerStyle}>
       <div style={labelStyle}>{label}</div>
       <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', width: '100%' }}>
-        <div style={{ display: 'flex', alignItems: 'baseline', gap: '2px', justifyContent: 'center' }}>
-          <input
-            type="text"
-            inputMode="numeric"
-            autoComplete="off"
-            autoCorrect="off"
-            autoCapitalize="off"
-            spellCheck="false"
-            value={value}
-            onChange={e => onChangeLocal(field, e.target.value)}
-            onBlur={onCommit}
-            style={inputStyle}
-          />
-          <span style={unitStyle}>{unit}</span>
-        </div>
+        <input
+          type="text"
+          inputMode="numeric"
+          autoComplete="off"
+          autoCorrect="off"
+          autoCapitalize="off"
+          spellCheck="false"
+          value={value}
+          onChange={e => onChangeLocal(field, e.target.value)}
+          onBlur={onCommit}
+          style={inputStyle}
+        />
       </div>
       <div style={MACRO_BAR_BG_STYLE}>
         <div style={barFillStyle} />
       </div>
       <div style={footStyle}>
-        {Math.round(current)}{unit} ({pct}%)
+        {Math.round(current)}/{value || 0}{unit} ({pct}%)
       </div>
     </div>
   )

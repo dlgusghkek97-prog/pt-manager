@@ -5,7 +5,6 @@ import DatePicker from './DatePicker'
 import DietFavModal from './DietFavModal'
 import DietDayFavModal from './DietDayFavModal'
 import useModalBackButton from './useModalBackButton'
-import HelpDot from './HelpDot'
 
 const NUTRIENTS = [
   { key: 'calories', label: '칼로리', unit: 'kcal', color: THEME.nutCalories },
@@ -1073,14 +1072,6 @@ export default function DietLog({ user, onDietUpdate, tableOverride, trainerIdFi
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px', gap: '8px' }}>
             <div style={{ display: 'flex', alignItems: 'center' }}>
               <p style={{ ...S.cardTitle, margin: 0 }}>식단 기록</p>
-              {!readOnly && <HelpDot title="식단 기록 입력법" items={[
-                '끼니별로 탄수·단백질·지방(g) 입력 → 칼로리 자동 계산 (탄·단×4 + 지×9).',
-                '칼로리 직접 입력하면 그 값 우선 (수동 모드, 회색 → 흰색 배경).',
-                '입력칸을 떠나면 자동 저장.',
-                '★ 즐겨찾기 — 한 끼 저장. 📅 일일 즐겨찾기 — 하루 통째로 저장·적용.',
-                '+ 식사 추가 — 끼니 N개로 자유롭게 확장 (식사1 / 식사2 / 식사3 ...).',
-                '사진 첨부 가능. 영양정보는 삼성헬스 등 앱에서 검색 후 입력하면 편함.',
-              ]} />}
             </div>
             {!readOnly && (
               <button
@@ -1258,14 +1249,6 @@ export default function DietLog({ user, onDietUpdate, tableOverride, trainerIdFi
 
       {tab === 'stats' && (
         <div style={S.card}>
-          <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '6px' }}>
-            <HelpDot title="식단 통계 보기" items={[
-              '주간 — 7일간 일자별 막대 그래프. 월간 — 1~12월 비교.',
-              '하단 탭: 칼로리 / 탄수 / 단백 / 지방 / 소비 / 잉여·적자.',
-              '소비 — 기초대사 + 생활활동 + 웨이트 + 유산소 합산. 골격근량(필수)·체지방률(권장)로 더 정확.',
-              '잉여(+) = 살찜 (벌크업 목표 OK). 적자(−) = 빠짐 (다이어트 목표 OK).',
-            ]} />
-          </div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px', marginBottom: '10px' }}>
             {[
               { key: 'week', label: '주간' },
