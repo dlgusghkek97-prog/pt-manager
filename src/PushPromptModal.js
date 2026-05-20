@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useState, useRef, useEffect } from 'react'
 import { THEME } from './utils'
 import { subscribeToPush, dismissPushPrompt } from './utils'
 import useModalBackButton from './useModalBackButton'
@@ -6,12 +6,27 @@ import useModalBackButton from './useModalBackButton'
 export default function PushPromptModal({ userId, userType, onClose }) {
   useModalBackButton(true, onClose)
   const [loading, setLoading] = useState(false)
+  const mountedRef = useRef(true)
+  useEffect(() => () => { mountedRef.current = false }, [])
 
   const handleEnable = async () => {
     if (loading) return
     setLoading(true)
-    const result = await subscribeToPush(userId, userType)
-    setLoading(false)
+    // subscribeToPush 가 hang 되는 경우(브라우저 권한 다이얼로그 무시 등) 영원히
+    // 닫히지 않는 문제 방지 — 10초 타임아웃.
+    const TIMEOUT_MS = 10000
+    let result
+    try {
+      result = await Promise.race([
+        subscribeToPush(userId, userType),
+        new Promise((_, rej) => setTimeout(() => rej(new Error('timeout')), TIMEOUT_MS)),
+      ])
+    } catch (e) {
+      result = { success: false, error: e?.message === 'timeout' ? '응답 시간 초과 — 다시 시도해주세요' : (e?.message || '알 수 없는 오류') }
+    } finally {
+      if (mountedRef.current) setLoading(false)
+    }
+    if (!mountedRef.current) return  // "나중에"로 이미 닫힘
     if (result.success) {
       alert('푸시 알림이 켜졌습니다!\n앱이 꺼져 있어도 알림을 받을 수 있어요.')
       onClose()
@@ -46,7 +61,20 @@ export default function PushPromptModal({ userId, userType, onClose }) {
         width: '100%',
         maxWidth: '340px',
         textAlign: 'center',
+        position: 'relative',
       }}>
+        {/* 우상단 닫기 — 진행 중에도 항상 활성. 무한 대기 탈출용 안전망 */}
+        <button
+          onClick={handleLater}
+          aria-label="닫기"
+          style={{
+            position: 'absolute', top: 8, right: 8,
+            width: 28, height: 28, borderRadius: '50%',
+            background: 'transparent', border: 'none',
+            color: THEME.textSub, fontSize: 18, lineHeight: 1,
+            cursor: 'pointer', fontFamily: 'inherit', padding: 0,
+          }}
+        >✕</button>
         {/* 아이콘 */}
         <div style={{
           width: '56px',
@@ -107,7 +135,6 @@ export default function PushPromptModal({ userId, userType, onClose }) {
         </button>
         <button
           onClick={handleLater}
-          disabled={loading}
           style={{
             width: '100%',
             background: '#FFF',
