@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react'
-import { PARTS, PART_COLORS, S, THEME, getWeekNum, weekLabels, calcPRs, BIG4_EXERCISES, loadBig4PRs, saveBig4PR, uploadPRMedia, removePRMedia } from './utils'
+import { PARTS, PART_COLORS, S, THEME, getWeekNum, weekLabels, calcPRs, BIG4_EXERCISES, loadBig4PRs, saveBig4PR, uploadPRMedia, removePRMedia, loadFavorites } from './utils'
 import HelpDot from './HelpDot'
 
 export default function WorkoutStats({
@@ -10,7 +10,7 @@ export default function WorkoutStats({
   readOnly = false,
   onJumpToLog,  // (dateStr) => void — 캘린더 셀 클릭 시 운동 기록 탭으로 이동
 }) {
-  const [statsTab, setStatsTab] = useState('daily')
+  const [statsTab, setStatsTab] = useState('workout')
   const today = new Date()
   const todayStr = today.toISOString().split('T')[0]
   const [viewYear, setViewYear] = useState(today.getFullYear())
@@ -23,9 +23,15 @@ export default function WorkoutStats({
   const [big4Draft, setBig4Draft] = useState({})
   const [prPreview, setPRPreview] = useState(null)  // { url, isVideo, label }
 
+  // 즐겨찾기 — PR 탭 진입 시 로드. 라인차트용 운동 선택 칩.
+  const [favList, setFavList] = useState([])
+  const [selectedFav, setSelectedFav] = useState(null)  // { body_part, exercise_name }
+
   useEffect(() => {
     if (statsTab === 'pr' && memberId) {
       reloadBig4()
+      const favTable = bigPrIdField === 'trainer_id' ? 'trainer_favorite_exercises' : 'member_favorite_exercises'
+      loadFavorites(memberId, favTable, bigPrIdField).then(setFavList)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [statsTab, memberId, bigPrTable, bigPrIdField])
@@ -248,8 +254,8 @@ export default function WorkoutStats({
         ))}
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: '6px', marginBottom: '10px' }}>
-        {['daily', 'weekly', 'monthly', 'pr'].map((t, i) => {
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px', marginBottom: '10px' }}>
+        {['workout', 'pr'].map((t, i) => {
           const active = statsTab === t
           return (
             <button key={t} style={{
@@ -262,13 +268,13 @@ export default function WorkoutStats({
               fontWeight: active ? '500' : '400',
               cursor: 'pointer'
             }} onClick={() => setStatsTab(t)}>
-              {['일간', '주간', '월간', 'PR'][i]}
+              {['운동', 'PR'][i]}
             </button>
           )
         })}
       </div>
 
-      {statsTab === 'daily' && (
+      {statsTab === 'workout' && (
         <div style={S.card}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
             <p style={{ ...S.cardTitle, margin: 0 }}>{viewYear}년 {viewMonth}월</p>
@@ -468,7 +474,7 @@ export default function WorkoutStats({
         </div>
       )}
 
-      {statsTab === 'weekly' && (
+      {statsTab === 'workout' && (
         <div style={S.card}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
             <p style={{ ...S.cardTitle, margin: 0 }}>{viewYear}년 {viewMonth}월 주차별</p>
@@ -505,7 +511,7 @@ export default function WorkoutStats({
         </div>
       )}
 
-      {statsTab === 'monthly' && (
+      {statsTab === 'workout' && (
         <div style={S.card}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
             <p style={{ ...S.cardTitle, margin: 0 }}>{viewYear}년 월별</p>
@@ -710,6 +716,173 @@ export default function WorkoutStats({
               )}
             </div>
           )}
+
+          {/* ─── 즐겨찾기 운동 추이 — 라인차트 (최근 60일, 일자별 최대 세트 볼륨) ─── */}
+          {(() => {
+            const big4Names = new Set(BIG4_EXERCISES.map(e => e.label))
+            const favs = favList.filter(f => !big4Names.has((f.exercise_name || '').trim()))
+            return (
+              <div style={{ ...S.card, padding: '12px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
+                  <p style={{ ...S.cardTitle, margin: 0 }}>즐겨찾기 운동 추이</p>
+                  <span style={{ fontSize: '10px', color: THEME.textHint }}>최근 60일 · 최대 세트 볼륨</span>
+                </div>
+                {favs.length === 0 ? (
+                  <p style={{ fontSize: '11px', color: THEME.textSub, textAlign: 'center', padding: '14px 0', margin: 0 }}>
+                    즐겨찾기한 운동이 없어요. 운동 기록에서 ★ 로 등록하세요.
+                  </p>
+                ) : (
+                  <>
+                    <div style={{ display: 'flex', gap: 5, overflowX: 'auto', paddingBottom: 6, marginBottom: 8 }}>
+                      {favs.map(f => {
+                        const active = selectedFav?.exercise_name === f.exercise_name
+                        const color = PART_COLORS[f.body_part] || THEME.primary
+                        return (
+                          <button key={f.id}
+                            onClick={() => setSelectedFav({ body_part: f.body_part, exercise_name: f.exercise_name })}
+                            style={{
+                              flexShrink: 0,
+                              background: active ? color : '#FFF',
+                              color: active ? '#FFF' : THEME.text,
+                              border: `0.5px solid ${active ? color : THEME.border}`,
+                              borderRadius: 14, padding: '5px 11px',
+                              fontSize: 11, fontWeight: active ? 500 : 400,
+                              cursor: 'pointer', fontFamily: 'inherit',
+                              whiteSpace: 'nowrap',
+                            }}>
+                            {f.exercise_name}
+                          </button>
+                        )
+                      })}
+                    </div>
+                    {(() => {
+                      if (!selectedFav) {
+                        return <p style={{ fontSize: '11px', color: THEME.textHint, textAlign: 'center', padding: '14px 0', margin: 0 }}>운동을 선택하세요</p>
+                      }
+                      const since = new Date(); since.setDate(since.getDate() - 60)
+                      const sinceStr = since.toISOString().split('T')[0]
+                      const rows = allLogs.filter(r =>
+                        (r.exercise_name || '').trim() === selectedFav.exercise_name &&
+                        r.log_date && r.log_date >= sinceStr
+                      )
+                      if (rows.length === 0) {
+                        return <p style={{ fontSize: '11px', color: THEME.textHint, textAlign: 'center', padding: '14px 0', margin: 0 }}>최근 60일 기록이 없어요</p>
+                      }
+                      // 일자별 최대 세트 볼륨
+                      const byDate = {}
+                      rows.forEach(r => {
+                        const v = r.volume || 0
+                        if (!byDate[r.log_date] || v > byDate[r.log_date]) byDate[r.log_date] = v
+                      })
+                      const dates = Object.keys(byDate).sort()
+                      const values = dates.map(d => byDate[d])
+                      const maxV = Math.max(...values, 1)
+                      const W = 320, H = 170, padL = 28, padR = 10, padT = 14, padB = 24
+                      const innerW = W - padL - padR, innerH = H - padT - padB
+                      const xOf = (i) => dates.length === 1 ? padL + innerW / 2 : padL + (i / (dates.length - 1)) * innerW
+                      const yOf = (v) => padT + (1 - v / maxV) * innerH
+                      const pts = dates.map((d, i) => `${xOf(i)},${yOf(byDate[d])}`).join(' ')
+                      const color = PART_COLORS[selectedFav.body_part] || THEME.primary
+                      const fmtDate = (s) => `${parseInt(s.split('-')[1])}/${parseInt(s.split('-')[2])}`
+                      return (
+                        <svg viewBox={`0 0 ${W} ${H}`} style={{ width: '100%', height: 'auto' }}>
+                          {[0, 0.5, 1].map((p, i) => (
+                            <line key={i} x1={padL} y1={padT + p * innerH} x2={W - padR} y2={padT + p * innerH} stroke={THEME.borderLight} strokeWidth="0.5" />
+                          ))}
+                          {[0, 0.5, 1].map((p, i) => (
+                            <text key={i} x={padL - 4} y={padT + p * innerH + 3} textAnchor="end" fontSize="8" fill={THEME.textHint}>
+                              {Math.round(maxV * (1 - p))}
+                            </text>
+                          ))}
+                          <polyline points={pts} fill="none" stroke={color} strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
+                          {dates.map((d, i) => (
+                            <g key={d}>
+                              <circle cx={xOf(i)} cy={yOf(byDate[d])} r="2.5" fill={color} />
+                              {(i === 0 || i === dates.length - 1 || i === Math.floor(dates.length / 2)) && (
+                                <text x={xOf(i)} y={H - padB + 12} textAnchor="middle" fontSize="8" fill={THEME.textSub}>
+                                  {fmtDate(d)}
+                                </text>
+                              )}
+                            </g>
+                          ))}
+                          <text x={W - padR} y={padT - 3} textAnchor="end" fontSize="9" fill={THEME.textSub}>
+                            kg·rep
+                          </text>
+                        </svg>
+                      )
+                    })()}
+                  </>
+                )}
+              </div>
+            )
+          })()}
+
+          {/* ─── 부위별 운동 횟수 — radar (이번 달 기준) ─── */}
+          {(() => {
+            const now = new Date()
+            const yyyy = now.getFullYear()
+            const mm = String(now.getMonth() + 1).padStart(2, '0')
+            const prefix = `${yyyy}-${mm}`
+            // 이번 달 row 들 부위별 unique log_date 수
+            const partDays = {}
+            PARTS.forEach(p => { partDays[p] = new Set() })
+            allLogs.forEach(r => {
+              if (r.log_date && r.log_date.startsWith(prefix) && r.body_part && partDays[r.body_part]) {
+                partDays[r.body_part].add(r.log_date)
+              }
+            })
+            const counts = PARTS.map(p => partDays[p].size)
+            const maxC = Math.max(...counts, 3)  // 최소 3 (시각 안정)
+            const N = PARTS.length
+            const W = 320, H = 240, cx = W / 2, cy = 110, R = 80
+            const angleAt = (i) => -Math.PI / 2 + (i * 2 * Math.PI) / N
+            const ptAt = (i, ratio) => {
+              const a = angleAt(i)
+              return [cx + Math.cos(a) * R * ratio, cy + Math.sin(a) * R * ratio]
+            }
+            const dataPts = counts.map((c, i) => ptAt(i, c / maxC)).map(([x, y]) => `${x},${y}`).join(' ')
+            return (
+              <div style={{ ...S.card, padding: '12px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                  <p style={{ ...S.cardTitle, margin: 0 }}>부위별 운동 횟수</p>
+                  <span style={{ fontSize: '10px', color: THEME.textHint }}>{now.getMonth() + 1}월 · 일 수 기준</span>
+                </div>
+                <svg viewBox={`0 0 ${W} ${H}`} style={{ width: '100%', height: 'auto' }}>
+                  {/* 배경 격자 (0.25 / 0.5 / 0.75 / 1) */}
+                  {[0.25, 0.5, 0.75, 1].map((r, idx) => {
+                    const pts = PARTS.map((_, i) => ptAt(i, r)).map(([x, y]) => `${x},${y}`).join(' ')
+                    return <polygon key={idx} points={pts} fill="none" stroke={THEME.borderLight} strokeWidth="0.5" />
+                  })}
+                  {/* 축 선 */}
+                  {PARTS.map((_, i) => {
+                    const [x, y] = ptAt(i, 1)
+                    return <line key={i} x1={cx} y1={cy} x2={x} y2={y} stroke={THEME.borderLight} strokeWidth="0.5" />
+                  })}
+                  {/* 데이터 다각형 */}
+                  <polygon points={dataPts} fill={THEME.primary} fillOpacity="0.25" stroke={THEME.primary} strokeWidth="1.5" />
+                  {/* 데이터 점 + 값 */}
+                  {counts.map((c, i) => {
+                    const [x, y] = ptAt(i, c / maxC)
+                    return <circle key={i} cx={x} cy={y} r="3" fill={PART_COLORS[PARTS[i]] || THEME.primary} />
+                  })}
+                  {/* 라벨 */}
+                  {PARTS.map((p, i) => {
+                    const [x, y] = ptAt(i, 1.18)
+                    return (
+                      <g key={p}>
+                        <text x={x} y={y} textAnchor="middle" fontSize="10" fontWeight="500" fill={PART_COLORS[p] || THEME.text}>
+                          {p}
+                        </text>
+                        <text x={x} y={y + 11} textAnchor="middle" fontSize="9" fill={THEME.textSub}>
+                          {counts[i]}회
+                        </text>
+                      </g>
+                    )
+                  })}
+                </svg>
+              </div>
+            )
+          })()}
 
           {/* ─── 기존 PR 그리드 ─── */}
           <div style={S.card}>
