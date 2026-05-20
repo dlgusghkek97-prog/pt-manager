@@ -48,12 +48,13 @@ const MACRO_INPUT_STYLE = {
 }
 
 const MACRO_BAR_BG_STYLE = {
-  height: '8px',
+  height: '22px',
   background: '#FFF',
-  borderRadius: '5px',
+  borderRadius: '11px',
   width: '100%',
   marginBottom: '6px',
   overflow: 'hidden',
+  position: 'relative',
 }
 
 const ChatBubbleIcon = ({ color = THEME.textSub, size = 14 }) => (
@@ -92,9 +93,30 @@ const MacroCell = React.memo(function MacroCell({
   const barFillStyle = React.useMemo(() => ({
     width: `${pct}%`,
     background: over ? THEME.danger : accent,
-    height: '8px',
-    borderRadius: '5px',
+    height: '22px',
+    borderRadius: '11px',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    transition: 'width 0.25s',
   }), [pct, over, accent])
+
+  const labelInside = pct >= 22
+  const pctTextStyle = React.useMemo(() => ({
+    fontSize: '11px',
+    fontWeight: '600',
+    color: '#FFF',
+    lineHeight: 1,
+    whiteSpace: 'nowrap',
+  }), [])
+  const pctTextOutsideStyle = React.useMemo(() => ({
+    position: 'absolute',
+    right: '6px', top: '50%', transform: 'translateY(-50%)',
+    fontSize: '10px', fontWeight: '600',
+    color: over ? THEME.danger : dark,
+    lineHeight: 1,
+    pointerEvents: 'none',
+  }), [over, dark])
 
   const footStyle = React.useMemo(() => ({
     fontSize: '10px',
@@ -124,10 +146,13 @@ const MacroCell = React.memo(function MacroCell({
         />
       </div>
       <div style={MACRO_BAR_BG_STYLE}>
-        <div style={barFillStyle} />
+        <div style={barFillStyle}>
+          {labelInside && <span style={pctTextStyle}>{pct}%</span>}
+        </div>
+        {!labelInside && <span style={pctTextOutsideStyle}>{pct}%</span>}
       </div>
       <div style={footStyle}>
-        {Math.round(current)}/{value || 0}{unit} ({pct}%)
+        {Math.round(current)}/{value || 0}{unit}
       </div>
     </div>
   )

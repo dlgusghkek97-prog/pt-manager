@@ -616,14 +616,17 @@ export const removeWorkoutDayFavorite = async (favId, table = 'workout_day_favor
   return { success: true }
 }
 
-export const getLatestRecord = (allLogs, bodyPart, exerciseName) => {
+// excludeDate: 해당 날짜(보통 현재 편집중인 selectedDate)는 "이전 기록" 에 포함시키지 않음.
+// 오늘 입력하는 세트가 오늘의 "최근 기록" 으로 표시되는 모순 방지.
+export const getLatestRecord = (allLogs, bodyPart, exerciseName, excludeDate = null) => {
   if (!allLogs || !bodyPart || !exerciseName) return null
   const matched = allLogs.filter(l =>
     l.exercise_type !== 'cardio' &&
     l.body_part === bodyPart &&
     l.exercise_name === exerciseName &&
     parseFloat(l.weight) > 0 &&
-    parseInt(l.reps) > 0
+    parseInt(l.reps) > 0 &&
+    (!excludeDate || l.log_date !== excludeDate)
   )
   if (matched.length === 0) return null
   matched.sort((a, b) => b.log_date.localeCompare(a.log_date))
