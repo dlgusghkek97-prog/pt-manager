@@ -759,7 +759,7 @@ export default function WorkoutStats({
                       const range = maxV - minV > 0 ? maxV - minV : Math.max(1, maxV * 0.1)
                       const yMin = maxV - minV > 0 ? minV : Math.max(0, minV - range / 2)
                       const yMax = maxV - minV > 0 ? maxV : minV + range / 2
-                      const W = 320, H = 180, padL = 40, padR = 14, padT = 18, padB = 28
+                      const W = 320, H = 175, padL = 36, padR = 12, padT = 14, padB = 22
                       const innerW = W - padL - padR, innerH = H - padT - padB
                       const xOf = (i) => dates.length === 1 ? padL + innerW / 2 : padL + (i / (dates.length - 1)) * innerW
                       const yOf = (v) => padT + (1 - (v - yMin) / (yMax - yMin)) * innerH
@@ -772,22 +772,22 @@ export default function WorkoutStats({
                             <line key={i} x1={padL} y1={padT + p * innerH} x2={W - padR} y2={padT + p * innerH} stroke={THEME.borderLight} strokeWidth="0.5" />
                           ))}
                           {[0, 0.5, 1].map((p, i) => (
-                            <text key={i} x={padL - 5} y={padT + p * innerH + 4} textAnchor="end" fontSize="11" fill={THEME.textSub}>
+                            <text key={i} x={padL - 5} y={padT + p * innerH + 3} textAnchor="end" fontSize="8" fill={THEME.textHint}>
                               {Math.round(yMax - (yMax - yMin) * p)}
                             </text>
                           ))}
-                          <polyline points={pts} fill="none" stroke={color} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
+                          <polyline points={pts} fill="none" stroke={color} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
                           {dates.map((d, i) => (
                             <g key={d}>
-                              <circle cx={xOf(i)} cy={yOf(byDate[d])} r="3.2" fill={color} />
+                              <circle cx={xOf(i)} cy={yOf(byDate[d])} r="2.6" fill={color} />
                               {(i === 0 || i === dates.length - 1 || (dates.length > 2 && i === Math.floor(dates.length / 2))) && (
-                                <text x={xOf(i)} y={H - padB + 14} textAnchor="middle" fontSize="11" fill={THEME.text} fontWeight="500">
+                                <text x={xOf(i)} y={H - padB + 12} textAnchor="middle" fontSize="8.5" fill={THEME.textSub}>
                                   {fmtDate(d)}
                                 </text>
                               )}
                             </g>
                           ))}
-                          <text x={W - padR} y={padT - 5} textAnchor="end" fontSize="10" fill={THEME.textHint}>
+                          <text x={W - padR} y={padT - 4} textAnchor="end" fontSize="8" fill={THEME.textHint}>
                             kg·회
                           </text>
                         </svg>
@@ -816,7 +816,8 @@ export default function WorkoutStats({
             const counts = PARTS.map(p => partDays[p].size)
             const maxC = Math.max(...counts, 3)  // 최소 3 (시각 안정)
             const N = PARTS.length
-            const W = 320, H = 240, cx = W / 2, cy = 110, R = 80
+            // 데이터 영역(R) 작게 + 라벨 ratio 멀리 → 라벨이 그래프 안 침범
+            const W = 320, H = 240, cx = W / 2, cy = 118, R = 64
             const angleAt = (i) => -Math.PI / 2 + (i * 2 * Math.PI) / N
             const ptAt = (i, ratio) => {
               const a = angleAt(i)
@@ -841,21 +842,21 @@ export default function WorkoutStats({
                     return <line key={i} x1={cx} y1={cy} x2={x} y2={y} stroke={THEME.borderLight} strokeWidth="0.5" />
                   })}
                   {/* 데이터 다각형 */}
-                  <polygon points={dataPts} fill={THEME.primary} fillOpacity="0.25" stroke={THEME.primary} strokeWidth="1.5" />
+                  <polygon points={dataPts} fill={THEME.primary} fillOpacity="0.22" stroke={THEME.primary} strokeWidth="1.3" />
                   {/* 데이터 점 + 값 */}
                   {counts.map((c, i) => {
                     const [x, y] = ptAt(i, c / maxC)
-                    return <circle key={i} cx={x} cy={y} r="3" fill={PART_COLORS[PARTS[i]] || THEME.primary} />
+                    return <circle key={i} cx={x} cy={y} r="2.4" fill={PART_COLORS[PARTS[i]] || THEME.primary} />
                   })}
-                  {/* 라벨 */}
+                  {/* 라벨 — 격자 밖으로 충분히 (1.45) */}
                   {PARTS.map((p, i) => {
-                    const [x, y] = ptAt(i, 1.18)
+                    const [x, y] = ptAt(i, 1.45)
                     return (
                       <g key={p}>
-                        <text x={x} y={y} textAnchor="middle" fontSize="10" fontWeight="500" fill={PART_COLORS[p] || THEME.text}>
+                        <text x={x} y={y} textAnchor="middle" fontSize="8" fontWeight="500" fill={PART_COLORS[p] || THEME.text}>
                           {p}
                         </text>
-                        <text x={x} y={y + 11} textAnchor="middle" fontSize="9" fill={THEME.textSub}>
+                        <text x={x} y={y + 9} textAnchor="middle" fontSize="7" fill={THEME.textSub}>
                           {counts[i]}회
                         </text>
                       </g>
