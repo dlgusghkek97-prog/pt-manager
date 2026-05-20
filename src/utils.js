@@ -561,6 +561,61 @@ export const removeDietDayFavorite = async (favId, table = 'diet_day_favorites')
   return { success: true }
 }
 
+// ── 일일 운동 즐겨찾기 (하루 전체 운동 set) ──
+export const loadWorkoutDayFavorites = async (userId, table = 'workout_day_favorites', idField = 'member_id') => {
+  const { data, error } = await supabase
+    .from(table)
+    .select('*')
+    .eq(idField, userId)
+    .order('created_at', { ascending: false })
+  if (error) {
+    console.error('[loadWorkoutDayFavorites] error:', error)
+    return []
+  }
+  return data || []
+}
+
+// exercises: 화면 현재 exercises 배열. 빈 운동은 저장하지 않음.
+// 저장 형태 — { slot, exercise_type, body_part, exercise_name, memo, description,
+//              sets: [{ weight, reps }] }  (id 는 저장 안 함 — 적용 시 새 row 생성)
+export const addWorkoutDayFavorite = async (userId, label, exercises, table = 'workout_day_favorites', idField = 'member_id') => {
+  const trimmed = (label || '').trim()
+  if (!trimmed) return { success: false, error: '이름이 필요합니다' }
+  const cleaned = (exercises || [])
+    .map(ex => ({
+      slot: ex.slot,
+      exercise_type: ex.exercise_type || 'weight',
+      body_part: ex.body_part || '',
+      exercise_name: ex.exercise_name || '',
+      memo: ex.memo || '',
+      description: ex.description || '',
+      sets: (ex.sets || [])
+        .map(s => ({
+          weight: s.weight !== '' && s.weight != null ? String(s.weight) : '',
+          reps: s.reps !== '' && s.reps != null ? String(s.reps) : '',
+        }))
+        .filter(s => s.weight !== '' || s.reps !== ''),
+    }))
+    .filter(ex => ex.exercise_name && ex.body_part && ex.sets.length > 0)
+  if (cleaned.length === 0) return { success: false, error: '저장할 운동 내용이 없습니다' }
+  const payload = { [idField]: userId, label: trimmed, exercises: cleaned }
+  const { data, error } = await supabase.from(table).insert(payload).select().single()
+  if (error) {
+    console.error('[addWorkoutDayFavorite] error:', error)
+    return { success: false, error: error.message }
+  }
+  return { success: true, data }
+}
+
+export const removeWorkoutDayFavorite = async (favId, table = 'workout_day_favorites') => {
+  const { error } = await supabase.from(table).delete().eq('id', favId)
+  if (error) {
+    console.error('[removeWorkoutDayFavorite] error:', error)
+    return { success: false, error: error.message }
+  }
+  return { success: true }
+}
+
 export const getLatestRecord = (allLogs, bodyPart, exerciseName) => {
   if (!allLogs || !bodyPart || !exerciseName) return null
   const matched = allLogs.filter(l =>

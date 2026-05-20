@@ -597,8 +597,6 @@ export default function WorkoutStats({
                   const draft = big4Draft[key] || { weight: '', reps: '' }
                   const saved = big4State[key]
                   const recordedDate = saved?.recorded_date
-                  const mediaUrl = saved?.media_url
-                  const isVideo = mediaUrl && /\.(mp4|mov|webm|m4v)(\?|$)/i.test(mediaUrl)
 
                   return (
                     <div key={key} style={{
@@ -607,15 +605,8 @@ export default function WorkoutStats({
                       borderRadius: '10px',
                       padding: '9px',
                     }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+                      <div style={{ marginBottom: '6px' }}>
                         <div style={{ fontSize: '11px', color: THEME.primary, fontWeight: '500' }}>{label}</div>
-                        {!readOnly && mediaUrl && (
-                          <button
-                            onClick={() => handlePRMediaRemove(key)}
-                            style={{ background: 'none', border: 'none', color: THEME.danger, fontSize: '10px', cursor: 'pointer', padding: 0 }}
-                            title="영상/사진 삭제"
-                          >✕</button>
-                        )}
                       </div>
 
                       <div style={{ display: 'flex', alignItems: 'baseline', gap: '4px', whiteSpace: 'nowrap', marginBottom: '6px' }}>
@@ -658,50 +649,6 @@ export default function WorkoutStats({
                         )}
                       </div>
 
-                      {/* 영상/사진 슬롯 — 한 달 자동삭제 예외 (영구 보존) */}
-                      {mediaUrl ? (
-                        <div
-                          onClick={() => setPRPreview({ url: mediaUrl, isVideo, label })}
-                          style={{
-                            width: '100%', height: 70, borderRadius: 6, overflow: 'hidden',
-                            background: '#000', cursor: 'pointer', position: 'relative',
-                            marginBottom: 4,
-                          }}
-                        >
-                          {isVideo ? (
-                            <video src={mediaUrl} muted playsInline preload="metadata"
-                              style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                          ) : (
-                            <img src={mediaUrl} alt={label}
-                              style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
-                          )}
-                          {isVideo && (
-                            <div style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', width: 26, height: 26, borderRadius: '50%', background: 'rgba(0,0,0,0.55)', color: '#FFF', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11 }}>▶</div>
-                          )}
-                        </div>
-                      ) : readOnly ? (
-                        <div style={{
-                          display: 'flex', alignItems: 'center', justifyContent: 'center',
-                          height: 30, borderRadius: 6,
-                          background: THEME.borderLight, color: THEME.textHint,
-                          fontSize: 10, marginBottom: 4,
-                        }}>영상/사진 없음</div>
-                      ) : (
-                        <label style={{
-                          display: 'flex', alignItems: 'center', justifyContent: 'center',
-                          gap: 4, height: 30, borderRadius: 6,
-                          border: `0.5px dashed ${THEME.primaryAccent}`,
-                          background: '#FFF', color: THEME.primary,
-                          fontSize: 10, fontWeight: 500, cursor: 'pointer',
-                          marginBottom: 4,
-                        }}>
-                          + 영상/사진
-                          <input type="file" accept="image/*,video/*" style={{ display: 'none' }}
-                            onChange={e => e.target.files[0] && handlePRMediaUpload(key, e.target.files[0])}
-                          />
-                        </label>
-                      )}
-
                       <div style={{ fontSize: '9px', color: THEME.textHint }}>
                         {recordedDate ? recordedDate.replace(/-/g, '.') : '미기록'}
                       </div>
@@ -717,24 +664,54 @@ export default function WorkoutStats({
             </div>
           )}
 
-          {/* ─── 즐겨찾기 운동 추이 — 라인차트 (최근 60일, 일자별 최대 세트 볼륨) ─── */}
+          {/* ─── PR 추이 — 부위별 즐겨찾기 운동 라인차트 (최근 60일, 일자별 최대 세트 볼륨) ─── */}
           {(() => {
             const big4Names = new Set(BIG4_EXERCISES.map(e => e.label))
             const favs = favList.filter(f => !big4Names.has((f.exercise_name || '').trim()))
+            const partsWithFav = PARTS.filter(p => favs.some(f => f.body_part === p))
+            const activePart = (selectedFav && partsWithFav.includes(selectedFav.body_part))
+              ? selectedFav.body_part
+              : (partsWithFav[0] || null)
+            const partFavs = activePart ? favs.filter(f => f.body_part === activePart) : []
             return (
               <div style={{ ...S.card, padding: '12px' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
-                  <p style={{ ...S.cardTitle, margin: 0 }}>즐겨찾기 운동 추이</p>
-                  <span style={{ fontSize: '10px', color: THEME.textHint }}>최근 60일 · 최대 세트 볼륨</span>
+                  <p style={{ ...S.cardTitle, margin: 0 }}>PR 추이</p>
+                  <span style={{ fontSize: '11px', color: THEME.textHint }}>최근 60일 · 최대 세트 볼륨</span>
                 </div>
                 {favs.length === 0 ? (
-                  <p style={{ fontSize: '11px', color: THEME.textSub, textAlign: 'center', padding: '14px 0', margin: 0 }}>
+                  <p style={{ fontSize: '12px', color: THEME.textSub, textAlign: 'center', padding: '14px 0', margin: 0 }}>
                     즐겨찾기한 운동이 없어요. 운동 기록에서 ★ 로 등록하세요.
                   </p>
                 ) : (
                   <>
+                    {/* 1차: 부위 칩 */}
                     <div style={{ display: 'flex', gap: 5, overflowX: 'auto', paddingBottom: 6, marginBottom: 8 }}>
-                      {favs.map(f => {
+                      {partsWithFav.map(p => {
+                        const active = activePart === p
+                        const color = PART_COLORS[p] || THEME.primary
+                        return (
+                          <button key={p}
+                            onClick={() => {
+                              const first = favs.find(f => f.body_part === p)
+                              if (first) setSelectedFav({ body_part: p, exercise_name: first.exercise_name })
+                            }}
+                            style={{
+                              flexShrink: 0,
+                              background: active ? color : '#FFF',
+                              color: active ? '#FFF' : THEME.text,
+                              border: `0.5px solid ${active ? color : THEME.border}`,
+                              borderRadius: 14, padding: '6px 14px',
+                              fontSize: 12, fontWeight: active ? 600 : 400,
+                              cursor: 'pointer', fontFamily: 'inherit',
+                              whiteSpace: 'nowrap',
+                            }}>{p}</button>
+                        )
+                      })}
+                    </div>
+                    {/* 2차: 그 부위 운동 칩 */}
+                    <div style={{ display: 'flex', gap: 5, overflowX: 'auto', paddingBottom: 6, marginBottom: 10 }}>
+                      {partFavs.map(f => {
                         const active = selectedFav?.exercise_name === f.exercise_name
                         const color = PART_COLORS[f.body_part] || THEME.primary
                         return (
@@ -742,10 +719,10 @@ export default function WorkoutStats({
                             onClick={() => setSelectedFav({ body_part: f.body_part, exercise_name: f.exercise_name })}
                             style={{
                               flexShrink: 0,
-                              background: active ? color : '#FFF',
-                              color: active ? '#FFF' : THEME.text,
-                              border: `0.5px solid ${active ? color : THEME.border}`,
-                              borderRadius: 14, padding: '5px 11px',
+                              background: active ? color : THEME.cardAlt,
+                              color: active ? '#FFF' : THEME.textSub,
+                              border: `0.5px solid ${active ? color : THEME.borderLight}`,
+                              borderRadius: 12, padding: '5px 11px',
                               fontSize: 11, fontWeight: active ? 500 : 400,
                               cursor: 'pointer', fontFamily: 'inherit',
                               whiteSpace: 'nowrap',
@@ -757,7 +734,7 @@ export default function WorkoutStats({
                     </div>
                     {(() => {
                       if (!selectedFav) {
-                        return <p style={{ fontSize: '11px', color: THEME.textHint, textAlign: 'center', padding: '14px 0', margin: 0 }}>운동을 선택하세요</p>
+                        return <p style={{ fontSize: '12px', color: THEME.textHint, textAlign: 'center', padding: '14px 0', margin: 0 }}>운동을 선택하세요</p>
                       }
                       const since = new Date(); since.setDate(since.getDate() - 60)
                       const sinceStr = since.toISOString().split('T')[0]
@@ -766,7 +743,7 @@ export default function WorkoutStats({
                         r.log_date && r.log_date >= sinceStr
                       )
                       if (rows.length === 0) {
-                        return <p style={{ fontSize: '11px', color: THEME.textHint, textAlign: 'center', padding: '14px 0', margin: 0 }}>최근 60일 기록이 없어요</p>
+                        return <p style={{ fontSize: '12px', color: THEME.textHint, textAlign: 'center', padding: '14px 0', margin: 0 }}>최근 60일 기록이 없어요</p>
                       }
                       // 일자별 최대 세트 볼륨
                       const byDate = {}
@@ -776,11 +753,16 @@ export default function WorkoutStats({
                       })
                       const dates = Object.keys(byDate).sort()
                       const values = dates.map(d => byDate[d])
-                      const maxV = Math.max(...values, 1)
-                      const W = 320, H = 170, padL = 28, padR = 10, padT = 14, padB = 24
+                      const maxV = Math.max(...values)
+                      const minV = Math.min(...values)
+                      // 변동폭 강조: 하단=최저, 상단=최대. min===max 면 약간의 여유.
+                      const range = maxV - minV > 0 ? maxV - minV : Math.max(1, maxV * 0.1)
+                      const yMin = maxV - minV > 0 ? minV : Math.max(0, minV - range / 2)
+                      const yMax = maxV - minV > 0 ? maxV : minV + range / 2
+                      const W = 320, H = 180, padL = 40, padR = 14, padT = 18, padB = 28
                       const innerW = W - padL - padR, innerH = H - padT - padB
                       const xOf = (i) => dates.length === 1 ? padL + innerW / 2 : padL + (i / (dates.length - 1)) * innerW
-                      const yOf = (v) => padT + (1 - v / maxV) * innerH
+                      const yOf = (v) => padT + (1 - (v - yMin) / (yMax - yMin)) * innerH
                       const pts = dates.map((d, i) => `${xOf(i)},${yOf(byDate[d])}`).join(' ')
                       const color = PART_COLORS[selectedFav.body_part] || THEME.primary
                       const fmtDate = (s) => `${parseInt(s.split('-')[1])}/${parseInt(s.split('-')[2])}`
@@ -790,23 +772,23 @@ export default function WorkoutStats({
                             <line key={i} x1={padL} y1={padT + p * innerH} x2={W - padR} y2={padT + p * innerH} stroke={THEME.borderLight} strokeWidth="0.5" />
                           ))}
                           {[0, 0.5, 1].map((p, i) => (
-                            <text key={i} x={padL - 4} y={padT + p * innerH + 3} textAnchor="end" fontSize="8" fill={THEME.textHint}>
-                              {Math.round(maxV * (1 - p))}
+                            <text key={i} x={padL - 5} y={padT + p * innerH + 4} textAnchor="end" fontSize="11" fill={THEME.textSub}>
+                              {Math.round(yMax - (yMax - yMin) * p)}
                             </text>
                           ))}
-                          <polyline points={pts} fill="none" stroke={color} strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
+                          <polyline points={pts} fill="none" stroke={color} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
                           {dates.map((d, i) => (
                             <g key={d}>
-                              <circle cx={xOf(i)} cy={yOf(byDate[d])} r="2.5" fill={color} />
-                              {(i === 0 || i === dates.length - 1 || i === Math.floor(dates.length / 2)) && (
-                                <text x={xOf(i)} y={H - padB + 12} textAnchor="middle" fontSize="8" fill={THEME.textSub}>
+                              <circle cx={xOf(i)} cy={yOf(byDate[d])} r="3.2" fill={color} />
+                              {(i === 0 || i === dates.length - 1 || (dates.length > 2 && i === Math.floor(dates.length / 2))) && (
+                                <text x={xOf(i)} y={H - padB + 14} textAnchor="middle" fontSize="11" fill={THEME.text} fontWeight="500">
                                   {fmtDate(d)}
                                 </text>
                               )}
                             </g>
                           ))}
-                          <text x={W - padR} y={padT - 3} textAnchor="end" fontSize="9" fill={THEME.textSub}>
-                            kg·rep
+                          <text x={W - padR} y={padT - 5} textAnchor="end" fontSize="10" fill={THEME.textHint}>
+                            kg·회
                           </text>
                         </svg>
                       )

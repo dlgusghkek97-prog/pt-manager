@@ -4,6 +4,7 @@ import { PARTS, PART_COLORS, S, THEME, calcWeightCalories, checkNewPRs, getLates
 import DatePicker from './DatePicker'
 import useModalBackButton from './useModalBackButton'
 import HelpDot from './HelpDot'
+import WorkoutDayFavModal from './WorkoutDayFavModal'
 
 const CameraIcon = ({ color = '#A8C8B5', size = 20 }) => (
   <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="1.8" strokeLinecap="round">
@@ -36,6 +37,7 @@ export default function WorkoutLog({ user, selectedDate, setSelectedDate, exerci
   const [cardioName, setCardioName] = useState('')
   const [cardioCalories, setCardioCalories] = useState('')
   const [previewIdx, setPreviewIdx] = useState(null)
+  const [dayFavOpen, setDayFavOpen] = useState(false)
   const fileInputRefs = useRef({})
 
   const [timerActive, setTimerActive] = useState(false)
@@ -980,9 +982,32 @@ export default function WorkoutLog({ user, selectedDate, setSelectedDate, exerci
         )}
       </div>
 
+      {dayFavOpen && !readOnly && (
+        <WorkoutDayFavModal
+          userId={user.id}
+          currentExercises={exercises}
+          favTable={trainerIdField ? 'trainer_workout_day_favorites' : 'workout_day_favorites'}
+          favIdField={trainerIdField || 'member_id'}
+          onApply={(applied) => setExercises(applied)}
+          onClose={() => setDayFavOpen(false)}
+        />
+      )}
+
       <div style={{ ...S.card, paddingBottom: '90px' }}>
-        <div style={{ display: 'flex', alignItems: 'center', marginBottom: '10px' }}>
-          <p style={{ ...S.cardTitle, margin: 0 }}>운동 기록</p>
+        <div style={{ display: 'flex', alignItems: 'center', marginBottom: '10px', gap: 8 }}>
+          <p style={{ ...S.cardTitle, margin: 0, flex: 1 }}>운동 기록</p>
+          {!readOnly && (
+            <button
+              onClick={() => setDayFavOpen(true)}
+              style={{
+                background: THEME.warningLight, border: `0.5px solid ${THEME.warningBorder}`,
+                color: THEME.warningDark, padding: '5px 10px', borderRadius: 14,
+                fontSize: 11, fontWeight: 500, cursor: 'pointer', fontFamily: 'inherit',
+                whiteSpace: 'nowrap',
+              }}
+              title="오늘 운동 통째로 저장 / 저장된 일일 운동 불러오기"
+            >★ 일일 운동</button>
+          )}
           {!readOnly && <HelpDot title="운동 기록 입력법" items={[
             '부위 → 종목명 → 무게(kg) → 횟수 순서로 입력.',
             '입력칸을 떠나면 자동 저장 — 별도 저장 버튼 없음.',
