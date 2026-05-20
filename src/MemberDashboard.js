@@ -522,29 +522,49 @@ export default function MemberDashboard({ user, onLogout }) {
     flexShrink: 0,
   }
 
-  const MainTabBtn = ({ tabKey, label }) => {
+  const MainTabBtn = ({ tabKey, label, hasHelp }) => {
     const active = mainTab === tabKey
     const longLabel = (label || '').length > 5
     return (
-      <button
+      <div
         onClick={() => setMainTab(tabKey)}
         style={{
           background: active ? THEME.primaryAccent : '#FFF',
           color: active ? THEME.primaryDark : THEME.textSub,
-          border: 'none',
           borderRadius: RADIUS.md,
           padding: '9px 4px',
           fontSize: longLabel ? `${FONT.sm}px` : `${FONT.md}px`,
           fontWeight: active ? 500 : 400,
           cursor: 'pointer',
           overflow: 'hidden',
-          textOverflow: 'ellipsis',
           whiteSpace: 'nowrap',
           minWidth: 0,
           fontFamily: 'inherit',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          gap: 4,
+          position: 'relative',
+          userSelect: 'none',
         }}
         title={label}
-      >{label}</button>
+      >
+        <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>{label}</span>
+        {hasHelp && (
+          <span
+            onClick={e => { e.stopPropagation(); setShowHelp(true) }}
+            style={{
+              display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+              width: 16, height: 16, borderRadius: '50%',
+              border: `0.5px solid ${active ? THEME.primaryDark : THEME.border}`,
+              color: active ? THEME.primaryDark : THEME.textHint,
+              fontSize: 10, fontWeight: 500, lineHeight: 1,
+              cursor: 'pointer', flexShrink: 0, background: '#FFF',
+            }}
+            title="설명서 보기"
+          >?</span>
+        )}
+      </div>
     )
   }
 
@@ -987,9 +1007,9 @@ export default function MemberDashboard({ user, onLogout }) {
         )}
 
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '5px', marginBottom: '10px' }}>
-          <MainTabBtn tabKey="workout" label="운동" />
-          <MainTabBtn tabKey="diet" label="식단" />
-          <MainTabBtn tabKey="inbody" label="인바디" />
+          <MainTabBtn tabKey="workout" label="운동" hasHelp />
+          <MainTabBtn tabKey="diet" label="식단" hasHelp />
+          <MainTabBtn tabKey="inbody" label="인바디" hasHelp />
           <MainTabBtn tabKey="trainer" label="내 트레이너" />
         </div>
 

@@ -1071,18 +1071,42 @@ export default function TrainerDashboard({ user, onLogout }) {
     </div>
   )
 
-  const MainTabBtn = ({ active, onClick, label }) => (
-    <button onClick={onClick} style={{
-      background: active ? THEME.primaryAccent : '#FFF',
-      color: active ? THEME.primaryDark : THEME.textSub,
-      border: 'none',
-      borderRadius: RADIUS.lg,
-      padding: SPACING.md,
-      fontSize: `${FONT.lg}px`,
-      fontWeight: active ? 500 : 400,
-      cursor: 'pointer',
-      fontFamily: 'inherit',
-    }}>{label}</button>
+  const MainTabBtn = ({ active, onClick, label, hasHelp }) => (
+    <div
+      onClick={onClick}
+      style={{
+        background: active ? THEME.primaryAccent : '#FFF',
+        color: active ? THEME.primaryDark : THEME.textSub,
+        borderRadius: RADIUS.lg,
+        padding: SPACING.md,
+        fontSize: `${FONT.lg}px`,
+        fontWeight: active ? 500 : 400,
+        cursor: 'pointer',
+        fontFamily: 'inherit',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: 6,
+        minWidth: 0,
+        userSelect: 'none',
+      }}
+    >
+      <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{label}</span>
+      {hasHelp && (
+        <span
+          onClick={e => { e.stopPropagation(); setShowHelp(true) }}
+          style={{
+            display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+            width: 18, height: 18, borderRadius: '50%',
+            border: `0.5px solid ${active ? THEME.primaryDark : THEME.border}`,
+            color: active ? THEME.primaryDark : THEME.textHint,
+            fontSize: 11, fontWeight: 500, lineHeight: 1,
+            cursor: 'pointer', flexShrink: 0, background: '#FFF',
+          }}
+          title="설명서 보기"
+        >?</span>
+      )}
+    </div>
   )
 
   const SubTabs = ({ value, onChange }) => (
@@ -1895,8 +1919,8 @@ export default function TrainerDashboard({ user, onLogout }) {
             />
 
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '6px', marginBottom: '10px' }}>
-              <MainTabBtn active={trainerMainTab === 'workout'} onClick={() => setTrainerMainTab('workout')} label="운동" />
-              <MainTabBtn active={trainerMainTab === 'diet'} onClick={() => setTrainerMainTab('diet')} label="식단" />
+              <MainTabBtn active={trainerMainTab === 'workout'} onClick={() => setTrainerMainTab('workout')} label="운동" hasHelp />
+              <MainTabBtn active={trainerMainTab === 'diet'} onClick={() => setTrainerMainTab('diet')} label="식단" hasHelp />
               <button
                 onClick={() => {
                   if (scheduleEnabled) {
@@ -2018,9 +2042,9 @@ export default function TrainerDashboard({ user, onLogout }) {
             />
 
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: '6px', marginBottom: '10px' }}>
-              <MainTabBtn active={memberMainTab === 'workout'} onClick={() => setMemberMainTab('workout')} label="운동" />
-              <MainTabBtn active={memberMainTab === 'diet'} onClick={() => setMemberMainTab('diet')} label="식단" />
-              <MainTabBtn active={memberMainTab === 'inbody'} onClick={() => setMemberMainTab('inbody')} label="인바디" />
+              <MainTabBtn active={memberMainTab === 'workout'} onClick={() => setMemberMainTab('workout')} label="운동" hasHelp />
+              <MainTabBtn active={memberMainTab === 'diet'} onClick={() => setMemberMainTab('diet')} label="식단" hasHelp />
+              <MainTabBtn active={memberMainTab === 'inbody'} onClick={() => setMemberMainTab('inbody')} label="인바디" hasHelp />
               <MainTabBtn active={memberMainTab === 'memo'} onClick={() => setMemberMainTab('memo')} label="메모" />
             </div>
 

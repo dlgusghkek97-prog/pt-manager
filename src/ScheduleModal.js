@@ -699,24 +699,19 @@ function SessionEditModal({ user, userType, trainerId, target, members, onClose,
   const TimeRow = (
     <div>
       <div style={lbl}>시간</div>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-        <span style={{
-          fontSize: FONT.sm, color: THEME.primary, fontWeight: 500,
-          background: THEME.primaryLight, padding: '7px 12px', borderRadius: RADIUS.sm,
-          whiteSpace: 'nowrap',
-        }}>{dateLabel}</span>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'nowrap' }}>
         <input
           type="time"
           value={startTime}
           onChange={e => setStartTime(e.target.value)}
-          style={timeInp}
+          style={{ ...timeInp, flex: 1, minWidth: 0 }}
         />
-        <span style={{ fontSize: FONT.sm, color: THEME.textSub }}>~</span>
+        <span style={{ fontSize: FONT.sm, color: THEME.textSub, flexShrink: 0 }}>~</span>
         <input
           type="time"
           value={endTime}
           onChange={e => { setEndTime(e.target.value); setAutoEnd(false) }}
-          style={{ ...timeInp, opacity: autoEnd ? 0.7 : 1 }}
+          style={{ ...timeInp, opacity: autoEnd ? 0.7 : 1, flex: 1, minWidth: 0 }}
         />
       </div>
       <div style={{
@@ -759,9 +754,12 @@ function SessionEditModal({ user, userType, trainerId, target, members, onClose,
         boxSizing: 'border-box', pointerEvents: 'auto',
       }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-          <p style={{ fontSize: FONT.lg, fontWeight: 500, color: THEME.text, margin: 0 }}>
-            {isNew ? '슬롯 등록' : '슬롯 편집'}
-          </p>
+          <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, minWidth: 0 }}>
+            <p style={{ fontSize: FONT.lg, fontWeight: 500, color: THEME.text, margin: 0 }}>
+              {isNew ? '슬롯 등록' : '슬롯 편집'}
+            </p>
+            <span style={{ fontSize: FONT.sm, color: THEME.primary, fontWeight: 500, whiteSpace: 'nowrap' }}>{dateLabel}</span>
+          </div>
           <CloseButton onClick={onClose} />
         </div>
 

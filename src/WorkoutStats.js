@@ -807,7 +807,7 @@ export default function WorkoutStats({
             const maxC = Math.max(...counts, 3)  // 최소 3 (시각 안정)
             const N = PARTS.length
             // 데이터 영역(R) 작게 + 라벨 ratio 멀리 → 라벨이 그래프 안 침범
-            const W = 320, H = 240, cx = W / 2, cy = 118, R = 64
+            const W = 320, H = 260, cx = W / 2, cy = 130, R = 64
             const angleAt = (i) => -Math.PI / 2 + (i * 2 * Math.PI) / N
             const ptAt = (i, ratio) => {
               const a = angleAt(i)
@@ -820,7 +820,7 @@ export default function WorkoutStats({
                   <p style={{ ...S.cardTitle, margin: 0 }}>부위별 운동 횟수</p>
                   <span style={{ fontSize: '10px', color: THEME.textHint }}>{now.getMonth() + 1}월 · 일 수 기준</span>
                 </div>
-                <svg viewBox={`0 0 ${W} ${H}`} style={{ width: '100%', height: 'auto' }}>
+                <svg viewBox={`0 -6 ${W} ${H + 6}`} style={{ width: '100%', height: 'auto', overflow: 'visible' }}>
                   {/* 배경 격자 (0.25 / 0.5 / 0.75 / 1) */}
                   {[0.25, 0.5, 0.75, 1].map((r, idx) => {
                     const pts = PARTS.map((_, i) => ptAt(i, r)).map(([x, y]) => `${x},${y}`).join(' ')
