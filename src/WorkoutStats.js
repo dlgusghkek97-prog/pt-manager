@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react'
-import { PARTS, PART_COLORS, S, THEME, getWeekNum, weekLabels, calcPRs, BIG4_EXERCISES, loadBig4PRs, saveBig4PR, uploadPRMedia, removePRMedia, loadFavorites } from './utils'
+import { PARTS, PART_COLORS, S, THEME, calcPRs, BIG4_EXERCISES, loadBig4PRs, saveBig4PR, uploadPRMedia, removePRMedia, loadFavorites } from './utils'
 
 export default function WorkoutStats({
   allLogs,
@@ -25,6 +25,9 @@ export default function WorkoutStats({
   // 즐겨찾기 — PR 탭 진입 시 로드. 라인차트용 운동 선택 칩.
   const [favList, setFavList] = useState([])
   const [selectedFav, setSelectedFav] = useState(null)  // { body_part, exercise_name }
+
+  // 월별 막대 차트 — 부위 필터 ('전체' | PARTS)
+  const [monthlyPart, setMonthlyPart] = useState('전체')
 
   useEffect(() => {
     if (statsTab === 'pr' && memberId) {
@@ -132,33 +135,24 @@ export default function WorkoutStats({
   Object.values(byPart).forEach(p => p.dates.sort((a, b) => b.date.localeCompare(a.date)))
   const activePartsThisMonth = PARTS.filter(p => byPart[p].total > 0).sort((a, b) => byPart[b].total - byPart[a].total)
 
-  const weeklyByPart = Array.from({ length: 5 }, () => { const o = {}; PARTS.forEach(p => o[p] = 0); return o })
-  const weeklyTotals = [0, 0, 0, 0, 0]
-  monthLogs.forEach(row => {
-    const wk = getWeekNum(row.log_date)
-    if (row.body_part) weeklyByPart[wk][row.body_part] = (weeklyByPart[wk][row.body_part] || 0) + (row.volume || 0)
-    weeklyTotals[wk] += row.volume || 0
-  })
-
-  const monthlyByMonth = {}
-  for (let m = 1; m <= 12; m++) {
-    const mStr = String(m).padStart(2, '0')
-    monthlyByMonth[mStr] = { total: 0, parts: {} }
-    PARTS.forEach(p => monthlyByMonth[mStr].parts[p] = 0)
+  // 최근 6개월 막대 차트 — 부위 필터 적용
+  const last6Months = []
+  for (let i = 5; i >= 0; i--) {
+    const d = new Date(viewYear, viewMonth - 1 - i, 1)
+    last6Months.push({ year: d.getFullYear(), month: d.getMonth() + 1 })
   }
-  allLogs.filter(r => r.log_date && r.log_date.startsWith(yearStr)).forEach(row => {
-    const mStr = row.log_date.split('-')[1]
-    monthlyByMonth[mStr].total += row.volume || 0
-    if (row.body_part) monthlyByMonth[mStr].parts[row.body_part] = (monthlyByMonth[mStr].parts[row.body_part] || 0) + (row.volume || 0)
+  const monthlyBars = last6Months.map(({ year, month }) => {
+    const prefix = `${year}-${String(month).padStart(2, '0')}`
+    const rows = allLogs.filter(r => r.log_date && r.log_date.startsWith(prefix))
+    const total = rows
+      .filter(r => monthlyPart === '전체' || r.body_part === monthlyPart)
+      .reduce((sum, r) => sum + (r.volume || 0), 0)
+    return { year, month, total }
   })
-
-  const todayTotal = (allLogs.filter(r => r.log_date === todayStr)).reduce((sum, r) => sum + (r.volume || 0), 0)
-  const thisWeekStart = new Date(today); thisWeekStart.setDate(today.getDate() - today.getDay() + 1)
-  const thisWeekTotal = allLogs.filter(r => r.log_date >= thisWeekStart.toISOString().split('T')[0] && r.log_date <= todayStr).reduce((sum, r) => sum + (r.volume || 0), 0)
-  const thisMonthStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}`
-  const thisMonthTotal = allLogs.filter(r => r.log_date && r.log_date.startsWith(thisMonthStr)).reduce((sum, r) => sum + (r.volume || 0), 0)
-  const maxMonthVol = Math.max(...Object.values(monthlyByMonth).map(m => m.total), 1)
-  const maxWeekVol = Math.max(...weeklyTotals, 1)
+  const maxBar = Math.max(...monthlyBars.map(d => d.total), 1)
+  const currentMonthBar = monthlyBars[monthlyBars.length - 1]
+  const prevMonthBar = monthlyBars[monthlyBars.length - 2]
+  const monthDiff = currentMonthBar.total - (prevMonthBar?.total || 0)
 
   const yearOptions = []
   for (let y = today.getFullYear(); y >= today.getFullYear() - 3; y--) yearOptions.push(y)
@@ -189,7 +183,7 @@ export default function WorkoutStats({
       <select value={viewYear} onChange={e => setViewYear(parseInt(e.target.value))} style={{ padding: '5px 9px', borderRadius: '6px', border: 'none', background: THEME.borderLight, fontSize: '11px', color: THEME.text, fontFamily: 'inherit', outline: 'none' }}>
         {yearOptions.map(y => <option key={y} value={y}>{y}년</option>)}
       </select>
-      {statsTab !== 'monthly' && statsTab !== 'pr' && (
+      {statsTab !== 'pr' && (
         <select value={viewMonth} onChange={e => setViewMonth(parseInt(e.target.value))} style={{ padding: '5px 9px', borderRadius: '6px', border: 'none', background: THEME.borderLight, fontSize: '11px', color: THEME.text, fontFamily: 'inherit', outline: 'none' }}>
           {Array.from({ length: 12 }, (_, i) => i + 1).map(m => <option key={m} value={m}>{m}월</option>)}
         </select>
@@ -229,21 +223,6 @@ export default function WorkoutStats({
           )}
         </div>
       )}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '8px', marginBottom: '10px' }}>
-        {[
-          { label: '오늘', val: todayTotal, color: THEME.nutCarbsDark },
-          { label: '이번 주', val: thisWeekTotal, color: THEME.primary },
-          { label: '이번 달', val: thisMonthTotal, color: THEME.nutFatText },
-        ].map(({ label, val, color }) => (
-          <div key={label} style={{ background: '#FFF', borderRadius: '12px', padding: '11px', textAlign: 'center' }}>
-            <p style={{ fontSize: '10px', color: THEME.textSub, margin: '0 0 4px' }}>{label}</p>
-            <p style={{ fontSize: '15px', fontWeight: '500', color, margin: 0 }}>
-              {formatVol(val)}
-            </p>
-          </div>
-        ))}
-      </div>
-
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px', marginBottom: '10px' }}>
         {['workout', 'pr'].map((t, i) => {
           const active = statsTab === t
@@ -258,7 +237,7 @@ export default function WorkoutStats({
               fontWeight: active ? '500' : '400',
               cursor: 'pointer'
             }} onClick={() => setStatsTab(t)}>
-              {['운동', 'PR'][i]}
+              {['운동', '추이'][i]}
             </button>
           )
         })}
@@ -464,78 +443,82 @@ export default function WorkoutStats({
         </div>
       )}
 
-      {statsTab === 'workout' && (
-        <div style={S.card}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
-            <p style={{ ...S.cardTitle, margin: 0 }}>{viewYear}년 {viewMonth}월 주차별</p>
-            <YearMonthPicker />
-          </div>
-          {weeklyTotals.every(v => v === 0) ? (
-            <p style={{ color: THEME.textSub, fontSize: '12px', textAlign: 'center', padding: '16px 0' }}>운동 기록이 없습니다</p>
-          ) : (
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
-              {weekLabels.map((label, wk) => {
-                if (weeklyTotals[wk] === 0) return null
-                // 카드 내 가장 큰 부위 값 기준으로 막대 비례
-                const cardMax = Math.max(...PARTS.map(p => weeklyByPart[wk][p] || 0), 1)
-                return (
-                  <div key={wk} style={{ background: THEME.cardAlt, borderRadius: '12px', padding: '10px', minWidth: 0 }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: '8px', gap: '4px' }}>
-                      <span style={{ fontSize: '11px', fontWeight: '500', color: THEME.text, whiteSpace: 'nowrap' }}>{label}</span>
-                      <span style={{ fontSize: '11px', fontWeight: '500', color: THEME.nutFatText, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', minWidth: 0 }}>{formatVol(weeklyTotals[wk])}</span>
-                    </div>
-                    {PARTS.filter(p => weeklyByPart[wk][p] > 0).map(part => (
-                      <div key={part} style={{ display: 'flex', alignItems: 'center', gap: '5px', marginBottom: '5px', minWidth: 0 }}>
-                        <span style={{ fontSize: '10px', color: THEME.text, width: '26px', flexShrink: 0 }}>{part}</span>
-                        <div style={{ flex: 1, background: THEME.borderLight, borderRadius: '4px', height: '7px', minWidth: 0 }}>
-                          <div style={{ height: '7px', borderRadius: '4px', width: `${weeklyByPart[wk][part] / cardMax * 100}%`, background: PART_COLORS[part] }} />
-                        </div>
-                        <span style={{ fontSize: '9px', color: THEME.textSub, flexShrink: 0, whiteSpace: 'nowrap' }}>{formatVol(weeklyByPart[wk][part])}</span>
-                      </div>
-                    ))}
-                  </div>
-                )
-              })}
+      {statsTab === 'workout' && (() => {
+        // 비교 텍스트
+        const partLabel = monthlyPart === '전체' ? '볼륨' : `${monthlyPart} 볼륨`
+        const prevLabel = prevMonthBar ? `${prevMonthBar.month}월` : '지난달'
+        const diffAbs = Math.abs(monthDiff)
+        const diffWord = monthDiff >= 0 ? '늘었어요' : '줄었어요'
+        const diffColor = monthDiff >= 0 ? THEME.primary : THEME.danger
+        const compact = (v) => v >= 1000 ? `${(v / 1000).toFixed(v >= 10000 ? 0 : 1)}t` : `${v}`
+        const barColor = monthlyPart === '전체' ? THEME.primary : (PART_COLORS[monthlyPart] || THEME.primary)
+        const allZero = monthlyBars.every(d => d.total === 0)
+        return (
+          <div style={S.card}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
+              <p style={{ ...S.cardTitle, margin: 0 }}>월별 볼륨</p>
+              <YearMonthPicker />
             </div>
-          )}
-        </div>
-      )}
 
-      {statsTab === 'workout' && (
-        <div style={S.card}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
-            <p style={{ ...S.cardTitle, margin: 0 }}>{viewYear}년 월별</p>
-            <YearMonthPicker />
-          </div>
-          {Object.values(monthlyByMonth).every(d => d.total === 0) ? (
-            <p style={{ color: THEME.textSub, fontSize: '12px', textAlign: 'center', padding: '16px 0' }}>운동 기록이 없습니다</p>
-          ) : (
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
-              {Object.entries(monthlyByMonth).filter(([, d]) => d.total > 0).map(([mStr, d]) => {
-                // 카드 내 가장 큰 부위 값 기준
-                const cardMax = Math.max(...PARTS.map(p => d.parts[p] || 0), 1)
+            <p style={{ fontSize: '13px', fontWeight: '500', color: THEME.text, margin: '0 0 4px', lineHeight: 1.45 }}>
+              {partLabel}이 {prevLabel}보다
+            </p>
+            <p style={{ fontSize: '15px', fontWeight: '600', margin: '0 0 12px', lineHeight: 1.3, color: diffColor }}>
+              {diffAbs.toLocaleString()} kg {diffWord}
+            </p>
+
+            {/* 부위 칩 — 전체 + PARTS */}
+            <div style={{ display: 'flex', gap: '5px', overflowX: 'auto', paddingBottom: '6px', marginBottom: '10px', WebkitOverflowScrolling: 'touch' }}>
+              {['전체', ...PARTS].map(p => {
+                const active = monthlyPart === p
+                const chipColor = p === '전체' ? THEME.primary : (PART_COLORS[p] || THEME.primary)
                 return (
-                  <div key={mStr} style={{ background: THEME.cardAlt, borderRadius: '12px', padding: '10px', minWidth: 0 }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: '8px', gap: '4px' }}>
-                      <span style={{ fontSize: '11px', fontWeight: '500', color: THEME.text, whiteSpace: 'nowrap' }}>{parseInt(mStr)}월</span>
-                      <span style={{ fontSize: '11px', fontWeight: '500', color: THEME.nutCarbsDark, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', minWidth: 0 }}>{formatVol(d.total)}</span>
-                    </div>
-                    {PARTS.filter(p => d.parts[p] > 0).map(part => (
-                      <div key={part} style={{ display: 'flex', alignItems: 'center', gap: '5px', marginBottom: '5px', minWidth: 0 }}>
-                        <span style={{ fontSize: '10px', color: THEME.text, width: '26px', flexShrink: 0 }}>{part}</span>
-                        <div style={{ flex: 1, background: THEME.borderLight, borderRadius: '4px', height: '7px', minWidth: 0 }}>
-                          <div style={{ height: '7px', borderRadius: '4px', width: `${d.parts[part] / cardMax * 100}%`, background: PART_COLORS[part] }} />
-                        </div>
-                        <span style={{ fontSize: '9px', color: THEME.textSub, flexShrink: 0, whiteSpace: 'nowrap' }}>{formatVol(d.parts[part])}</span>
-                      </div>
-                    ))}
-                  </div>
+                  <button key={p} onClick={() => setMonthlyPart(p)} style={{
+                    padding: '5px 12px', borderRadius: '14px',
+                    border: `0.5px solid ${active ? chipColor : THEME.border}`,
+                    background: active ? chipColor : '#FFF',
+                    color: active ? '#FFF' : THEME.textSub,
+                    fontSize: '11px', fontWeight: active ? '500' : '400',
+                    cursor: 'pointer', whiteSpace: 'nowrap', flexShrink: 0,
+                    fontFamily: 'inherit',
+                  }}>{p}</button>
                 )
               })}
             </div>
-          )}
-        </div>
-      )}
+
+            {allZero ? (
+              <p style={{ fontSize: '11px', color: THEME.textHint, textAlign: 'center', padding: '20px 0', margin: 0 }}>
+                최근 6개월간 {monthlyPart === '전체' ? '' : `${monthlyPart} `}운동 기록이 없습니다
+              </p>
+            ) : (
+              <div style={{ display: 'flex', alignItems: 'flex-end', gap: '6px', height: '140px', padding: '4px 2px 0' }}>
+                {monthlyBars.map((d, i) => {
+                  const isLast = i === monthlyBars.length - 1
+                  const ratio = d.total / maxBar
+                  const barH = d.total > 0 ? Math.max(ratio * 110, 6) : 4
+                  return (
+                    <div key={`${d.year}-${d.month}`} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', minWidth: 0, gap: '5px' }}>
+                      <span style={{ fontSize: '9px', color: THEME.textSub, fontWeight: '500', lineHeight: 1, whiteSpace: 'nowrap' }}>
+                        {compact(d.total)}
+                      </span>
+                      <div style={{
+                        width: '100%', maxWidth: '32px',
+                        height: `${barH}px`,
+                        background: isLast ? barColor : THEME.borderLight,
+                        borderRadius: '6px 6px 0 0',
+                        transition: 'background 0.2s',
+                      }} />
+                      <span style={{ fontSize: '10px', color: isLast ? THEME.text : THEME.textHint, fontWeight: isLast ? '500' : '400', lineHeight: 1 }}>
+                        {d.month}월
+                      </span>
+                    </div>
+                  )
+                })}
+              </div>
+            )}
+          </div>
+        )
+      })()}
 
       {statsTab === 'pr' && (
         <>
