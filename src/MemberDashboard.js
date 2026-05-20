@@ -157,7 +157,9 @@ export default function MemberDashboard({ user, onLogout }) {
   // 핸드폰 뒤로가기 → 식단 설정 모달 닫힘
   useModalBackButton(showCalcModal, () => setShowCalcModal(false))
   const [todayDiet, setTodayDiet] = useState([])
-  const [showHelp, setShowHelp] = useState(false)
+  // null | 'general' | 'workout' | 'diet' | 'inbody' | 'schedule'
+  const [helpSection, setHelpSection] = useState(null)
+  const openHelp = (sec) => setHelpSection(sec)
   const [showSettings, setShowSettings] = useState(false)
   const [showSchedule, setShowSchedule] = useState(false)
   const [scheduleVisible, setScheduleVisible] = useState(false)
@@ -522,9 +524,10 @@ export default function MemberDashboard({ user, onLogout }) {
     flexShrink: 0,
   }
 
-  const MainTabBtn = ({ tabKey, label, hasHelp }) => {
+  const MainTabBtn = ({ tabKey, label, helpSection: tabHelp }) => {
     const active = mainTab === tabKey
     const longLabel = (label || '').length > 5
+    const hasHelp = !!tabHelp
     return (
       <div
         onClick={() => setMainTab(tabKey)}
@@ -532,7 +535,7 @@ export default function MemberDashboard({ user, onLogout }) {
           background: active ? THEME.primaryAccent : '#FFF',
           color: active ? THEME.primaryDark : THEME.textSub,
           borderRadius: RADIUS.md,
-          padding: '9px 4px',
+          padding: hasHelp ? '9px 22px 9px 8px' : '9px 4px',
           fontSize: longLabel ? `${FONT.sm}px` : `${FONT.md}px`,
           fontWeight: active ? 500 : 400,
           cursor: 'pointer',
@@ -543,7 +546,6 @@ export default function MemberDashboard({ user, onLogout }) {
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
-          gap: 4,
           position: 'relative',
           userSelect: 'none',
         }}
@@ -552,8 +554,9 @@ export default function MemberDashboard({ user, onLogout }) {
         <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>{label}</span>
         {hasHelp && (
           <span
-            onClick={e => { e.stopPropagation(); setShowHelp(true) }}
+            onClick={e => { e.stopPropagation(); openHelp(tabHelp) }}
             style={{
+              position: 'absolute', right: 5, top: '50%', transform: 'translateY(-50%)',
               display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
               width: 16, height: 16, borderRadius: '50%',
               border: `0.5px solid ${active ? THEME.primaryDark : THEME.border}`,
@@ -696,9 +699,9 @@ export default function MemberDashboard({ user, onLogout }) {
             <ChatUnreadBadge userId={user.id} userType="member" />
           </button>
           <button
-            onClick={() => setShowHelp(true)}
+            onClick={() => openHelp('general')}
             style={{ background: '#FFF', border: `0.5px solid ${THEME.border}`, color: THEME.textSub, width: '100%', height: '36px', borderRadius: '18px', cursor: 'pointer', fontSize: '15px', fontWeight: '500', padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', boxSizing: 'border-box', fontFamily: 'inherit' }}
-            title="도움말"
+            title="기본 사용 설명서"
           >?</button>
           {scheduleVisible && (
             <button
@@ -746,7 +749,7 @@ export default function MemberDashboard({ user, onLogout }) {
           />
         )}
 
-        {showHelp && <HelpModal type="member" onClose={() => setShowHelp(false)} />}
+        {helpSection && <HelpModal type="member" section={helpSection} onClose={() => setHelpSection(null)} />}
 
         {showPushPrompt && (
           <PushPromptModal
@@ -1007,9 +1010,9 @@ export default function MemberDashboard({ user, onLogout }) {
         )}
 
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '5px', marginBottom: '10px' }}>
-          <MainTabBtn tabKey="workout" label="운동" hasHelp />
-          <MainTabBtn tabKey="diet" label="식단" hasHelp />
-          <MainTabBtn tabKey="inbody" label="인바디" hasHelp />
+          <MainTabBtn tabKey="workout" label="운동" helpSection="workout" />
+          <MainTabBtn tabKey="diet" label="식단" helpSection="diet" />
+          <MainTabBtn tabKey="inbody" label="인바디" helpSection="inbody" />
           <MainTabBtn tabKey="trainer" label="내 트레이너" />
         </div>
 

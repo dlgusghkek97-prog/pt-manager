@@ -3,12 +3,23 @@ import { THEME } from './utils'
 import useModalBackButton from './useModalBackButton'
 import CloseButton from './CloseButton'
 
-export default function HelpModal({ type, onClose }) {
+// section: 'general' | 'workout' | 'diet' | 'inbody' | 'schedule' | undefined
+// undefined → 전체 보기 (기존 동작 호환)
+export default function HelpModal({ type, section, onClose }) {
   useModalBackButton(true, onClose)
   const isTrainer = type === 'trainer'
 
+  const sectionTitle = {
+    general:  '사용 설명서',
+    workout:  '운동 설명서',
+    diet:     '식단 설명서',
+    inbody:   '인바디 설명서',
+    schedule: '스케줄 설명서',
+  }
+
   const trainerSections = [
     {
+      category: 'general',
       title: '회원 관리',
       items: [
         { label: '회원 추가', desc: '우상단 [+ 회원 추가] 클릭 → 이름·성별·목표·PT 시작일 입력 → 6자리 코드가 자동 생성됨' },
@@ -20,6 +31,7 @@ export default function HelpModal({ type, onClose }) {
       ]
     },
     {
+      category: 'general',
       title: '회원 상세 보기',
       items: [
         { desc: '회원 카드를 탭하면 해당 회원의 모든 기록을 자세히 볼 수 있습니다' },
@@ -28,6 +40,7 @@ export default function HelpModal({ type, onClose }) {
       ]
     },
     {
+      category: 'general',
       title: '알림 (🔔) — 회원 활동 즉시 확인',
       highlight: true,
       items: [
@@ -40,6 +53,7 @@ export default function HelpModal({ type, onClose }) {
       ]
     },
     {
+      category: 'general',
       title: '채팅 (💬) — 회원과 1:1 대화',
       highlight: true,
       items: [
@@ -51,6 +65,7 @@ export default function HelpModal({ type, onClose }) {
       ]
     },
     {
+      category: 'general',
       title: '푸시 알림 — 앱처럼 받기 (홈 화면에 추가)',
       highlight: true,
       items: [
@@ -63,6 +78,7 @@ export default function HelpModal({ type, onClose }) {
       ]
     },
     {
+      category: 'general',
       title: '직업 활동량 (NEW v5)',
       highlight: true,
       items: [
@@ -77,6 +93,7 @@ export default function HelpModal({ type, onClose }) {
       ]
     },
     {
+      category: 'general',
       title: '회원 메모',
       items: [
         { desc: '회원 상세 화면 상단 [메모] 버튼 → 회원별 메모 작성 가능. 부상, 컨디션, 목표, 특이사항 등을 카테고리별로 정리' },
@@ -89,6 +106,7 @@ export default function HelpModal({ type, onClose }) {
       ]
     },
     {
+      category: 'inbody',
       title: '인바디 측정',
       items: [
         { desc: '회원 상세 화면 상단 [인바디] 버튼으로 트레이너가 직접 측정한 회원 인바디 입력. [추이] 버튼으로 변화 확인' },
@@ -101,6 +119,7 @@ export default function HelpModal({ type, onClose }) {
       ]
     },
     {
+      category: 'workout',
       title: '4대 종목 PR',
       items: [
         { desc: '운동 → 통계 → PR 탭 상단에 스쿼트/데드리프트/벤치/오버헤드 4대 종목 카드가 항상 표시됨' },
@@ -112,6 +131,7 @@ export default function HelpModal({ type, onClose }) {
       ]
     },
     {
+      category: 'workout',
       title: '3대 중량 배너',
       items: [
         { desc: 'PR 탭 상단에 그라디언트 배너로 자동 표시. 스쿼트 + 데드리프트 + 벤치 합계 (오버헤드 제외)' },
@@ -119,6 +139,7 @@ export default function HelpModal({ type, onClose }) {
       ]
     },
     {
+      category: 'workout',
       title: '휴식 타이머',
       items: [
         { desc: '운동 화면 우측 하단에 시계 아이콘 FAB(고정 버튼) 표시. 다른 화면(식단 등) 가면 자동으로 숨겨짐' },
@@ -131,6 +152,7 @@ export default function HelpModal({ type, onClose }) {
       ]
     },
     {
+      category: 'workout',
       title: '즐겨찾기 등록',
       items: [
         { desc: '운동 카드의 특이사항 옆에 [★] [등록] 버튼 2개로 즐겨찾기 관리' },
@@ -144,6 +166,7 @@ export default function HelpModal({ type, onClose }) {
       ]
     },
     {
+      category: 'workout',
       title: '오늘 운동 요약 카드',
       items: [
         { desc: '운동 기록 페이지 상단에 자동 표시 — 오늘 입력한 웨이트 + 유산소를 한 카드에 모아 보여줍니다' },
@@ -155,18 +178,20 @@ export default function HelpModal({ type, onClose }) {
       ]
     },
     {
+      category: 'workout',
       title: '운동 통계 보기',
       items: [
-        { desc: '운동 → 통계 탭에서 일간·주간·월간 + PR 추이를 한 화면에서 스크롤로 확인' },
+        { desc: '운동 → 통계 탭에서 월별 막대 + 추이(라인·radar) 두 영역을 스크롤로 확인' },
       ],
       highlights: [
-        { title: '상단 요약', desc: '오늘 / 이번 주 / 이번 달 총 볼륨' },
+        { title: '월별 막대', desc: '최근 6개월간 월별 총 볼륨. 상단 부위 칩(전체 / 하체 / 가슴 / 등 / 어깨 / 팔 / 코어 / 복근)으로 부위별 필터링 가능. 헤더에 "지난달 대비 X kg 늘었어요/줄었어요" 자동 표시' },
         { title: '일간 달력', desc: '점·부위 라벨로 어떤 부위 운동했는지 한눈에. 셀 누르면 그 날의 운동 기록으로 이동' },
-        { title: '주간/월간', desc: '부위별 막대 그래프. 카드 안 최대 부위 기준으로 비례 표시' },
-        { title: 'PR 추이', desc: '즐겨찾기 운동을 부위별 칩으로 선택하면 라인 차트로 최근 2달간 한 세트 최대 운동 볼륨 변화. 부위별 운동 횟수 radar 차트도 함께' },
+        { title: '추이 라인 차트', desc: '즐겨찾기 운동을 부위별 칩으로 선택하면 라인 차트로 최근 2달간 한 세트 최대 운동 볼륨 변화 표시' },
+        { title: '부위별 운동 횟수 radar', desc: '이번 달 부위별 운동 일 수를 한눈에. 라벨은 격자 밖에 표시' },
       ]
     },
     {
+      category: 'diet',
       title: '식단 사진 + 피드백',
       items: [
         { desc: '회원의 식단 페이지에서 매 식사 사진과 코멘트를 한눈에 확인하고 즉시 피드백 가능' },
@@ -178,6 +203,7 @@ export default function HelpModal({ type, onClose }) {
       ]
     },
     {
+      category: 'workout',
       title: '운동 칼로리 자동 계산',
       items: [
         { desc: '운동 기록 시 "오늘 소비 칼로리" 카드에 자동 표시됩니다' },
@@ -188,6 +214,7 @@ export default function HelpModal({ type, onClose }) {
       ]
     },
     {
+      category: 'general',
       title: '내 기록 (트레이너 본인)',
       items: [
         { label: '목표 설정', desc: '우상단 [식단 설정] → 신체정보·활동량·직업 활동량 입력하면 자동 계산' },
@@ -196,6 +223,43 @@ export default function HelpModal({ type, onClose }) {
       ]
     },
     {
+      category: 'schedule',
+      title: '스케줄 — 기본 사용',
+      items: [
+        { desc: '상단 📅 / [스케줄] 버튼으로 주간 캘린더 모달 열기. 가로축은 요일, 세로축은 0~23시 시간. 회원과 트레이너 모두 공유' },
+      ],
+      highlights: [
+        { title: '주차 이동', desc: '상단 ◀ ▶ 으로 주 단위 이동. [오늘] 버튼으로 이번 주 즉시 복귀' },
+        { title: '빈 시간 셀 탭', desc: '빈 셀을 누르면 슬롯 등록 모달이 열려요. 시작·끝 시간은 셀 위치 기준으로 자동 채워짐' },
+        { title: '범례 색상', desc: '수업(파랑) / 신청(주황) / 일반(회색) / OFF(연회색) / 노쇼(빨강)' },
+      ]
+    },
+    {
+      category: 'schedule',
+      title: '슬롯 등록 / 출결 관리',
+      items: [
+        { desc: '빈 셀 또는 슬롯 탭하면 [슬롯 등록] / [슬롯 편집] 모달' },
+      ],
+      highlights: [
+        { title: '유형 선택', desc: '예약 — 회원과 1:1 PT. 회원 검색해서 지정\nOFF — 트레이너 부재/휴무 (회원 신청 불가)\n일반 — 그룹/기타 일정 (회원 미지정)\n노쇼 — 결석 처리된 슬롯' },
+        { title: '수업 길이 자동 종료', desc: '체크하면 시작 시간 + 설정한 분(기본 50분)으로 끝 시간 자동 계산. 수업이 길거나 짧으면 직접 수정 가능' },
+        { title: '예약 → 출석/결석/취소', desc: '예약 슬롯 탭하면 [출석] [결석] [취소] 버튼.\n출석 — PT 1회 차감, 상태 완료\n결석 — 차감 여부 선택 가능\n취소 — 이미 차감됐던 경우 자동 환불' },
+        { title: 'PT 잔여 표시', desc: '회원 검색 시 선택된 회원 칩에 "잔여 N / 총 M회" 표시. PT 0회면 등록 경고' },
+      ]
+    },
+    {
+      category: 'schedule',
+      title: '운영시간 설정',
+      items: [
+        { desc: '캘린더 상단 [운영시간] 버튼 → 요일별 영업 시작·종료 시간 지정. 회원의 셀 클릭은 운영시간 안에서만 허용 (트레이너 본인은 시간 외에도 등록 가능)' },
+      ],
+      highlights: [
+        { title: '운영시간 OFF', desc: '운영시간 설정을 해제하면 24시간 모두 운영 — 회원도 어느 시간이나 신청 가능' },
+        { title: '회원 화면 잠금', desc: '트레이너가 스케줄 자체를 OFF 하면 회원 화면의 캘린더 아이콘/카드/모달이 모두 숨겨져요' },
+      ]
+    },
+    {
+      category: 'workout',
       title: '운동 기록 입력법',
       items: [
         { label: '1단계', desc: '부위 선택 (하체/가슴/등/어깨/팔/복근/코어)' },
@@ -212,6 +276,7 @@ export default function HelpModal({ type, onClose }) {
       ]
     },
     {
+      category: 'diet',
       title: '식단 기록 입력법',
       items: [
         { label: '입력 영역', desc: '아침/점심/저녁/간식 4개 영역. [+ 식사 추가]로 끼니를 N개까지 자유롭게 확장 (식사1 / 식사2 ...)' },
@@ -227,6 +292,7 @@ export default function HelpModal({ type, onClose }) {
       ]
     },
     {
+      category: 'diet',
       title: '식단 통계 - 잉여 / 적자',
       items: [
         { desc: '식단 → 통계 → "잉여 / 적자" 탭에서 회원의 다이어트/벌크업 진행 상황을 한눈에 확인' },
@@ -237,6 +303,7 @@ export default function HelpModal({ type, onClose }) {
       ]
     },
     {
+      category: 'diet',
       title: '기초대사량(BMR) · 일일 소비 공식',
       highlight: true,
       items: [
@@ -251,6 +318,7 @@ export default function HelpModal({ type, onClose }) {
       ]
     },
     {
+      category: 'diet',
       title: 'TDEE 기반 잉여/적자 계산 공식 (v5 업데이트)',
       items: [
         { desc: '잉여/적자는 단순히 (섭취 − 운동소비)가 아니라, 회원의 TDEE(총 일일 에너지 소비량)를 기준으로 계산됩니다. BMR(기초대사량)과 NEAT(생활 활동)까지 모두 반영해서 정확합니다.' },
@@ -267,7 +335,8 @@ export default function HelpModal({ type, onClose }) {
       ]
     },
     {
-      title: '통계 보기',
+      category: 'diet',
+      title: '식단 통계 — 주간/월간',
       items: [
         { label: '주간', desc: '7일간 일자별 막대그래프. 영양소 탭(칼로리/탄수/단백/지방/잉여 적자)으로 전환' },
         { label: '월간', desc: '1~12월 비교. 각 월의 평균 칼로리/영양소 확인' },
@@ -277,6 +346,7 @@ export default function HelpModal({ type, onClose }) {
 
   const memberSections = [
     {
+      category: 'general',
       title: '처음 시작할 때',
       highlight: true,
       items: [
@@ -286,6 +356,7 @@ export default function HelpModal({ type, onClose }) {
       ]
     },
     {
+      category: 'general',
       title: '직업 활동량 추가됨 (NEW v5)',
       highlight: true,
       items: [
@@ -295,6 +366,7 @@ export default function HelpModal({ type, onClose }) {
       ]
     },
     {
+      category: 'diet',
       title: '목표 수치 카드',
       items: [
         { desc: '화면 상단에 항상 표시됨. 오늘의 식단이 목표 대비 몇 % 달성됐는지 한눈에 확인' },
@@ -303,6 +375,7 @@ export default function HelpModal({ type, onClose }) {
       ]
     },
     {
+      category: 'general',
       title: '알림 (🔔) — 트레이너 코칭 받기',
       highlight: true,
       items: [
@@ -314,6 +387,7 @@ export default function HelpModal({ type, onClose }) {
       ]
     },
     {
+      category: 'general',
       title: '채팅 (💬) — 트레이너와 1:1 대화',
       highlight: true,
       items: [
@@ -324,6 +398,7 @@ export default function HelpModal({ type, onClose }) {
       ]
     },
     {
+      category: 'general',
       title: '푸시 알림 — 앱처럼 받기 (홈 화면에 추가)',
       highlight: true,
       items: [
@@ -336,6 +411,7 @@ export default function HelpModal({ type, onClose }) {
       ]
     },
     {
+      category: 'inbody',
       title: '인바디 입력 / 추이',
       items: [
         { desc: '상단 [인바디] 버튼으로 측정값 입력, [추이] 버튼으로 변화 확인' },
@@ -348,6 +424,7 @@ export default function HelpModal({ type, onClose }) {
       ]
     },
     {
+      category: 'workout',
       title: '4대 종목 PR',
       items: [
         { desc: '운동 → 통계 → PR 탭 상단에 스쿼트/데드리프트/벤치/오버헤드 4대 종목 카드가 항상 표시됨' },
@@ -358,6 +435,7 @@ export default function HelpModal({ type, onClose }) {
       ]
     },
     {
+      category: 'workout',
       title: '3대 중량 배너',
       items: [
         { desc: 'PR 탭 상단에 그라디언트 배너로 자동 표시' },
@@ -365,6 +443,7 @@ export default function HelpModal({ type, onClose }) {
       ]
     },
     {
+      category: 'workout',
       title: '휴식 타이머',
       items: [
         { desc: '운동 화면 우측 하단의 시계 아이콘 버튼을 누르면 휴식 타이머 시작' },
@@ -377,6 +456,7 @@ export default function HelpModal({ type, onClose }) {
       ]
     },
     {
+      category: 'workout',
       title: '즐겨찾기 등록',
       items: [
         { desc: '운동 카드의 특이사항 옆에 [★] [등록] 버튼 2개로 자주 하는 운동 관리' },
@@ -390,6 +470,7 @@ export default function HelpModal({ type, onClose }) {
       ]
     },
     {
+      category: 'workout',
       title: '오늘 운동 요약 카드',
       items: [
         { desc: '운동 기록 페이지 상단에 자동 표시 — 오늘 입력한 웨이트 + 유산소를 한 카드에 모아 보여줍니다' },
@@ -400,18 +481,33 @@ export default function HelpModal({ type, onClose }) {
       ]
     },
     {
+      category: 'workout',
       title: '운동 통계 보기',
       items: [
-        { desc: '운동 → 통계 탭에서 일간·주간·월간 + PR 추이를 한 화면에서 스크롤로 확인' },
+        { desc: '운동 → 통계 탭에서 월별 막대 + 추이(라인·radar)를 한 화면에서 스크롤로 확인' },
       ],
       highlights: [
-        { title: '상단 요약', desc: '오늘 / 이번 주 / 이번 달 총 볼륨' },
+        { title: '월별 막대', desc: '최근 6개월 총 볼륨 + 부위 칩(전체/하체/가슴/등/어깨/팔/코어/복근)으로 필터링. "지난달 대비 X kg 늘었어요/줄었어요" 자동 표시' },
         { title: '일간 달력', desc: '점·부위 라벨로 어떤 부위 운동했는지 한눈에. 셀 누르면 그 날의 운동 기록으로 이동' },
-        { title: '주간/월간', desc: '부위별 막대 그래프' },
-        { title: 'PR 추이', desc: '즐겨찾기 운동을 부위별 칩으로 선택하면 라인 차트로 최근 2달간 한 세트 최대 운동 볼륨 변화. 부위별 운동 횟수 radar 차트도 함께' },
+        { title: '추이 라인 차트', desc: '즐겨찾기 운동을 부위별 칩으로 선택하면 라인 차트로 최근 2달간 한 세트 최대 운동 볼륨 변화 표시' },
+        { title: '부위별 운동 횟수 radar', desc: '이번 달 부위별 운동 일 수를 한눈에 비교' },
       ]
     },
     {
+      category: 'schedule',
+      title: '스케줄 — PT 신청과 일정 확인',
+      items: [
+        { desc: '상단 📅 아이콘으로 주간 캘린더 모달. 담당 트레이너의 운영시간 안에서 빈 셀을 탭하면 PT 신청 가능' },
+      ],
+      highlights: [
+        { title: '주차 이동', desc: '◀ ▶ 으로 주 단위 이동. [오늘] 버튼으로 이번 주로 복귀' },
+        { title: '슬롯 색상', desc: '내 예약(파랑) / 신청 대기(주황) / OFF(연회색) / 다른 회원 일반 슬롯(회색) — 다른 사람 예약은 자세한 정보 비공개' },
+        { title: 'PT 잔여 부족 안내', desc: 'PT 잔여 0회면 신청 불가 안내. 트레이너에게 결제 문의' },
+        { title: '신청 후 흐름', desc: '내 신청 → "대기" 상태로 트레이너에게 알림. 트레이너가 확정하면 "확정"으로 바뀌고, 메인 화면 상단 [내 PT 일정] 카드에도 표시' },
+      ]
+    },
+    {
+      category: 'diet',
       title: '식단 사진 + 피드백',
       items: [
         { desc: '식사 사진을 올리면 트레이너가 보고 코멘트를 달아줘요' },
@@ -423,6 +519,7 @@ export default function HelpModal({ type, onClose }) {
       ]
     },
     {
+      category: 'workout',
       title: '오늘 소비 칼로리',
       items: [
         { desc: '운동 기록 페이지 상단에 자동 표시됩니다. 웨이트 + 유산소 합산' },
@@ -433,6 +530,7 @@ export default function HelpModal({ type, onClose }) {
       ]
     },
     {
+      category: 'workout',
       title: '운동 기록',
       items: [
         { label: '기본 기록 방법', desc: '1) 부위 선택 → 2) 운동명 입력 → 3) 세트마다 무게(kg)·횟수 입력 → 4) 종목 더 추가하려면 [+ 종목 추가]' },
@@ -449,6 +547,7 @@ export default function HelpModal({ type, onClose }) {
       ]
     },
     {
+      category: 'diet',
       title: '식단 기록',
       items: [
         { desc: '아침/점심/저녁/간식 4개 영역. [+ 식사 추가]로 끼니를 자유롭게 더 추가 (식사1 / 식사2 ...)' },
@@ -463,6 +562,7 @@ export default function HelpModal({ type, onClose }) {
       ]
     },
     {
+      category: 'diet',
       title: '식단 통계 - 잉여 / 적자',
       items: [
         { desc: '식단 → 통계 → "잉여 / 적자" 탭에서 살이 빠지는지 찌는지 확인' },
@@ -473,6 +573,7 @@ export default function HelpModal({ type, onClose }) {
       ]
     },
     {
+      category: 'diet',
       title: '소비 칼로리 계산 공식 (BMR + 활동 + 운동)',
       highlight: true,
       items: [
@@ -487,7 +588,8 @@ export default function HelpModal({ type, onClose }) {
       ]
     },
     {
-      title: '통계 보기',
+      category: 'diet',
+      title: '식단 통계 — 주간/월간',
       items: [
         { label: '주간', desc: '7일간 일자별 막대그래프' },
         { label: '월간', desc: '1~12월 비교 (각 월의 평균)' },
@@ -495,6 +597,7 @@ export default function HelpModal({ type, onClose }) {
       ]
     },
     {
+      category: 'general',
       title: '자주 묻는 질문',
       danger: true,
       faqs: [
@@ -512,7 +615,12 @@ export default function HelpModal({ type, onClose }) {
     },
   ]
 
-  const sections = isTrainer ? trainerSections : memberSections
+  const allSections = isTrainer ? trainerSections : memberSections
+  // section prop 으로 필터링. 미지정 또는 'all' 이면 전체 표시
+  const sections = (section && section !== 'all')
+    ? allSections.filter(s => s.category === section)
+    : allSections
+  const headerTitle = sectionTitle[section] || `${isTrainer ? '트레이너' : '회원'} 사용 설명서`
 
   const sectionStyle = (highlight, danger) => {
     if (highlight) return { background: '#FFF7E6', borderLeft: `3px solid ${THEME.warning}`, borderRadius: '0 8px 8px 0' }
@@ -555,7 +663,7 @@ export default function HelpModal({ type, onClose }) {
           flexShrink: 0
         }}>
           <p style={{ fontSize: '14px', fontWeight: '500', color: THEME.primary, margin: 0 }}>
-            {isTrainer ? '트레이너' : '회원'} 사용 설명서
+            {headerTitle}
           </p>
           <CloseButton onClick={onClose} />
         </div>

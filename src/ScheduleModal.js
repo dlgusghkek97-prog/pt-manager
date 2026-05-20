@@ -9,6 +9,7 @@ import {
 import { supabase } from './supabase'
 import useModalBackButton from './useModalBackButton'
 import CloseButton from './CloseButton'
+import HelpModal from './HelpModal'
 
 // 상태별 색상 (스크린샷 범례 참고)
 const STATUS_STYLE = {
@@ -66,6 +67,7 @@ export default function ScheduleModal({ user, userType, trainerId, initialOpenSe
   const [members, setMembers] = useState([])
   const [businessHours, setBH] = useState(null)
   const [bhEditOpen, setBhEditOpen] = useState(false)
+  const [showHelp, setShowHelp] = useState(false)
   const initialOpenedRef = useRef(false)
 
   const weekEnd = useMemo(() => addDays(weekStart, 7), [weekStart])
@@ -227,19 +229,30 @@ export default function ScheduleModal({ user, userType, trainerId, initialOpenSe
               aria-label="다음 달"
             >›</button>
           </div>
-          {userType === 'trainer' ? (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            {userType === 'trainer' && (
+              <button
+                onClick={() => setBhEditOpen(true)}
+                style={{
+                  background: '#FFF', border: `0.5px solid ${THEME.border}`,
+                  color: THEME.primary, padding: '0 10px', height: 28,
+                  borderRadius: 14, fontSize: 11, fontWeight: 500,
+                  cursor: 'pointer', fontFamily: 'inherit',
+                }}
+              >운영시간</button>
+            )}
             <button
-              onClick={() => setBhEditOpen(true)}
+              onClick={() => setShowHelp(true)}
               style={{
                 background: '#FFF', border: `0.5px solid ${THEME.border}`,
-                color: THEME.primary, padding: '0 10px', height: 28,
-                borderRadius: 14, fontSize: 11, fontWeight: 500,
-                cursor: 'pointer', fontFamily: 'inherit',
+                color: THEME.textHint, width: 28, height: 28,
+                borderRadius: '50%', fontSize: 12, fontWeight: 500,
+                cursor: 'pointer', fontFamily: 'inherit', padding: 0,
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
               }}
-            >운영시간</button>
-          ) : (
-            <div style={{ width: 32 }} />
-          )}
+              title="스케줄 설명서"
+            >?</button>
+          </div>
         </div>
 
         {/* 큰 주차 네비 (가운데) + 범례 */}
@@ -422,6 +435,14 @@ export default function ScheduleModal({ user, userType, trainerId, initialOpenSe
           trainerId={trainerId}
           initial={businessHours}
           onClose={() => setBhEditOpen(false)}
+        />
+      )}
+
+      {showHelp && (
+        <HelpModal
+          type={userType === 'trainer' ? 'trainer' : 'member'}
+          section="schedule"
+          onClose={() => setShowHelp(false)}
         />
       )}
     </>
