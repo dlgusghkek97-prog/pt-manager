@@ -176,7 +176,11 @@ export default function WorkoutStats({
 
   const weekdayKor = ['일', '월', '화', '수', '목', '금', '토']
 
-  const prs = calcPRs(allLogs)
+  // 즐겨찾기 등록된 운동에 한해서만 PR 카드에 표시.
+  // (즐겨찾기 안 한 운동은 "한 번 해봤다" 수준일 가능성이 커서 PR 노이즈를 만듦)
+  const favKey = (p) => `${p.body_part}|${p.exercise_name}`
+  const favSet = new Set((favList || []).map(favKey))
+  const prs = calcPRs(allLogs).filter(p => favSet.has(favKey(p)))
 
   const YearMonthPicker = () => (
     <div style={{ display: 'flex', gap: '6px' }}>

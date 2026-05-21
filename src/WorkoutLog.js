@@ -1020,7 +1020,9 @@ export default function WorkoutLog({ user, selectedDate, setSelectedDate, exerci
           const isRegistered = !!currentFav
           const canRegister = ex.body_part && ex.exercise_name?.trim() && !isRegistered
 
-          const latest = isRegistered ? getLatestRecord(allLogs, ex.body_part, ex.exercise_name, selectedDate) : null
+          const latest = (ex.body_part && ex.exercise_name?.trim())
+            ? getLatestRecord(allLogs, ex.body_part, ex.exercise_name, selectedDate)
+            : null
 
           // 카메라 박스 색상/스타일 결정
           const cameraDisabled = ptIsZero && !hasMedia
