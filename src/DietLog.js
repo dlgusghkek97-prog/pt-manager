@@ -159,7 +159,7 @@ const MealRow = React.memo(function MealRow({ meal, onUpdate, onBlur, onRemove, 
   )
 })
 
-export default function DietLog({ user, onDietUpdate, tableOverride, trainerIdField, weight, muscle, bodyFat, occupation, workoutTable, workoutIdField, forcedTab, forcedDate, macroResult, goal, intensity, ptIsZero = false, readOnly = false }) {
+export default function DietLog({ user, onDietUpdate, onTodayTotals, tableOverride, trainerIdField, weight, muscle, bodyFat, occupation, workoutTable, workoutIdField, forcedTab, forcedDate, macroResult, goal, intensity, ptIsZero = false, readOnly = false }) {
   const TABLE = tableOverride || 'diet_logs'
   const ID_FIELD = trainerIdField || 'member_id'
   const W_TABLE = workoutTable || 'workout_logs'
@@ -205,6 +205,31 @@ export default function DietLog({ user, onDietUpdate, tableOverride, trainerIdFi
     id: null,
   })
   const [meals, setMeals] = useState(() => [emptyMealAt(1)])
+
+  // DB 로딩 완료 시점 추적 — 초기 빈 meals 상태가 0/0/0/0 을 emit 해서 매크로가 깜빡이는 것 방지
+  const mealsLoadedRef = React.useRef(false)
+  const [mealsLoadedTick, setMealsLoadedTick] = useState(0)
+
+  // 부모(MemberDashboard 매크로 카드)로 오늘의 실시간 totals 방출.
+  // 즐겨찾기/일일 즐겨찾기 적용 시 DB 라운드트립 기다리지 않고 즉시 반영.
+  useEffect(() => {
+    if (!onTodayTotals || readOnly) return
+    if (!mealsLoadedRef.current) return  // 첫 loadLogs 완료 전엔 skip
+    const todayStr = new Date().toISOString().split('T')[0]
+    if (selectedDate !== todayStr) return  // 오늘 보고 있을 때만 emit
+    let c = 0, p = 0, f = 0, cal = 0
+    meals.forEach(m => {
+      const mc = parseFloat(m.carbs) || 0
+      const mp = parseFloat(m.protein) || 0
+      const mf = parseFloat(m.fat) || 0
+      const mcal = parseFloat(m.calories) || 0
+      c += mc; p += mp; f += mf
+      if (m.calorieManual && mcal > 0) cal += mcal
+      else if (mc || mp || mf) cal += computeCal(mc, mp, mf)
+      else cal += mcal
+    })
+    onTodayTotals({ carbs: c, protein: p, fat: f, calories: cal })
+  }, [meals, selectedDate, onTodayTotals, readOnly, mealsLoadedTick])
 
   // 즐겨찾기 모달: 어느 슬롯에서 열렸는지
   const [favModalSlot, setFavModalSlot] = useState(null)
@@ -307,6 +332,8 @@ export default function DietLog({ user, onDietUpdate, tableOverride, trainerIdFi
     mealsRef.current = next
     dirtyRef.current = false
     pendingSaveRef.current = false
+    mealsLoadedRef.current = true
+    setMealsLoadedTick(t => t + 1)
     if (retryTimerRef.current) { clearTimeout(retryTimerRef.current); retryTimerRef.current = null }
     setSaveStatus('idle')
   }

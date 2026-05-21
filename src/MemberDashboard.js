@@ -183,6 +183,8 @@ export default function MemberDashboard({ user, onLogout }) {
   // 핸드폰 뒤로가기 → 식단 설정 모달 닫힘
   useModalBackButton(showCalcModal, () => setShowCalcModal(false))
   const [todayDiet, setTodayDiet] = useState([])
+  // DietLog 가 마운트된 동안 emit 하는 실시간 totals — 즐겨찾기 적용 등 DB 저장 전에도 매크로 카드 즉시 반영
+  const [liveDietTotals, setLiveDietTotals] = useState(null)
   // null | 'general' | 'workout' | 'diet' | 'inbody' | 'schedule'
   const [helpSection, setHelpSection] = useState(null)
   const openHelp = (sec) => setHelpSection(sec)
@@ -519,10 +521,12 @@ export default function MemberDashboard({ user, onLogout }) {
     }
   }, [])
 
-  const todayCalories = todayDiet.reduce((s, l) => s + (l.calories || 0), 0)
-  const todayCarbs = todayDiet.reduce((s, l) => s + (l.carbs || 0), 0)
-  const todayProtein = todayDiet.reduce((s, l) => s + (l.protein || 0), 0)
-  const todayFat = todayDiet.reduce((s, l) => s + (l.fat || 0), 0)
+  // 실시간 totals(liveDietTotals) 가 있으면 우선 사용 — DietLog 가 마운트된 상태에서는
+  // DB 라운드트립 없이 매크로 카드를 즉시 갱신할 수 있음.
+  const todayCalories = liveDietTotals?.calories ?? todayDiet.reduce((s, l) => s + (l.calories || 0), 0)
+  const todayCarbs    = liveDietTotals?.carbs    ?? todayDiet.reduce((s, l) => s + (l.carbs || 0), 0)
+  const todayProtein  = liveDietTotals?.protein  ?? todayDiet.reduce((s, l) => s + (l.protein || 0), 0)
+  const todayFat      = liveDietTotals?.fat      ?? todayDiet.reduce((s, l) => s + (l.fat || 0), 0)
 
   const PTLogo = () => (
     <div style={{
@@ -1084,7 +1088,7 @@ export default function MemberDashboard({ user, onLogout }) {
         {mainTab === 'diet' && (
           <>
             <SubTabs value={dietSubTab} onChange={setDietSubTab} />
-            <DietLog user={user} onDietUpdate={loadTodayDiet} weight={weight} muscle={muscle} bodyFat={bodyFat} occupation={occupation} forcedTab={dietSubTab} forcedDate={dietTargetDate} macroResult={macroResult} goal={goal} intensity={intensity} ptIsZero={ptIsZero} />
+            <DietLog user={user} onDietUpdate={loadTodayDiet} onTodayTotals={setLiveDietTotals} weight={weight} muscle={muscle} bodyFat={bodyFat} occupation={occupation} forcedTab={dietSubTab} forcedDate={dietTargetDate} macroResult={macroResult} goal={goal} intensity={intensity} ptIsZero={ptIsZero} />
           </>
         )}
 
