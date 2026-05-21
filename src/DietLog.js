@@ -53,13 +53,6 @@ const NAME_INPUT_STYLE = {
   outline: 'none',
 }
 
-const CameraIcon = () => (
-  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
-    <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/>
-    <circle cx="12" cy="13" r="4"/>
-  </svg>
-)
-
 const LockIcon = () => (
   <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
     <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
@@ -75,13 +68,14 @@ const computeCal = (carbs, protein, fat) => {
   return Math.round(c * 4 + p * 4 + f * 9)
 }
 
-const MealRow = React.memo(function MealRow({ meal, onUpdate, onBlur, onRemove, onStar, canRemove, readOnly = false }) {
+const MealRow = React.memo(function MealRow({ meal, onUpdate, onBlur, onRemove, onStar, onUploadPhoto, canRemove, readOnly = false, ptIsZero = false }) {
   const kcalStyle = meal.calorieManual ? CELL_STYLE : CELL_STYLE_AUTO
   const ro = !!readOnly
+  const hasPhoto = !!meal.media_url
   return (
     <div style={{ background: THEME.cardAlt, borderRadius: '10px', padding: '10px', marginBottom: '8px' }}>
-      {/* 식사 이름 + ★ 즐겨찾기 + ✕ 삭제 */}
-      <div style={{ display: 'grid', gridTemplateColumns: ro ? '1fr' : '1fr 34px 28px', gap: '6px', marginBottom: '8px' }}>
+      {/* 식사 이름 + 📷 사진 + ★ 즐겨찾기 + ✕ 삭제 */}
+      <div style={{ display: 'grid', gridTemplateColumns: ro ? '1fr' : '1fr 34px 34px 28px', gap: '6px', marginBottom: '8px' }}>
         <input
           type="text"
           value={meal.name}
@@ -92,6 +86,31 @@ const MealRow = React.memo(function MealRow({ meal, onUpdate, onBlur, onRemove, 
           readOnly={ro}
           disabled={ro}
         />
+        {!ro && (
+          <label
+            style={{
+              background: hasPhoto ? THEME.primaryLight : (ptIsZero ? '#F5F5F0' : '#FFF'),
+              border: `0.5px solid ${hasPhoto ? THEME.primaryAccent : THEME.border}`,
+              color: hasPhoto ? THEME.primary : (ptIsZero ? THEME.textHint : THEME.textSub),
+              padding: '6px 0', borderRadius: '6px',
+              cursor: ptIsZero ? 'not-allowed' : 'pointer',
+              fontFamily: 'inherit',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              opacity: ptIsZero ? 0.7 : 1,
+            }}
+            title={ptIsZero ? 'PT 잔여 없음 — 업로드 제한' : (hasPhoto ? '사진 교체' : '사진 추가')}
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/>
+              <circle cx="12" cy="13" r="4"/>
+            </svg>
+            <input
+              type="file" accept="image/*" style={{ display: 'none' }}
+              disabled={ptIsZero}
+              onChange={e => { if (e.target.files[0] && onUploadPhoto) onUploadPhoto(meal.slot, e.target.files[0]); e.target.value = '' }}
+            />
+          </label>
+        )}
         {!ro && (
           <button
             onClick={() => onStar(meal.slot)}
@@ -1136,21 +1155,12 @@ export default function DietLog({ user, onDietUpdate, onTodayTotals, tableOverri
               onBlur={onBlurField}
               onRemove={removeMeal}
               onStar={(slot) => setFavModalSlot(slot)}
+              onUploadPhoto={uploadMealPhoto}
               canRemove={meals.length > 1}
               readOnly={readOnly}
+              ptIsZero={ptIsZero}
             />
           ))}
-
-          {!readOnly && (
-            <button
-              onClick={addMeal}
-              style={{
-                background: 'transparent', border: `0.5px dashed ${THEME.primaryAccent}`, color: THEME.primary,
-                borderRadius: '8px', padding: '10px', fontSize: '12px', fontWeight: '500',
-                cursor: 'pointer', width: '100%', marginBottom: '10px', fontFamily: 'inherit'
-              }}
-            >＋ 식사 추가</button>
-          )}
 
           {/* 합계 */}
           <div style={{
@@ -1165,7 +1175,20 @@ export default function DietLog({ user, onDietUpdate, onTodayTotals, tableOverri
             <span style={{ fontSize: '12px', color: '#FFE8A8', textAlign: 'center', fontWeight: '500' }}>{Math.round(totals.calories)}</span>
           </div>
 
-          <p style={{ fontSize: '11px', color: THEME.textSub, fontWeight: '500', margin: '14px 0 8px' }}>식사 사진</p>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', margin: '14px 0 8px', gap: '8px' }}>
+            <p style={{ fontSize: '11px', color: THEME.textSub, fontWeight: '500', margin: 0 }}>식사 사진</p>
+            {!readOnly && (
+              <button
+                onClick={addMeal}
+                style={{
+                  background: 'transparent', border: `0.5px dashed ${THEME.primaryAccent}`, color: THEME.primary,
+                  borderRadius: '8px', padding: '5px 12px', fontSize: '11px', fontWeight: '500',
+                  cursor: 'pointer', fontFamily: 'inherit', flexShrink: 0,
+                }}
+                title="새 식사 추가"
+              >＋ 식사 추가</button>
+            )}
+          </div>
           {ptIsZero && (
             <div style={{ background: THEME.dangerLight, border: `0.5px solid ${THEME.danger}`, borderRadius: '8px', padding: '8px 10px', marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '8px' }}>
               <LockIcon />
@@ -1174,60 +1197,43 @@ export default function DietLog({ user, onDietUpdate, onTodayTotals, tableOverri
               </span>
             </div>
           )}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', marginBottom: '12px' }}>
-            {meals.map(m => {
-              const url = m.media_url
-              const label = m.name || `식사 ${m.slot}`
+          {(() => {
+            const mealsWithPhoto = meals.filter(m => m.media_url)
+            if (mealsWithPhoto.length === 0) {
               return (
-                <div key={m.slot}>
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '4px', gap: '4px' }}>
-                    <span style={{ fontSize: '11px', color: THEME.text, fontWeight: '500', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', minWidth: 0, flex: 1 }}>{label}</span>
-                    {url && (
-                      <button
-                        onClick={() => removeMealPhoto(m.slot)}
-                        style={{ background: 'none', border: 'none', color: THEME.danger, fontSize: '10px', cursor: 'pointer', padding: 0, flexShrink: 0 }}
-                      >삭제</button>
-                    )}
-                  </div>
-                  {url ? (
-                    <div
-                      onClick={() => setPreviewUrl(url)}
-                      style={{ width: '100%', height: '90px', borderRadius: '8px', overflow: 'hidden', cursor: 'pointer', background: THEME.cardAlt }}
-                    >
-                      <img src={url} alt={label} style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
-                    </div>
-                  ) : ptIsZero ? (
-                    <div
-                      style={{
-                        cursor: 'not-allowed',
-                        display: 'flex',
-                        flexDirection: 'column',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        gap: '4px',
-                        background: '#F5F5F0',
-                        border: `0.5px dashed ${THEME.border}`,
-                        borderRadius: '8px',
-                        height: '90px',
-                        color: THEME.danger,
-                        opacity: 0.7,
-                      }}
-                      title="PT 잔여 없음 - 업로드 제한"
-                    >
-                      <LockIcon />
-                      <span style={{ fontSize: '9px' }}>업로드 제한</span>
-                    </div>
-                  ) : (
-                    <label style={{ cursor: 'pointer', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '4px', background: THEME.cardAlt, border: `0.5px dashed ${THEME.primaryAccent}`, borderRadius: '8px', height: '90px', color: THEME.textSub }}>
-                      <CameraIcon />
-                      <span style={{ fontSize: '10px' }}>사진 추가</span>
-                      <input type="file" accept="image/*" style={{ display: 'none' }} onChange={e => e.target.files[0] && uploadMealPhoto(m.slot, e.target.files[0])} />
-                    </label>
-                  )}
-                </div>
+                <p style={{ fontSize: '11px', color: THEME.textHint, textAlign: 'center', padding: '14px 0', margin: 0, background: THEME.cardAlt, borderRadius: '8px', marginBottom: '12px' }}>
+                  업로드된 식사 사진이 없습니다 — 위 식사 카드의 📷 버튼으로 추가하세요
+                </p>
               )
-            })}
-          </div>
+            }
+            return (
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', marginBottom: '12px' }}>
+                {mealsWithPhoto.map(m => {
+                  const url = m.media_url
+                  const label = m.name || `식사 ${m.slot}`
+                  return (
+                    <div key={m.slot}>
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '4px', gap: '4px' }}>
+                        <span style={{ fontSize: '11px', color: THEME.text, fontWeight: '500', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', minWidth: 0, flex: 1 }}>{label}</span>
+                        {!readOnly && (
+                          <button
+                            onClick={() => removeMealPhoto(m.slot)}
+                            style={{ background: 'none', border: 'none', color: THEME.danger, fontSize: '10px', cursor: 'pointer', padding: 0, flexShrink: 0 }}
+                          >삭제</button>
+                        )}
+                      </div>
+                      <div
+                        onClick={() => setPreviewUrl(url)}
+                        style={{ width: '100%', height: '90px', borderRadius: '8px', overflow: 'hidden', cursor: 'pointer', background: THEME.cardAlt }}
+                      >
+                        <img src={url} alt={label} style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            )
+          })()}
 
           {(!readOnly || feedback) && (
             <div style={{ background: THEME.cardAlt, border: `0.5px solid ${THEME.border}`, borderRadius: '10px', padding: '11px', marginBottom: '12px' }}>
