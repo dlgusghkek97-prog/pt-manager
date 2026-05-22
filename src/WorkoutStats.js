@@ -743,13 +743,19 @@ export default function WorkoutStats({
                       const pts = dates.map((d, i) => `${xOf(i)},${yOf(byDate[d])}`).join(' ')
                       const color = PART_COLORS[selectedFav.body_part] || THEME.primary
                       const fmtDate = (s) => `${parseInt(s.split('-')[1])}/${parseInt(s.split('-')[2])}`
+                      // 날짜 라벨 잘림 방지 — 첫 점은 start, 끝 점은 end 정렬
+                      const dateAnchor = (i) => {
+                        if (i === 0) return 'start'
+                        if (i === dates.length - 1) return 'end'
+                        return 'middle'
+                      }
                       return (
-                        <svg viewBox={`0 0 ${W} ${H}`} style={{ width: '100%', height: 'auto' }}>
+                        <svg viewBox={`0 0 ${W} ${H}`} style={{ width: '100%', height: 'auto', overflow: 'visible' }}>
                           {[0, 0.5, 1].map((p, i) => (
                             <line key={i} x1={padL} y1={padT + p * innerH} x2={W - padR} y2={padT + p * innerH} stroke={THEME.borderLight} strokeWidth="0.5" />
                           ))}
                           {[0, 0.5, 1].map((p, i) => (
-                            <text key={i} x={padL - 5} y={padT + p * innerH + 3} textAnchor="end" fontSize="8" fill={THEME.textHint}>
+                            <text key={i} x={padL - 5} y={padT + p * innerH + 3} textAnchor="end" fontSize="7.5" fill={THEME.textHint}>
                               {Math.round(yMax - (yMax - yMin) * p)}
                             </text>
                           ))}
@@ -758,13 +764,13 @@ export default function WorkoutStats({
                             <g key={d}>
                               <circle cx={xOf(i)} cy={yOf(byDate[d])} r="2.6" fill={color} />
                               {(i === 0 || i === dates.length - 1 || (dates.length > 2 && i === Math.floor(dates.length / 2))) && (
-                                <text x={xOf(i)} y={H - padB + 12} textAnchor="middle" fontSize="8.5" fill={THEME.textSub}>
+                                <text x={xOf(i)} y={H - padB + 12} textAnchor={dateAnchor(i)} fontSize="8" fill={THEME.textSub}>
                                   {fmtDate(d)}
                                 </text>
                               )}
                             </g>
                           ))}
-                          <text x={W - padR} y={padT - 4} textAnchor="end" fontSize="8" fill={THEME.textHint}>
+                          <text x={W - padR} y={padT - 4} textAnchor="end" fontSize="7.5" fill={THEME.textHint}>
                             kg·회
                           </text>
                         </svg>
@@ -793,8 +799,10 @@ export default function WorkoutStats({
             const counts = PARTS.map(p => partDays[p].size)
             const maxC = Math.max(...counts, 3)  // 최소 3 (시각 안정)
             const N = PARTS.length
-            // 데이터 영역(R) 작게 + 라벨 ratio 멀리 → 라벨이 그래프 안 침범
-            const W = 320, H = 260, cx = W / 2, cy = 130, R = 64
+            // R = 48 (컴팩트), 라벨 ratio 1.7 → grid edge 와 라벨 사이 간격 ≈ 34px
+            // 부위명 / 횟수 모두 작게 (7 / 6.5)
+            const W = 320, H = 270, cx = W / 2, cy = 140, R = 48
+            const labelR = 1.7
             const angleAt = (i) => -Math.PI / 2 + (i * 2 * Math.PI) / N
             const ptAt = (i, ratio) => {
               const a = angleAt(i)
@@ -807,7 +815,7 @@ export default function WorkoutStats({
                   <p style={{ ...S.cardTitle, margin: 0 }}>부위별 운동 횟수</p>
                   <span style={{ fontSize: '10px', color: THEME.textHint }}>{now.getMonth() + 1}월 · 일 수 기준</span>
                 </div>
-                <svg viewBox={`0 -6 ${W} ${H + 6}`} style={{ width: '100%', height: 'auto', overflow: 'visible' }}>
+                <svg viewBox={`0 -8 ${W} ${H + 8}`} style={{ width: '100%', height: 'auto', overflow: 'visible' }}>
                   {/* 배경 격자 (0.25 / 0.5 / 0.75 / 1) */}
                   {[0.25, 0.5, 0.75, 1].map((r, idx) => {
                     const pts = PARTS.map((_, i) => ptAt(i, r)).map(([x, y]) => `${x},${y}`).join(' ')
@@ -825,15 +833,15 @@ export default function WorkoutStats({
                     const [x, y] = ptAt(i, c / maxC)
                     return <circle key={i} cx={x} cy={y} r="2.4" fill={PART_COLORS[PARTS[i]] || THEME.primary} />
                   })}
-                  {/* 라벨 — 격자 밖으로 충분히 (1.45) */}
+                  {/* 라벨 + 횟수 — 부위명 위, 횟수 아래로 분리 (y±5) */}
                   {PARTS.map((p, i) => {
-                    const [x, y] = ptAt(i, 1.45)
+                    const [x, y] = ptAt(i, labelR)
                     return (
                       <g key={p}>
-                        <text x={x} y={y} textAnchor="middle" fontSize="8" fontWeight="500" fill={PART_COLORS[p] || THEME.text}>
+                        <text x={x} y={y - 2} textAnchor="middle" fontSize="7" fontWeight="500" fill={PART_COLORS[p] || THEME.text}>
                           {p}
                         </text>
-                        <text x={x} y={y + 9} textAnchor="middle" fontSize="7" fill={THEME.textSub}>
+                        <text x={x} y={y + 9} textAnchor="middle" fontSize="6.5" fill={THEME.textSub}>
                           {counts[i]}회
                         </text>
                       </g>
