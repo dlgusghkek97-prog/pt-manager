@@ -9,12 +9,32 @@ export default function PushPromptModal({ userId, userType, onClose }) {
   const mountedRef = useRef(true)
   useEffect(() => () => { mountedRef.current = false }, [])
 
+  // 최후 안전망: 어떤 이유로 handleEnable 이 흐름 끝까지 못 가도
+  // 6초 뒤 강제 닫기. (정상 흐름이 먼저 끝나면 forceCloseTimerRef 를 clear)
+  const forceCloseTimerRef = useRef(null)
+  const armForceClose = () => {
+    if (forceCloseTimerRef.current) clearTimeout(forceCloseTimerRef.current)
+    forceCloseTimerRef.current = setTimeout(() => {
+      console.warn('[PushPromptModal] forceClose fired — 6초 안에 정상 종료되지 않음')
+      if (mountedRef.current) {
+        try { dismissPushPrompt(userId) } catch (_) {}
+        onClose()
+      }
+    }, 6000)
+  }
+  const disarmForceClose = () => {
+    if (forceCloseTimerRef.current) {
+      clearTimeout(forceCloseTimerRef.current)
+      forceCloseTimerRef.current = null
+    }
+  }
+  useEffect(() => () => disarmForceClose(), [])
+
   const handleEnable = async () => {
     if (loading) return
     setLoading(true)
-    // subscribeToPush 가 hang 되는 경우(브라우저 권한 다이얼로그 무시 등) 영원히
-    // 닫히지 않는 문제 방지 — 10초 타임아웃.
-    const TIMEOUT_MS = 10000
+    armForceClose()  // 6초 강제 닫기 무장
+    const TIMEOUT_MS = 5000  // subscribeToPush 자체 타임아웃 (브라우저 권한 무한 대기 방지)
     let result
     try {
       result = await Promise.race([
@@ -25,20 +45,21 @@ export default function PushPromptModal({ userId, userType, onClose }) {
       result = { success: false, error: e?.message === 'timeout' ? '응답 시간 초과 — 다시 시도해주세요' : (e?.message || '알 수 없는 오류') }
     } finally {
       if (mountedRef.current) setLoading(false)
+      disarmForceClose()
     }
-    if (!mountedRef.current) return  // "나중에"로 이미 닫힘
+    if (!mountedRef.current) return
     if (result.success) {
       alert('푸시 알림이 켜졌습니다!\n앱이 꺼져 있어도 알림을 받을 수 있어요.')
       onClose()
     } else {
       alert(result.error || '등록 실패')
-      // 권한 거절 등 실패도 닫기 (계속 띄우면 짜증)
       dismissPushPrompt(userId)
       onClose()
     }
   }
 
   const handleLater = () => {
+    disarmForceClose()
     dismissPushPrompt(userId)
     onClose()
   }
