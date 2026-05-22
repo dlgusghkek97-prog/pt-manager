@@ -799,10 +799,10 @@ export default function WorkoutStats({
             const counts = PARTS.map(p => partDays[p].size)
             const maxC = Math.max(...counts, 3)  // 최소 3 (시각 안정)
             const N = PARTS.length
-            // R = 48 (컴팩트), 라벨 ratio 1.7 → grid edge 와 라벨 사이 간격 ≈ 34px
-            // 부위명 / 횟수 모두 작게 (7 / 6.5)
-            const W = 320, H = 270, cx = W / 2, cy = 140, R = 48
-            const labelR = 1.7
+            // R = 42 (더 컴팩트), 라벨 ratio 2.0 → grid edge 와 라벨 사이 간격 ≈ 42px
+            // 부위명 ↔ 횟수 수직 간격 16px (y-4 / y+12)
+            const W = 320, H = 290, cx = W / 2, cy = 150, R = 42
+            const labelR = 2.0
             const angleAt = (i) => -Math.PI / 2 + (i * 2 * Math.PI) / N
             const ptAt = (i, ratio) => {
               const a = angleAt(i)
@@ -815,7 +815,7 @@ export default function WorkoutStats({
                   <p style={{ ...S.cardTitle, margin: 0 }}>부위별 운동 횟수</p>
                   <span style={{ fontSize: '10px', color: THEME.textHint }}>{now.getMonth() + 1}월 · 일 수 기준</span>
                 </div>
-                <svg viewBox={`0 -8 ${W} ${H + 8}`} style={{ width: '100%', height: 'auto', overflow: 'visible' }}>
+                <svg viewBox={`0 -10 ${W} ${H + 10}`} style={{ width: '100%', height: 'auto', overflow: 'visible' }}>
                   {/* 배경 격자 (0.25 / 0.5 / 0.75 / 1) */}
                   {[0.25, 0.5, 0.75, 1].map((r, idx) => {
                     const pts = PARTS.map((_, i) => ptAt(i, r)).map(([x, y]) => `${x},${y}`).join(' ')
@@ -833,15 +833,15 @@ export default function WorkoutStats({
                     const [x, y] = ptAt(i, c / maxC)
                     return <circle key={i} cx={x} cy={y} r="2.4" fill={PART_COLORS[PARTS[i]] || THEME.primary} />
                   })}
-                  {/* 라벨 + 횟수 — 부위명 위, 횟수 아래로 분리 (y±5) */}
+                  {/* 라벨 + 횟수 — 그래프에서 충분히 떨어지고 (gap 42px), 부위명 위·횟수 아래로 16px 분리 */}
                   {PARTS.map((p, i) => {
                     const [x, y] = ptAt(i, labelR)
                     return (
                       <g key={p}>
-                        <text x={x} y={y - 2} textAnchor="middle" fontSize="7" fontWeight="500" fill={PART_COLORS[p] || THEME.text}>
+                        <text x={x} y={y - 4} textAnchor="middle" fontSize="7" fontWeight="500" fill={PART_COLORS[p] || THEME.text}>
                           {p}
                         </text>
-                        <text x={x} y={y + 9} textAnchor="middle" fontSize="6.5" fill={THEME.textSub}>
+                        <text x={x} y={y + 12} textAnchor="middle" fontSize="6.5" fill={THEME.textSub}>
                           {counts[i]}회
                         </text>
                       </g>
