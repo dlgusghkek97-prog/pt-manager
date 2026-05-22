@@ -96,21 +96,22 @@ export default function SettingsModal({ user, userType, onClose, onLogout }) {
   const sectionLabel = {
     fontSize: FONT.xs,
     color: THEME.textHint,
-    margin: `${SPACING.lg}px ${SPACING.md}px ${SPACING.xs}px`,
+    margin: `${SPACING.md}px ${SPACING.sm}px ${SPACING.xs}px`,
     fontWeight: 500,
   }
 
   const row = {
     display: 'flex',
     alignItems: 'center',
-    gap: SPACING.md,
+    gap: SPACING.sm,
     background: '#FFF',
-    padding: '14px 16px',
+    padding: '12px 14px',
     cursor: 'pointer',
     border: 'none',
     width: '100%',
     fontFamily: 'inherit',
     textAlign: 'left',
+    boxSizing: 'border-box',
   }
 
   const rowTitle = { fontSize: FONT.sm, color: THEME.text, fontWeight: 500 }
@@ -146,9 +147,9 @@ export default function SettingsModal({ user, userType, onClose, onLogout }) {
 
   const Icon = ({ bg, children }) => (
     <div style={{
-      width: 36, height: 36, borderRadius: 10,
+      width: 32, height: 32, borderRadius: 9,
       background: bg, display: 'flex', alignItems: 'center', justifyContent: 'center',
-      flexShrink: 0, fontSize: 18,
+      flexShrink: 0, fontSize: 16,
     }}>{children}</div>
   )
 
@@ -156,12 +157,12 @@ export default function SettingsModal({ user, userType, onClose, onLogout }) {
     <>
       <div style={{
         position: 'fixed', inset: 0, background: THEME.bg, zIndex: 1500,
-        overflowY: 'auto',
+        overflowY: 'auto', WebkitOverflowScrolling: 'touch',
       }}>
         {/* 헤더 */}
         <div style={{
           display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-          padding: '14px 12px', background: '#FFF',
+          padding: '12px 10px', background: '#FFF',
           borderBottom: `0.5px solid ${THEME.border}`,
           position: 'sticky', top: 0, zIndex: 1,
         }}>
@@ -170,18 +171,18 @@ export default function SettingsModal({ user, userType, onClose, onLogout }) {
           <div style={{ width: 32 }} />  {/* 우측 균형 */}
         </div>
 
-        <div style={{ paddingBottom: 40 }}>
+        <div style={{ paddingBottom: 32, maxWidth: 520, margin: '0 auto', width: '100%', boxSizing: 'border-box' }}>
           {/* 프로필 카드 */}
           <div style={{
-            background: '#FFF', margin: `${SPACING.md}px ${SPACING.md}px 0`,
-            borderRadius: RADIUS.lg, padding: '14px 16px',
-            display: 'flex', alignItems: 'center', gap: SPACING.md,
+            background: '#FFF', margin: `${SPACING.sm}px ${SPACING.sm}px 0`,
+            borderRadius: RADIUS.lg, padding: '12px 14px',
+            display: 'flex', alignItems: 'center', gap: SPACING.sm,
           }}>
             <div style={{
-              width: 56, height: 56, borderRadius: '50%',
+              width: 48, height: 48, borderRadius: '50%',
               background: THEME.primaryLight, color: THEME.primaryDark,
               display: 'flex', alignItems: 'center', justifyContent: 'center',
-              fontSize: 22, fontWeight: 500, flexShrink: 0,
+              fontSize: 19, fontWeight: 500, flexShrink: 0,
             }}>
               {(user.name || user.email || '?').slice(0, 1)}
             </div>
@@ -215,7 +216,7 @@ export default function SettingsModal({ user, userType, onClose, onLogout }) {
             <>
               <div style={sectionLabel}>기능</div>
               <div style={{
-                background: '#FFF', borderRadius: RADIUS.md, marginInline: SPACING.md,
+                background: '#FFF', borderRadius: RADIUS.md, marginInline: SPACING.sm,
                 overflow: 'hidden',
               }}>
                 <div style={{ ...row, cursor: 'default' }}>
@@ -237,7 +238,7 @@ export default function SettingsModal({ user, userType, onClose, onLogout }) {
           {/* 알림 */}
           <div style={sectionLabel}>알림</div>
           <div style={{
-            background: '#FFF', borderRadius: RADIUS.md, marginInline: SPACING.md,
+            background: '#FFF', borderRadius: RADIUS.md, marginInline: SPACING.sm,
             overflow: 'hidden',
           }}>
             <div style={{ ...row, cursor: 'default' }}>
@@ -274,7 +275,7 @@ export default function SettingsModal({ user, userType, onClose, onLogout }) {
           {/* 기타 */}
           <div style={sectionLabel}>기타</div>
           <div style={{
-            background: '#FFF', borderRadius: RADIUS.md, marginInline: SPACING.md,
+            background: '#FFF', borderRadius: RADIUS.md, marginInline: SPACING.sm,
             overflow: 'hidden',
           }}>
             <button style={row} onClick={() => setLegalOpen('terms')}>
@@ -318,10 +319,11 @@ export default function SettingsModal({ user, userType, onClose, onLogout }) {
               display: 'block',
               background: '#FFF', color: THEME.danger,
               border: 'none', borderRadius: RADIUS.md,
-              padding: '14px 16px', margin: `${SPACING.lg}px ${SPACING.md}px 0`,
-              width: `calc(100% - ${SPACING.md * 2}px)`,
+              padding: '12px 14px', margin: `${SPACING.md}px ${SPACING.sm}px 0`,
+              width: `calc(100% - ${SPACING.sm * 2}px)`,
               fontSize: FONT.sm, fontWeight: 500, cursor: 'pointer',
               fontFamily: 'inherit', textAlign: 'center',
+              boxSizing: 'border-box',
             }}
           >
             로그아웃
