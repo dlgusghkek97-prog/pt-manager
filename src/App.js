@@ -19,9 +19,23 @@ const PTLogo = ({ size = 48 }) => (
   </div>
 )
 
+// 컴포넌트 평가 전(=Supabase 가 hash 처리하기 전) 동기적으로 recovery 진입 감지
+const initialModeFromUrl = (() => {
+  if (typeof window === 'undefined') return 'select'
+  try {
+    const hash = window.location.hash || ''
+    const search = window.location.search || ''
+    if (hash.includes('type=recovery') || hash.includes('access_token=') ||
+        search.includes('type=recovery')) {
+      return 'reset-password'
+    }
+  } catch {}
+  return 'select'
+})()
+
 export default function App() {
   // mode: select | trainer | member | signup | forgot-password | forgot-email | reset-password
-  const [mode, setMode] = useState('select')
+  const [mode, setMode] = useState(initialModeFromUrl)
   const [user, setUser] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
