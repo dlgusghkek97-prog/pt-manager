@@ -742,7 +742,9 @@ export default function WorkoutStats({
                       const yMaxRaw = (hasRange ? maxV : minV) + yPad
                       const yMin = Math.max(0, Math.floor(yMinRaw / niceStep) * niceStep)
                       const yMax = Math.ceil(yMaxRaw / niceStep) * niceStep
-                      const W = 320, H = 175, padL = 36, padR = 12, padT = 14, padB = 22
+                      // padT/padB 늘려서 차트 line 자체를 안쪽으로 → 상단 grid line 이 카드 위에서 내려오고
+                      // 하단 grid line 이 날짜 라벨에서 충분히 올라옴. y축 숫자도 그 line 에 정렬돼 함께 이동.
+                      const W = 320, H = 180, padL = 36, padR = 12, padT = 28, padB = 36
                       const innerW = W - padL - padR, innerH = H - padT - padB
                       const xOf = (i) => dates.length === 1 ? padL + innerW / 2 : padL + (i / (dates.length - 1)) * innerW
                       const yOf = (v) => padT + (1 - (v - yMin) / (yMax - yMin)) * innerH
