@@ -1879,7 +1879,19 @@ export default function TrainerDashboard({ user, onLogout }) {
             </div>
 
             {showAddMember && (
-              <div style={{ background: THEME.cardAlt, borderRadius: '12px', padding: '14px', marginBottom: '14px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+              <div style={{ background: THEME.cardAlt, borderRadius: '12px', padding: '14px', marginBottom: '14px', display: 'flex', flexDirection: 'column', gap: '10px', position: 'relative' }}>
+                <button
+                  onClick={() => { setShowAddMember(false); setGeneratedCode('') }}
+                  aria-label="닫기"
+                  style={{
+                    position: 'absolute', top: 8, right: 8,
+                    width: 26, height: 26, borderRadius: '50%',
+                    background: '#FFF', border: `0.5px solid ${THEME.border}`,
+                    color: THEME.textSub, fontSize: 14, lineHeight: 1,
+                    cursor: 'pointer', fontFamily: 'inherit', padding: 0,
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  }}
+                >✕</button>
                 <input style={S.input} type="text" placeholder="회원 이름" value={newMemberName} onChange={e => setNewMemberName(e.target.value)} />
                 <select style={S.input} value={newMemberGoal} onChange={e => setNewMemberGoal(e.target.value)}>
                   <option value="다이어트">다이어트</option>
