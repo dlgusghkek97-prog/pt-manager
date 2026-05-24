@@ -431,15 +431,16 @@ export default function WorkoutLog({ user, selectedDate, setSelectedDate, exerci
     const mediaUrl = exercises[exIdx]?.sets[0]?.media_url
     if (mediaUrl) {
       setPreviewIdx(exIdx)
-    } else {
-      // PT 0회면 차단
-      if (ptIsZero) {
-        alert('PT 잔여 횟수가 없어 사진/영상 업로드가 제한됩니다.\n트레이너에게 추가 결제를 문의해주세요.')
-        return
-      }
-      const ref = fileInputRefs.current[exIdx]
-      if (ref) ref.click()
+      return
     }
+    // 미디어 없는 카메라 칸: readOnly(회원이 트레이너 기록 볼 때) 면 아무 동작 X
+    if (readOnly) return
+    if (ptIsZero) {
+      alert('PT 잔여 횟수가 없어 사진/영상 업로드가 제한됩니다.\n트레이너에게 추가 결제를 문의해주세요.')
+      return
+    }
+    const ref = fileInputRefs.current[exIdx]
+    if (ref) ref.click()
   }
 
   const triggerFileSelect = (exIdx) => {
@@ -1168,7 +1169,8 @@ export default function WorkoutLog({ user, selectedDate, setSelectedDate, exerci
               </div>
 
               <div style={{ borderTop: `0.5px solid ${THEME.border}`, marginTop: '10px', paddingTop: '10px' }}>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 46px', gap: '6px', alignItems: 'stretch' }}>
+                {/* readOnly + 미디어 없음 = 카메라 칸 숨김 (회원이 트레이너 빈 슬롯 보고 업로드 모달 뜨는 걸 차단) */}
+                <div style={{ display: 'grid', gridTemplateColumns: (readOnly && !hasMedia) ? '1fr' : '1fr 46px', gap: '6px', alignItems: 'stretch' }}>
                   <textarea
                     style={{
                       width: '100%', padding: '7px 9px', borderRadius: '6px', border: `0.5px solid ${THEME.border}`,
@@ -1179,33 +1181,37 @@ export default function WorkoutLog({ user, selectedDate, setSelectedDate, exerci
                     value={ex.description || ''}
                     onChange={e => updateExField(realIdx, 'description', e.target.value)}
                     onBlur={() => requestSaveRef.current?.()}
+                    readOnly={readOnly}
+                    disabled={readOnly}
                   />
 
-                  <div
-                    onClick={() => handleCameraClick(realIdx)}
-                    style={{
-                      position: 'relative',
-                      background: cameraBg,
-                      border: cameraBorder,
-                      borderRadius: '6px',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      cursor: cameraDisabled ? 'not-allowed' : 'pointer',
-                      height: '46px',
-                      opacity: cameraDisabled ? 0.6 : 1,
-                    }}
-                    title={cameraDisabled ? 'PT 잔여 없음 - 업로드 제한' : (hasMedia ? '사진/영상 보기' : '사진/영상 추가')}
-                  >
-                    {cameraDisabled ? (
-                      <LockIcon color={THEME.danger} size={16} />
-                    ) : (
-                      <CameraIcon color={cameraIconColor} size={20} />
-                    )}
-                    {hasMedia && (
-                      <div style={{ position: 'absolute', top: '5px', right: '5px', width: '7px', height: '7px', background: THEME.primary, borderRadius: '50%', border: '1.5px solid #FFF' }} />
-                    )}
-                  </div>
+                  {!(readOnly && !hasMedia) && (
+                    <div
+                      onClick={() => handleCameraClick(realIdx)}
+                      style={{
+                        position: 'relative',
+                        background: cameraBg,
+                        border: cameraBorder,
+                        borderRadius: '6px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        cursor: cameraDisabled ? 'not-allowed' : 'pointer',
+                        height: '46px',
+                        opacity: cameraDisabled ? 0.6 : 1,
+                      }}
+                      title={cameraDisabled ? 'PT 잔여 없음 - 업로드 제한' : (hasMedia ? '사진/영상 보기' : '사진/영상 추가')}
+                    >
+                      {cameraDisabled ? (
+                        <LockIcon color={THEME.danger} size={16} />
+                      ) : (
+                        <CameraIcon color={cameraIconColor} size={20} />
+                      )}
+                      {hasMedia && (
+                        <div style={{ position: 'absolute', top: '5px', right: '5px', width: '7px', height: '7px', background: THEME.primary, borderRadius: '50%', border: '1.5px solid #FFF' }} />
+                      )}
+                    </div>
+                  )}
 
                   <input
                     type="file"
