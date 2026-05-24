@@ -732,10 +732,16 @@ export default function WorkoutStats({
                       const values = dates.map(d => byDate[d])
                       const maxV = Math.max(...values)
                       const minV = Math.min(...values)
-                      // 변동폭 강조: 하단=최저, 상단=최대. min===max 면 약간의 여유.
-                      const range = maxV - minV > 0 ? maxV - minV : Math.max(1, maxV * 0.1)
-                      const yMin = maxV - minV > 0 ? minV : Math.max(0, minV - range / 2)
-                      const yMax = maxV - minV > 0 ? maxV : minV + range / 2
+                      // 변동폭 강조 + 데이터 점이 차트 edge 에 닿지 않도록 위/아래 ~15% 여유,
+                      // 깔끔한 정수 단위로 라운드 → y축 숫자도 보기 좋게
+                      const hasRange = maxV - minV > 0
+                      const baseRange = hasRange ? maxV - minV : Math.max(1, maxV * 0.1)
+                      const yPad = baseRange * (hasRange ? 0.15 : 0.5)
+                      const niceStep = baseRange > 500 ? 100 : baseRange > 100 ? 50 : baseRange > 20 ? 10 : 5
+                      const yMinRaw = (hasRange ? minV : minV) - yPad
+                      const yMaxRaw = (hasRange ? maxV : minV) + yPad
+                      const yMin = Math.max(0, Math.floor(yMinRaw / niceStep) * niceStep)
+                      const yMax = Math.ceil(yMaxRaw / niceStep) * niceStep
                       const W = 320, H = 175, padL = 36, padR = 12, padT = 14, padB = 22
                       const innerW = W - padL - padR, innerH = H - padT - padB
                       const xOf = (i) => dates.length === 1 ? padL + innerW / 2 : padL + (i / (dates.length - 1)) * innerW
@@ -754,8 +760,9 @@ export default function WorkoutStats({
                           {[0, 0.5, 1].map((p, i) => (
                             <line key={i} x1={padL} y1={padT + p * innerH} x2={W - padR} y2={padT + p * innerH} stroke={THEME.borderLight} strokeWidth="0.5" />
                           ))}
+                          {/* y축 숫자 — dominantBaseline=middle 로 grid line 정중앙에 정렬 */}
                           {[0, 0.5, 1].map((p, i) => (
-                            <text key={i} x={padL - 5} y={padT + p * innerH + 3} textAnchor="end" fontSize="7.5" fill={THEME.textHint}>
+                            <text key={i} x={padL - 5} y={padT + p * innerH} textAnchor="end" dominantBaseline="middle" fontSize="5" fill={THEME.textHint}>
                               {Math.round(yMax - (yMax - yMin) * p)}
                             </text>
                           ))}
@@ -764,13 +771,13 @@ export default function WorkoutStats({
                             <g key={d}>
                               <circle cx={xOf(i)} cy={yOf(byDate[d])} r="2.6" fill={color} />
                               {(i === 0 || i === dates.length - 1 || (dates.length > 2 && i === Math.floor(dates.length / 2))) && (
-                                <text x={xOf(i)} y={H - padB + 12} textAnchor={dateAnchor(i)} fontSize="8" fill={THEME.textSub}>
+                                <text x={xOf(i)} y={H - padB + 11} textAnchor={dateAnchor(i)} fontSize="5.5" fill={THEME.textSub}>
                                   {fmtDate(d)}
                                 </text>
                               )}
                             </g>
                           ))}
-                          <text x={W - padR} y={padT - 4} textAnchor="end" fontSize="7.5" fill={THEME.textHint}>
+                          <text x={W - padR} y={padT - 4} textAnchor="end" fontSize="5" fill={THEME.textHint}>
                             kg·회
                           </text>
                         </svg>
