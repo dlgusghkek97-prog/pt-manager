@@ -5,6 +5,7 @@ import {
   requestClassSession, approveClassRequest, rejectClassRequest,
   getBusinessHours, setBusinessHours, isWithinBusinessHours,
   usePtSession, refundPtSession,
+  getOrCreateConversation, sendMessage,
 } from './utils'
 import { supabase } from './supabase'
 import useModalBackButton from './useModalBackButton'
@@ -519,6 +520,7 @@ function SessionEditModal({ user, userType, trainerId, target, members, onClose,
 
   const [note, setNote] = useState(target.note || '')
   const [saving, setSaving] = useState(false)
+  const [rejectReason, setRejectReason] = useState('')  // 트레이너 거절 사유 (필요 시 채팅으로 전송)
 
   // 마운트 직후 overlay 가드 (pointer-events 차단)
   const [armed, setArmed] = useState(false)
@@ -626,15 +628,53 @@ function SessionEditModal({ user, userType, trainerId, target, members, onClose,
     if (!res.success) { alert('삭제 실패: ' + res.error); return }
     onSaved()
   }
+  // 트레이너 ↔ 해당 회원 채팅방으로 자동 메시지 전송 (승인/거절 안내).
+  // 채팅방 없으면 자동 생성. 실패해도 메인 액션은 그대로 진행.
+  const postScheduleMessageToMember = async (text) => {
+    try {
+      if (!isTrainer || !target.member_id || !user?.id) return
+      const conv = await getOrCreateConversation(user.id, target.member_id)
+      if (!conv?.success || !conv.data?.id) return
+      await sendMessage({
+        conversationId: conv.data.id,
+        senderType: 'trainer',
+        senderId: user.id,
+        content: text,
+      })
+    } catch (e) {
+      console.warn('[postScheduleMessageToMember]', e?.message || e)
+    }
+  }
+
   const handleApprove = async () => {
     const res = await approveClassRequest(target.id)
     if (!res.success) { alert('승인 실패: ' + res.error); return }
+    const when = (() => {
+      const d = new Date(target.start_at)
+      const wd = ['일','월','화','수','목','금','토'][d.getDay()]
+      const h = String(d.getHours()).padStart(2, '0')
+      const m = String(d.getMinutes()).padStart(2, '0')
+      return `${d.getMonth() + 1}/${d.getDate()}(${wd}) ${h}:${m}`
+    })()
+    await postScheduleMessageToMember(`✅ 수업 신청이 승인됐어요\n${when} 예정`)
     onSaved()
   }
+
   const handleReject = async () => {
-    if (!window.confirm('신청을 거절(삭제)할까요?')) return
+    const reason = rejectReason.trim()
+    if (!reason && !window.confirm('거절 사유 없이 거절할까요?')) return
+    const when = (() => {
+      const d = new Date(target.start_at)
+      const h = String(d.getHours()).padStart(2, '0')
+      const m = String(d.getMinutes()).padStart(2, '0')
+      return `${d.getMonth() + 1}/${d.getDate()} ${h}:${m}`
+    })()
     const res = await rejectClassRequest(target.id)
     if (!res.success) { alert('거절 실패: ' + res.error); return }
+    const msg = reason
+      ? `❌ ${when} 수업 신청이 거절됐어요\n사유: ${reason}`
+      : `❌ ${when} 수업 신청이 거절됐어요`
+    await postScheduleMessageToMember(msg)
     onSaved()
   }
 
@@ -904,11 +944,26 @@ function SessionEditModal({ user, userType, trainerId, target, members, onClose,
             <textarea value={note} onChange={e => setNote(e.target.value)} rows={2} style={{ ...inp, resize: 'vertical' }} placeholder="(선택)" />
           </div>
 
-          {/* 트레이너 — 신청 슬롯에 대한 승인/거절 */}
+          {/* 트레이너 — 신청 슬롯에 대한 승인/거절 + 거절 사유 입력 */}
           {!isNew && isTrainer && target.status === 'requested' && (
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
-              <button onClick={handleApprove} style={{ ...btnPrimary, background: THEME.primary }}>승인</button>
-              <button onClick={handleReject} style={{ ...btnPrimary, background: THEME.danger }}>거절</button>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              <div>
+                <div style={lbl}>거절 사유 (거절 시 회원 채팅으로 전송)</div>
+                <textarea
+                  value={rejectReason}
+                  onChange={e => setRejectReason(e.target.value)}
+                  rows={2}
+                  style={{ ...inp, resize: 'vertical' }}
+                  placeholder="예: 같은 시간 다른 수업이 있어요"
+                />
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+                <button onClick={handleApprove} style={{ ...btnPrimary, background: THEME.primary }}>✅ 승인 + 알림</button>
+                <button onClick={handleReject} style={{ ...btnPrimary, background: THEME.danger }}>❌ 거절 + 사유 전송</button>
+              </div>
+              <p style={{ fontSize: FONT.xs, color: THEME.textHint, margin: 0, lineHeight: 1.5 }}>
+                승인/거절 둘 다 회원 채팅으로 자동 안내가 전송됩니다. 메시지를 받은 회원은 푸시 알림으로 결과를 즉시 확인할 수 있어요.
+              </p>
             </div>
           )}
 
