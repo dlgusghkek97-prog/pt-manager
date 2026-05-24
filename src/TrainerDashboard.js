@@ -2048,6 +2048,9 @@ export default function TrainerDashboard({ user, onLogout }) {
                     <ChatBubbleIcon color={THEME.primary} size={11} />
                     채팅
                   </button>
+                  <button onClick={() => setShowNotesMember(selectedMember)} style={memberActionBtn}>
+                    📝 메모
+                  </button>
                 </div>
               </div>
 
@@ -2098,11 +2101,10 @@ export default function TrainerDashboard({ user, onLogout }) {
               onCommit={commitMemberMacroField}
             />
 
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: '6px', marginBottom: '10px' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '6px', marginBottom: '10px' }}>
               <MainTabBtn active={memberMainTab === 'workout'} onClick={() => setMemberMainTab('workout')} label="운동" helpSection="workout" />
               <MainTabBtn active={memberMainTab === 'diet'} onClick={() => setMemberMainTab('diet')} label="식단" helpSection="diet" />
               <MainTabBtn active={memberMainTab === 'inbody'} onClick={() => setMemberMainTab('inbody')} label="인바디" helpSection="inbody" />
-              <MainTabBtn active={memberMainTab === 'memo'} onClick={() => setMemberMainTab('memo')} label="메모" />
             </div>
 
             {memberMainTab === 'workout' && (
@@ -2152,14 +2154,6 @@ export default function TrainerDashboard({ user, onLogout }) {
               />
             )}
 
-            {memberMainTab === 'memo' && (
-              <MemberNotes
-                member={selectedMember}
-                onClose={() => {}}
-                onUpdate={() => loadMemberNotes(selectedMember.id)}
-                embedded
-              />
-            )}
           </>
         )}
       </div>
