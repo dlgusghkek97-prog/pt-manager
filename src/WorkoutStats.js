@@ -742,9 +742,11 @@ export default function WorkoutStats({
                       const yMaxRaw = (hasRange ? maxV : minV) + yPad
                       const yMin = Math.max(0, Math.floor(yMinRaw / niceStep) * niceStep)
                       const yMax = Math.ceil(yMaxRaw / niceStep) * niceStep
-                      // padT/padB 늘려서 차트 line 자체를 안쪽으로 → 상단 grid line 이 카드 위에서 내려오고
-                      // 하단 grid line 이 날짜 라벨에서 충분히 올라옴. y축 숫자도 그 line 에 정렬돼 함께 이동.
-                      const W = 320, H = 180, padL = 36, padR = 12, padT = 28, padB = 36
+                      // 차트 drawing area 를 위·아래로 짜내서 grid line 안쪽 배치.
+                      // 상단 grid line: padT 만큼 위에서 떨어진 위치 (kg·회 와 분리)
+                      // 하단 grid line: padT + innerH 위치 (날짜 라벨과 분리)
+                      const W = 320, H = 210, padL = 36, padR = 12, padT = 40, padB = 50
+                      const dateLabelGap = 20  // 하단 grid line ↔ 날짜 라벨 사이 간격
                       const innerW = W - padL - padR, innerH = H - padT - padB
                       const xOf = (i) => dates.length === 1 ? padL + innerW / 2 : padL + (i / (dates.length - 1)) * innerW
                       const yOf = (v) => padT + (1 - (v - yMin) / (yMax - yMin)) * innerH
@@ -773,7 +775,7 @@ export default function WorkoutStats({
                             <g key={d}>
                               <circle cx={xOf(i)} cy={yOf(byDate[d])} r="2.6" fill={color} />
                               {(i === 0 || i === dates.length - 1 || (dates.length > 2 && i === Math.floor(dates.length / 2))) && (
-                                <text x={xOf(i)} y={H - padB + 11} textAnchor={dateAnchor(i)} fontSize="5.5" fill={THEME.textSub}>
+                                <text x={xOf(i)} y={padT + innerH + dateLabelGap} textAnchor={dateAnchor(i)} fontSize="5.5" fill={THEME.textSub}>
                                   {fmtDate(d)}
                                 </text>
                               )}
