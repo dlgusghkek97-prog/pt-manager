@@ -241,7 +241,7 @@ export default function WorkoutStats({
               fontWeight: active ? '500' : '400',
               cursor: 'pointer'
             }} onClick={() => setStatsTab(t)}>
-              {['운동', '추이'][i]}
+              {['추이', 'PR'][i]}
             </button>
           )
         })}
