@@ -1659,8 +1659,17 @@ export const unsubscribeFromPush = async (userId) => {
 // - 이미 권한 거절(denied) → 안 보임
 // - 이미 구독됨 → 안 보임
 // - 1일 이내 "나중에" 눌렀음 → 안 보임
+// 데스크톱 브라우저 감지 — 데스크톱 Chrome/Edge 는 FCM 인증이 자주 실패해
+// pushManager.subscribe() 가 'Registration failed - push service error' 로 거부됨.
+// 푸시는 모바일 한정 기능으로 사용.
+const isMobileDevice = () => {
+  if (typeof navigator === 'undefined') return false
+  return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent || '')
+}
+
 export const shouldShowPushPrompt = async (userId) => {
   if (!isPushSupported()) return false
+  if (!isMobileDevice()) return false  // 데스크톱은 푸시 안내 모달 자체를 안 띄움
   const status = getPushPermissionStatus()
   if (status === 'denied') return false  // 브라우저 차단 — 모달로 풀 수 없음
   if (status === 'granted') {
