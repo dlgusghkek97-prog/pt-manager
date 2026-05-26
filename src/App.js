@@ -3,6 +3,7 @@ import { supabase } from './supabase'
 import { S, THEME } from './utils'
 import TrainerDashboard from './TrainerDashboard'
 import MemberDashboard from './MemberDashboard'
+import LandingPage from './LandingPage'
 import LegalModal from './LegalModal'
 import { TERMS_VERSION } from './legal'
 import { identifyUser, resetUser } from './monitoring'
@@ -20,8 +21,9 @@ const PTLogo = ({ size = 48 }) => (
 )
 
 // 컴포넌트 평가 전(=Supabase 가 hash 처리하기 전) 동기적으로 recovery 진입 감지
+// 또는 ?app=1 / ?login=1 / 토스 결제 콜백 등 직접 진입 시 랜딩 페이지 우회
 const initialModeFromUrl = (() => {
-  if (typeof window === 'undefined') return 'select'
+  if (typeof window === 'undefined') return 'landing'
   try {
     const hash = window.location.hash || ''
     const search = window.location.search || ''
@@ -29,12 +31,17 @@ const initialModeFromUrl = (() => {
         search.includes('type=recovery')) {
       return 'reset-password'
     }
+    // 토스 결제 콜백 / 푸시 알림 / 명시적 앱 진입
+    const params = new URLSearchParams(search)
+    if (params.get('toss') || params.get('notif_link') || params.get('app') === '1') {
+      return 'select'
+    }
   } catch {}
-  return 'select'
+  return 'landing'  // 기본값: 랜딩 페이지
 })()
 
 export default function App() {
-  // mode: select | trainer | member | signup | forgot-password | forgot-email | reset-password
+  // mode: landing | select | trainer | member | signup | forgot-password | forgot-email | reset-password
   const [mode, setMode] = useState(initialModeFromUrl)
   const [user, setUser] = useState(null)
   const [loading, setLoading] = useState(true)
@@ -492,6 +499,17 @@ export default function App() {
 
   if (user?.type === 'trainer') return <TrainerDashboard user={user} onLogout={logout} />
   if (user?.type === 'member') return <MemberDashboard user={user} onLogout={logout} />
+
+  // 랜딩 페이지 — 비로그인 첫 진입
+  if (mode === 'landing') {
+    return (
+      <LandingPage
+        onStart={() => { setMode('signup'); setError(''); setInfo('') }}
+        onMemberLogin={() => { setMode('member'); setError(''); setInfo('') }}
+        onTrainerLogin={() => { setMode('trainer'); setError(''); setInfo('') }}
+      />
+    )
+  }
 
   return (
     <div style={{ ...S.container, alignItems: 'center', justifyContent: 'center' }}>
