@@ -11,6 +11,7 @@ import useModalBackButton from './useModalBackButton'
 import CloseButton from './CloseButton'
 import SubscriptionModal from './SubscriptionModal'
 import LegalModal from './LegalModal'
+import PtHistoryModal from './PtHistoryModal'
 
 // 풀스크린 설정 모달.
 // userType: 'trainer' | 'member'  — 트레이너에게만 구독 플랜 노출.
@@ -26,6 +27,7 @@ export default function SettingsModal({ user, userType, onClose, onLogout, onSha
   const [scheduleBusy, setScheduleBusy] = useState(false)
   const [subOpen, setSubOpen] = useState(false)
   const [legalOpen, setLegalOpen] = useState(null)  // 'terms' | 'privacy' | 'refund'
+  const [ptHistoryOpen, setPtHistoryOpen] = useState(false)
 
   useEffect(() => {
     let alive = true
@@ -279,6 +281,17 @@ export default function SettingsModal({ user, userType, onClose, onLogout, onSha
             background: '#FFF', borderRadius: RADIUS.md, marginInline: SPACING.sm,
             overflow: 'hidden',
           }}>
+            <button style={row} onClick={() => setPtHistoryOpen(true)}>
+              <Icon bg="#FFEEDD">📋</Icon>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={rowTitle}>PT 내역</div>
+                <div style={rowSub}>
+                  {userType === 'trainer' ? '회원별 PT 충전·차감·복구 기록' : '내 PT 충전·차감·복구 기록'}
+                </div>
+              </div>
+              <ArrowRight />
+            </button>
+            <div style={{ height: 0.5, background: THEME.border, marginInline: 16 }} />
             <button style={row} onClick={() => setLegalOpen('terms')}>
               <Icon bg={THEME.primaryLight}>📄</Icon>
               <div style={{ flex: 1, minWidth: 0 }}>
@@ -361,6 +374,14 @@ export default function SettingsModal({ user, userType, onClose, onLogout, onSha
       )}
       {legalOpen && (
         <LegalModal kind={legalOpen} onClose={() => setLegalOpen(null)} />
+      )}
+      {ptHistoryOpen && (
+        <PtHistoryModal
+          userType={userType}
+          memberId={userType === 'member' ? user.id : null}
+          trainerId={userType === 'trainer' ? user.id : null}
+          onClose={() => setPtHistoryOpen(false)}
+        />
       )}
     </>
   )

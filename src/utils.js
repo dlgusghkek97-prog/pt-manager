@@ -1028,7 +1028,8 @@ export const markAllNotificationsRead = async (recipientId) => {
 
 // PT 1회 차감. 10/5회 알림 자동 발송.
 // 반환: { success, remaining, total } 또는 { success: false, error }
-export const usePtSession = async (memberId) => {
+// usePtSession 옵션: reason ('attendance'|'no_show'|'manual'), classSessionId (연결된 슬롯)
+export const usePtSession = async (memberId, opts = {}) => {
   if (!memberId) return { success: false, error: 'memberId 누락' }
 
   // 1. 현재 회원 정보 가져오기
@@ -1068,6 +1069,19 @@ export const usePtSession = async (memberId) => {
     return { success: false, error: '차감 실패: ' + updErr.message }
   }
 
+  // 2-1. 이력 로깅 (실패해도 본 동작엔 영향 X)
+  try {
+    await supabase.rpc('log_pt_history', {
+      p_member_id: memberId,
+      p_action: 'use',
+      p_delta: -1,
+      p_reason: opts.reason || 'attendance',
+      p_class_session_id: opts.classSessionId || null,
+      p_total_after: total,
+      p_used_after: newUsed,
+    })
+  } catch (e) { console.warn('[log_pt_history use]', e?.message) }
+
   // 3. 10회/5회 알림 (트레이너에게)
   if (remaining === 10 && !member.pt_alert_10_sent) {
     await sendNotification({
@@ -1101,8 +1115,9 @@ export const usePtSession = async (memberId) => {
 }
 
 // PT 1회 복구(되돌리기). 잘못된 출석/결석 차감 취소용. 0 미만으로 안 내려감.
+// opts: reason ('cancel_refund'|'manual'), classSessionId
 // 반환: { success, remaining, total } 또는 { success: false, error }
-export const refundPtSession = async (memberId) => {
+export const refundPtSession = async (memberId, opts = {}) => {
   if (!memberId) return { success: false, error: 'memberId 누락' }
   const { data: member, error: memErr } = await supabase
     .from('members')
@@ -1127,6 +1142,17 @@ export const refundPtSession = async (memberId) => {
     console.error('[refundPtSession] update error:', updErr)
     return { success: false, error: '복구 실패: ' + updErr.message }
   }
+  try {
+    await supabase.rpc('log_pt_history', {
+      p_member_id: memberId,
+      p_action: 'refund',
+      p_delta: 1,
+      p_reason: opts.reason || 'cancel_refund',
+      p_class_session_id: opts.classSessionId || null,
+      p_total_after: total,
+      p_used_after: newUsed,
+    })
+  } catch (e) { console.warn('[log_pt_history refund]', e?.message) }
   return { success: true, remaining: total - newUsed, total, used: newUsed }
 }
 
@@ -1172,7 +1198,36 @@ export const addPtSessions = async (memberId, count) => {
     return { success: false, error: updErr.message }
   }
 
+  try {
+    await supabase.rpc('log_pt_history', {
+      p_member_id: memberId,
+      p_action: 'add',
+      p_delta: parseInt(count),
+      p_reason: 'charge',
+      p_class_session_id: null,
+      p_total_after: newTotal,
+      p_used_after: used,
+    })
+  } catch (e) { console.warn('[log_pt_history add]', e?.message) }
+
   return { success: true, newTotal, remaining }
+}
+
+// PT 내역 조회 — 회원 본인은 본인 것만 / 트레이너는 본인 담당 회원 전체 또는 특정 회원
+export const loadPtHistory = async ({ memberId, trainerId, limit = 100 }) => {
+  let q = supabase
+    .from('pt_history')
+    .select('*, members!pt_history_member_id_fkey(name)')
+    .order('created_at', { ascending: false })
+    .limit(limit)
+  if (memberId)  q = q.eq('member_id', memberId)
+  if (trainerId) q = q.eq('trainer_id', trainerId)
+  const { data, error } = await q
+  if (error) {
+    console.error('[loadPtHistory]', error)
+    return []
+  }
+  return data || []
 }
 
 // PT 잔여 횟수 계산 (헬퍼)
