@@ -855,57 +855,64 @@ export default function TrainerDashboard({ user, onLogout }) {
 
   const shareKakao = async (code, name) => {
     const url = window.location.origin || 'https://pt-manager-v2.vercel.app'
+    const trainerName = user?.name || ''
     const msg =
-`안녕하세요 ${name}님 😊
-${user?.name ? user.name + ' 트레이너입니다' : ''}
-
-PT Manager 회원 가입이 완료됐어요!
-운동·식단·인바디 기록을 같이 관리해드릴게요.
+`${name}님, 반갑습니다 😊
+${trainerName ? trainerName + ' 트레이너입니다.\n\n' : ''}PT Manager 에 회원으로 등록해 드렸어요.
+이제 운동·식단·인바디·PT 일정까지 한 앱에서 함께 관리해 드립니다.
 
 📱 접속 주소
 ${url}
 
-🔑 접속 코드
+🔑 회원 접속 코드
 ${code}
 
-[접속 방법]
-1. 위 주소를 핸드폰 크롬·삼성인터넷·사파리에서 열기
-2. "회원 접속" 클릭
-3. 이름(${name}) + 접속 코드(${code}) 입력
-4. 푸시 알림 안내가 뜨면 [알림 켜기] 누르고 홈 화면에 추가 → 앱처럼 사용
+[ 사용 안내 ]
+1. 위 주소를 핸드폰 브라우저(크롬·삼성인터넷·사파리)로 열기
+2. 첫 화면에서 "회원 접속" 선택
+3. 이름(${name}) + 접속 코드(${code}) 입력 후 로그인
+4. 알림 허용 + 홈 화면에 추가하면 앱처럼 사용 — 채팅·피드백을 잠금화면 알림으로 바로 받을 수 있어요
 
-문의나 도움이 필요하면 언제든 답장 주세요!`
+운동·식단 기록은 매일 5분이면 충분해요.
+궁금한 점이나 도움이 필요하면 언제든 답장 주세요!`
     try {
       await navigator.clipboard.writeText(msg)
       alert('카카오톡 안내 문구가 복사됐어요.\n카톡에서 붙여넣기 해주세요!')
     } catch (e) {
-      // clipboard 권한 없거나 실패 시 alert 로 fallback (수동 복사용)
       alert(`아래 내용을 복사해서 카카오톡으로 보내주세요!\n\n${msg}`)
     }
   }
 
   const shareTrainerInvite = async () => {
     const url = window.location.origin || 'https://pt-manager-v2.vercel.app'
+    const trainerName = user?.name || ''
     const msg =
 `안녕하세요!
-${user?.name ? user.name + ' 트레이너' : '저'}가 쓰고 있는 PT 회원관리 앱 PT Manager 추천드려요 💪
+${trainerName ? trainerName + ' 트레이너가' : '제가'} 사용 중인 PT 회원 관리 앱 PT Manager 추천드립니다 💪
 
-✨ 어떤 앱?
-회원 운동·식단·인바디·PT 스케줄을 한 곳에서 관리하는 트레이너 전용 SaaS.
-회원도 같은 앱에서 본인 기록·트레이너 피드백을 받을 수 있어요.
+✨ PT Manager 가 뭔가요?
+회원의 운동·식단·인바디·PT 스케줄·결제까지 한 곳에서 관리하는 트레이너 전용 서비스예요.
+회원도 같은 앱에서 본인 기록을 입력하고, 트레이너의 피드백을 실시간 푸시로 받을 수 있습니다.
 
-🎁 30일 무료 트라이얼
-가입하면 자동으로 30일 체험판이 시작돼요. 결제 안 해도 모든 기능 그대로.
+📋 주요 기능
+· 회원별 운동·식단·인바디 기록과 차트 통계
+· PT 스케줄 신청·승인 + 출결·잔여 회수 자동 관리
+· 1:1 채팅 + 식단 사진 코칭
+· 회원이 운동·식단 올리면 트레이너에게 푸시 알림
+
+💎 구독 플랜
+Starter · Standard · Pro 3가지 (회원 한도 차등).
+처음 가입하면 30일 무료로 모든 기능 사용 — 결제 정보 입력 없이 시작할 수 있어요.
 
 🔗 가입 주소
 ${url}
 
-[시작 방법]
+[ 시작 방법 ]
 1. 위 주소 접속 → "트레이너 회원가입"
-2. 이메일·비밀번호로 가입 (이메일 인증 메일이 도착하니 클릭)
-3. 첫 회원 추가 → 6자리 코드 카톡으로 전송
+2. 이메일·비밀번호 입력 후 인증 메일의 링크 클릭
+3. 첫 회원을 추가하고 6자리 접속 코드를 카톡으로 전달 → 회원이 본인 핸드폰으로 접속
 
-궁금한 거 있으면 답장 주세요!`
+쓰면서 궁금한 점은 답장 주세요. 같이 잘 써봅시다!`
     try {
       await navigator.clipboard.writeText(msg)
       alert('트레이너 추천 안내문이 복사됐어요.\n카톡에서 붙여넣기 해주세요!')
