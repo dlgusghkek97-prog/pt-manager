@@ -14,7 +14,8 @@ import LegalModal from './LegalModal'
 
 // 풀스크린 설정 모달.
 // userType: 'trainer' | 'member'  — 트레이너에게만 구독 플랜 노출.
-export default function SettingsModal({ user, userType, onClose, onLogout }) {
+// onShareTrainerInvite (선택): 트레이너 추천 카톡 안내문 클립보드 복사 (트레이너 한정)
+export default function SettingsModal({ user, userType, onClose, onLogout, onShareTrainerInvite }) {
   useModalBackButton(true, onClose)
 
   const [pushOn, setPushOn] = useState(false)
@@ -310,6 +311,19 @@ export default function SettingsModal({ user, userType, onClose, onLogout }) {
               </div>
               <ArrowRight />
             </button>
+            {userType === 'trainer' && onShareTrainerInvite && (
+              <>
+                <div style={{ height: 0.5, background: THEME.border, marginInline: 16 }} />
+                <button style={row} onClick={onShareTrainerInvite}>
+                  <Icon bg="#E0F2EE">📣</Icon>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={rowTitle}>동료 트레이너에게 추천</div>
+                    <div style={rowSub}>카톡 안내 문구를 클립보드에 복사</div>
+                  </div>
+                  <ArrowRight />
+                </button>
+              </>
+            )}
           </div>
 
           {/* 로그아웃 */}

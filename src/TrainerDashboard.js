@@ -853,8 +853,65 @@ export default function TrainerDashboard({ user, onLogout }) {
     await loadMembers()
   }
 
-  const shareKakao = (code, name) => {
-    alert(`아래 내용을 카카오톡으로 전송해주세요!\n\n안녕하세요 ${name}님!\nPT Manager 접속 코드: ${code}\n접속 주소: ${window.location.href}`)
+  const shareKakao = async (code, name) => {
+    const url = window.location.origin || 'https://pt-manager-v2.vercel.app'
+    const msg =
+`안녕하세요 ${name}님 😊
+${user?.name ? user.name + ' 트레이너입니다' : ''}
+
+PT Manager 회원 가입이 완료됐어요!
+운동·식단·인바디 기록을 같이 관리해드릴게요.
+
+📱 접속 주소
+${url}
+
+🔑 접속 코드
+${code}
+
+[접속 방법]
+1. 위 주소를 핸드폰 크롬·삼성인터넷·사파리에서 열기
+2. "회원 접속" 클릭
+3. 이름(${name}) + 접속 코드(${code}) 입력
+4. 푸시 알림 안내가 뜨면 [알림 켜기] 누르고 홈 화면에 추가 → 앱처럼 사용
+
+문의나 도움이 필요하면 언제든 답장 주세요!`
+    try {
+      await navigator.clipboard.writeText(msg)
+      alert('카카오톡 안내 문구가 복사됐어요.\n카톡에서 붙여넣기 해주세요!')
+    } catch (e) {
+      // clipboard 권한 없거나 실패 시 alert 로 fallback (수동 복사용)
+      alert(`아래 내용을 복사해서 카카오톡으로 보내주세요!\n\n${msg}`)
+    }
+  }
+
+  const shareTrainerInvite = async () => {
+    const url = window.location.origin || 'https://pt-manager-v2.vercel.app'
+    const msg =
+`안녕하세요!
+${user?.name ? user.name + ' 트레이너' : '저'}가 쓰고 있는 PT 회원관리 앱 PT Manager 추천드려요 💪
+
+✨ 어떤 앱?
+회원 운동·식단·인바디·PT 스케줄을 한 곳에서 관리하는 트레이너 전용 SaaS.
+회원도 같은 앱에서 본인 기록·트레이너 피드백을 받을 수 있어요.
+
+🎁 30일 무료 트라이얼
+가입하면 자동으로 30일 체험판이 시작돼요. 결제 안 해도 모든 기능 그대로.
+
+🔗 가입 주소
+${url}
+
+[시작 방법]
+1. 위 주소 접속 → "트레이너 회원가입"
+2. 이메일·비밀번호로 가입 (이메일 인증 메일이 도착하니 클릭)
+3. 첫 회원 추가 → 6자리 코드 카톡으로 전송
+
+궁금한 거 있으면 답장 주세요!`
+    try {
+      await navigator.clipboard.writeText(msg)
+      alert('트레이너 추천 안내문이 복사됐어요.\n카톡에서 붙여넣기 해주세요!')
+    } catch (e) {
+      alert(`아래 내용을 복사해서 카톡으로 보내주세요!\n\n${msg}`)
+    }
   }
 
   const openMember = async (member) => {
@@ -1444,6 +1501,7 @@ export default function TrainerDashboard({ user, onLogout }) {
             userType="trainer"
             onClose={() => setShowSettings(false)}
             onLogout={onLogout}
+            onShareTrainerInvite={shareTrainerInvite}
           />
         )}
 
