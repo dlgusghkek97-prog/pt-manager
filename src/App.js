@@ -196,6 +196,44 @@ export default function App() {
     })()
   }, [user?.id, user?.type])
 
+  // ─── 비로그인 화면 (랜딩/가입/로그인 등) 의 브라우저 뒤로가기 지원 ───
+  // mode 변경 시 history.pushState → 뒤로가기 누르면 popstate 가 발생해 이전 모드로 복귀.
+  // 로그인된 사용자는 각 dashboard 가 자체 history 를 관리하므로 비활성.
+  const isPopstateMode = React.useRef(false)
+  const prevAppMode = React.useRef(mode)
+  React.useEffect(() => {
+    // 첫 진입 시 현재 mode 를 history.state 에 기록 (랜딩이면 'landing')
+    try {
+      if (!window.history.state || !window.history.state.appMode) {
+        window.history.replaceState({ appMode: mode }, '', window.location.href)
+      }
+    } catch {}
+  }, []) // mount only — eslint-disable-next-line
+
+  React.useEffect(() => {
+    if (user) return  // 로그인 후엔 dashboard 가 처리
+    if (mode === prevAppMode.current) return
+    if (isPopstateMode.current) {
+      // popstate 로 인해 mode 가 바뀐 경우는 push 하지 않음
+      isPopstateMode.current = false
+    } else {
+      try { window.history.pushState({ appMode: mode }, '', window.location.href) } catch {}
+    }
+    prevAppMode.current = mode
+  }, [mode, user])
+
+  React.useEffect(() => {
+    const onPopstate = (e) => {
+      if (user) return
+      isPopstateMode.current = true
+      const m = e.state?.appMode || 'landing'
+      setMode(m)
+      setError(''); setInfo('')
+    }
+    window.addEventListener('popstate', onPopstate)
+    return () => window.removeEventListener('popstate', onPopstate)
+  }, [user])
+
   // ─── 비밀번호 재설정 메일 링크 진입 감지 ───
   // Supabase 가 #access_token=... 처리 후 onAuthStateChange 로 PASSWORD_RECOVERY 발생
   useEffect(() => {
