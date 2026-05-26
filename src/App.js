@@ -45,6 +45,7 @@ export default function App() {
   const [passwordConfirm, setPasswordConfirm] = useState('')
   const [signupName, setSignupName] = useState('')
   const [signupPhone, setSignupPhone] = useState('')
+  const [signupReferralCode, setSignupReferralCode] = useState('')
   const [memberCode, setMemberCode] = useState('')
   const [memberName, setMemberName] = useState('')
   const [findName, setFindName] = useState('')
@@ -165,6 +166,29 @@ export default function App() {
     }
   }, [])
 
+  // ─── 가입 후 첫 로그인 시 추천 코드 자동 적용 ───
+  // 가입 폼에서 'pt_pending_referral' 로 저장된 코드 → 트레이너 로그인 성공 후 1회 적용
+  useEffect(() => {
+    if (user?.type !== 'trainer') return
+    let code
+    try { code = localStorage.getItem('pt_pending_referral') } catch {}
+    if (!code) return
+    ;(async () => {
+      const { data, error } = await supabase.rpc('apply_referral_code', { p_code: code })
+      try { localStorage.removeItem('pt_pending_referral') } catch {}
+      if (!error && data?.success) {
+        alert(`추천 코드 적용 완료! 무료 체험이 +${data.referee_bonus_days || 3}일 늘어났어요 🎁`)
+      } else if (error) {
+        const m = error.message || ''
+        if (m.includes('invalid_referral_code')) console.warn('[apply_referral_code] invalid')
+        else if (m.includes('self_referral')) console.warn('[apply_referral_code] self_referral')
+        else if (m.includes('already_referred')) console.warn('[apply_referral_code] already_referred')
+        else if (m.includes('max_referrals')) console.warn('[apply_referral_code] referrer max reached')
+        else console.error('[apply_referral_code]', m)
+      }
+    })()
+  }, [user?.id, user?.type])
+
   // ─── 비밀번호 재설정 메일 링크 진입 감지 ───
   // Supabase 가 #access_token=... 처리 후 onAuthStateChange 로 PASSWORD_RECOVERY 발생
   useEffect(() => {
@@ -215,6 +239,11 @@ export default function App() {
     }
     if (password !== passwordConfirm) {
       setError('비밀번호 확인이 일치하지 않습니다.'); setLoading(false); return
+    }
+
+    // 추천 코드는 로그인 후 RPC 호출이 필요하므로 임시 보관
+    if (signupReferralCode.trim()) {
+      try { localStorage.setItem('pt_pending_referral', signupReferralCode.trim().toUpperCase()) } catch {}
     }
 
     const { data, error: signupError } = await supabase.auth.signUp({
@@ -500,6 +529,17 @@ export default function App() {
           <input style={S.input} type="email" placeholder="이메일" value={email} onChange={e => setEmail(e.target.value)} />
           <input style={S.input} type="password" placeholder="비밀번호 (6자 이상)" value={password} onChange={e => setPassword(e.target.value)} />
           <input style={S.input} type="password" placeholder="비밀번호 확인" value={passwordConfirm} onChange={e => setPasswordConfirm(e.target.value)} onKeyDown={e => e.key === 'Enter' && agreed && trainerSignup()} />
+          <input
+            style={S.input}
+            type="text"
+            placeholder="추천 코드 (선택)"
+            value={signupReferralCode}
+            onChange={e => setSignupReferralCode(e.target.value.toUpperCase().replace(/[^A-Z0-9가-힣\-]/g, ''))}
+            maxLength={20}
+          />
+          <p style={{ fontSize: '10px', color: THEME.textHint, margin: '-4px 4px 6px', lineHeight: 1.4 }}>
+            추천 코드를 입력하면 무료 체험이 +3일 늘어나요
+          </p>
           <ConsentRow agreed={agreed} setAgreed={markAgreed} onOpen={setLegalOpen} />
           <button style={S.btnPrimary} onClick={trainerSignup} disabled={loading || !agreed}>{loading ? '가입 중...' : '가입하기'}</button>
           <button style={S.btnSecondary} onClick={() => { setMode('select'); setError(''); setInfo('') }}>← 뒤로가기</button>

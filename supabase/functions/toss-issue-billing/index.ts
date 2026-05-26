@@ -119,6 +119,13 @@ serve(async (req) => {
         receipt_url: chargeData.receipt?.url || null,
       })
 
+      // 첫 유료 결제 성공 → 추천인 보너스 부여 (있을 때만, 실패해도 결제 결과엔 영향 X)
+      try {
+        await admin.rpc('award_referral_bonus', { p_referee_id: user.id })
+      } catch (e) {
+        console.warn('[award_referral_bonus] skip:', (e as Error).message)
+      }
+
       return new Response(JSON.stringify({ ok: true, plan, expires_at: expiresAt }), {
         headers: { ...CORS, 'Content-Type': 'application/json' },
       })
