@@ -731,13 +731,14 @@ export default function WorkoutStats({
                       const dates = Object.keys(byDate).sort()
                       const values = dates.map(d => byDate[d])
                       const maxV = Math.max(...values)
-                      // y축은 항상 0부터 시작. 데이터 최대값 위로 깔끔한 niceStep 단위 round-up
-                      const niceStep = maxV > 500 ? 100 : maxV > 100 ? 50 : maxV > 20 ? 10 : maxV > 5 ? 5 : 1
+                      // y축 항상 0부터, 그리드라인 5개 (0% / 25% / 50% / 75% / 100%) 고정
+                      // gridStep × 4 가 데이터 최대값(+10%) 이상이 되는 가장 작은 "둥근 단위" 선택
+                      const target = maxV * 1.1
+                      const niceUnits = [1, 2, 5, 10, 15, 20, 25, 50, 75, 100, 125, 150, 200, 250, 300, 500, 750, 1000, 1250, 1500, 2000, 2500, 5000, 7500, 10000]
+                      const gridStep = niceUnits.find(s => s * 4 >= target) || Math.ceil(target / 4)
                       const yMin = 0
-                      const yMax = Math.max(niceStep, Math.ceil((maxV * 1.1) / niceStep) * niceStep)
-                      // niceStep 단위로 gridline 생성 (0, step, 2step, ..., yMax)
-                      const tickCount = Math.round(yMax / niceStep) + 1
-                      const ticks = Array.from({ length: tickCount }, (_, i) => i * niceStep)
+                      const yMax = gridStep * 4
+                      const ticks = [0, gridStep, gridStep * 2, gridStep * 3, yMax]
                       // 차트 drawing area
                       const W = 320, H = 210, padL = 36, padR = 12, padT = 40, padB = 50
                       const dateLabelGap = 20
