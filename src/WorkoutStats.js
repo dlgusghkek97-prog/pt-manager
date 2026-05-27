@@ -731,29 +731,22 @@ export default function WorkoutStats({
                       const dates = Object.keys(byDate).sort()
                       const values = dates.map(d => byDate[d])
                       const maxV = Math.max(...values)
-                      const minV = Math.min(...values)
-                      // 변동폭 강조 + 데이터 점이 차트 edge 에 닿지 않도록 위/아래 ~15% 여유,
-                      // 깔끔한 정수 단위로 라운드 → y축 숫자도 보기 좋게
-                      const hasRange = maxV - minV > 0
-                      const baseRange = hasRange ? maxV - minV : Math.max(1, maxV * 0.1)
-                      const yPad = baseRange * (hasRange ? 0.15 : 0.5)
-                      const niceStep = baseRange > 500 ? 100 : baseRange > 100 ? 50 : baseRange > 20 ? 10 : 5
-                      const yMinRaw = (hasRange ? minV : minV) - yPad
-                      const yMaxRaw = (hasRange ? maxV : minV) + yPad
-                      const yMin = Math.max(0, Math.floor(yMinRaw / niceStep) * niceStep)
-                      const yMax = Math.ceil(yMaxRaw / niceStep) * niceStep
-                      // 차트 drawing area 를 위·아래로 짜내서 grid line 안쪽 배치.
-                      // 상단 grid line: padT 만큼 위에서 떨어진 위치 (kg·회 와 분리)
-                      // 하단 grid line: padT + innerH 위치 (날짜 라벨과 분리)
+                      // y축은 항상 0부터 시작. 데이터 최대값 위로 깔끔한 niceStep 단위 round-up
+                      const niceStep = maxV > 500 ? 100 : maxV > 100 ? 50 : maxV > 20 ? 10 : maxV > 5 ? 5 : 1
+                      const yMin = 0
+                      const yMax = Math.max(niceStep, Math.ceil((maxV * 1.1) / niceStep) * niceStep)
+                      // niceStep 단위로 gridline 생성 (0, step, 2step, ..., yMax)
+                      const tickCount = Math.round(yMax / niceStep) + 1
+                      const ticks = Array.from({ length: tickCount }, (_, i) => i * niceStep)
+                      // 차트 drawing area
                       const W = 320, H = 210, padL = 36, padR = 12, padT = 40, padB = 50
-                      const dateLabelGap = 20  // 하단 grid line ↔ 날짜 라벨 사이 간격
+                      const dateLabelGap = 20
                       const innerW = W - padL - padR, innerH = H - padT - padB
                       const xOf = (i) => dates.length === 1 ? padL + innerW / 2 : padL + (i / (dates.length - 1)) * innerW
                       const yOf = (v) => padT + (1 - (v - yMin) / (yMax - yMin)) * innerH
                       const pts = dates.map((d, i) => `${xOf(i)},${yOf(byDate[d])}`).join(' ')
                       const color = PART_COLORS[selectedFav.body_part] || THEME.primary
                       const fmtDate = (s) => `${parseInt(s.split('-')[1])}/${parseInt(s.split('-')[2])}`
-                      // 날짜 라벨 잘림 방지 — 첫 점은 start, 끝 점은 end 정렬
                       const dateAnchor = (i) => {
                         if (i === 0) return 'start'
                         if (i === dates.length - 1) return 'end'
@@ -761,15 +754,18 @@ export default function WorkoutStats({
                       }
                       return (
                         <svg viewBox={`0 0 ${W} ${H}`} style={{ width: '100%', height: 'auto', overflow: 'visible' }}>
-                          {[0, 0.5, 1].map((p, i) => (
-                            <line key={i} x1={padL} y1={padT + p * innerH} x2={W - padR} y2={padT + p * innerH} stroke={THEME.borderLight} strokeWidth="0.5" />
-                          ))}
-                          {/* y축 숫자 — dominantBaseline=middle 로 grid line 정중앙에 정렬 */}
-                          {[0, 0.5, 1].map((p, i) => (
-                            <text key={i} x={padL - 5} y={padT + p * innerH} textAnchor="end" dominantBaseline="middle" fontSize="5" fill={THEME.textHint}>
-                              {Math.round(yMax - (yMax - yMin) * p)}
-                            </text>
-                          ))}
+                          {/* gridline + y축 라벨 — 모든 niceStep 단위에 표시 */}
+                          {ticks.map((t, i) => {
+                            const y = yOf(t)
+                            return (
+                              <g key={i}>
+                                <line x1={padL} y1={y} x2={W - padR} y2={y} stroke={THEME.borderLight} strokeWidth="0.5" />
+                                <text x={padL - 5} y={y} textAnchor="end" dominantBaseline="middle" fontSize="5" fill={THEME.textHint}>
+                                  {t}
+                                </text>
+                              </g>
+                            )
+                          })}
                           <polyline points={pts} fill="none" stroke={color} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
                           {dates.map((d, i) => (
                             <g key={d}>

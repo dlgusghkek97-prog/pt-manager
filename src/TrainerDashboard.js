@@ -1041,6 +1041,9 @@ ${url}
   const handlePtReset = async () => {
     if (!ptChargeTarget) return
     setPtResetLoading(true)
+    const prevTotal = ptChargeTarget.pt_total_sessions || 0
+    const prevUsed = ptChargeTarget.pt_used_sessions || 0
+    const lost = Math.max(0, prevTotal - prevUsed)
     const { error } = await supabase
       .from('members')
       .update({
@@ -1056,6 +1059,18 @@ ${url}
       alert('PT 삭제 실패: ' + error.message)
       return
     }
+
+    try {
+      await supabase.rpc('log_pt_history', {
+        p_member_id: ptChargeTarget.id,
+        p_action: 'manual_adjust',
+        p_delta: -lost,
+        p_reason: 'reset',
+        p_class_session_id: null,
+        p_total_after: 0,
+        p_used_after: 0,
+      })
+    } catch (e) { console.warn('[log_pt_history reset]', e?.message) }
 
     alert(`${ptChargeTarget.name} 회원의 PT 횟수가 전체 삭제되었습니다.`)
     closePtChargeModal()
@@ -1286,9 +1301,6 @@ ${url}
 
     const days = calcDaysSince(member.start_date)
 
-    const hasMacro = !!stat.macro
-    const needsOccupationSetup = hasMacro && !member.macro_occupation
-
     const { total: ptTotal, remaining: ptRemaining, hasNoPt } = calcPtRemaining(member)
     const ptIsZero = !hasNoPt && ptRemaining <= 0
     const ptIsLow = !hasNoPt && ptRemaining <= 5 && ptRemaining > 0
@@ -1312,12 +1324,6 @@ ${url}
         <div style={{ paddingRight: '80px', marginBottom: '6px', display: 'flex', alignItems: 'baseline', gap: '6px', flexWrap: 'wrap' }}>
           <p style={{ fontSize: '13px', fontWeight: '500', color: THEME.text, margin: 0, lineHeight: 1.2 }}>{member.name}</p>
           <p style={{ fontSize: '10px', color: THEME.textSub, margin: 0, whiteSpace: 'nowrap' }}>{member.goal} · {member.gender}</p>
-          {needsOccupationSetup && (
-            <span
-              style={{ width: '6px', height: '6px', borderRadius: '50%', background: THEME.warning, flexShrink: 0, display: 'inline-block' }}
-              title="직업 활동량 미설정"
-            />
-          )}
         </div>
 
         <div
@@ -1375,17 +1381,19 @@ ${url}
             <span style={{
               display: 'flex', alignItems: 'center', gap: 4,
               fontSize: 11,
-              color: ok ? THEME.primaryDark : THEME.textHint,
-              fontWeight: ok ? 500 : 400,
+              color: ok ? THEME.primaryDark : '#C25555',
+              fontWeight: 500,
             }}>
               <span>{label}</span>
               <span style={{
                 display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-                minWidth: 16, height: 16, borderRadius: '50%',
-                background: ok ? THEME.primaryLight : '#F0E8E0',
-                color: ok ? THEME.primary : THEME.textHint,
+                width: 14, height: 14, borderRadius: '50%',
+                background: ok ? THEME.primaryLight : '#F8D7D7',
+                color: ok ? THEME.primary : 'transparent',
                 fontSize: 11, fontWeight: 700,
-              }}>{ok ? '✓' : '–'}</span>
+                border: ok ? 'none' : '1.5px solid #D96B6B',
+                boxSizing: 'border-box',
+              }}>{ok ? '✓' : ''}</span>
             </span>
           )
           return (

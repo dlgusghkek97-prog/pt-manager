@@ -109,6 +109,7 @@ export default function SettingsModal({ user, userType, onClose, onLogout, onSha
     gap: SPACING.sm,
     background: '#FFF',
     padding: '12px 14px',
+    minHeight: 56,
     cursor: 'pointer',
     border: 'none',
     width: '100%',
@@ -296,6 +297,7 @@ export default function SettingsModal({ user, userType, onClose, onLogout, onSha
               <Icon bg={THEME.primaryLight}>📄</Icon>
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={rowTitle}>이용약관</div>
+                <div style={rowSub}>서비스 이용 규정 확인</div>
               </div>
               <ArrowRight />
             </button>
@@ -304,6 +306,7 @@ export default function SettingsModal({ user, userType, onClose, onLogout, onSha
               <Icon bg={THEME.primaryLight}>🔒</Icon>
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={rowTitle}>개인정보처리방침</div>
+                <div style={rowSub}>데이터 수집·이용·보관 정책</div>
               </div>
               <ArrowRight />
             </button>
@@ -312,6 +315,7 @@ export default function SettingsModal({ user, userType, onClose, onLogout, onSha
               <Icon bg={THEME.primaryLight}>↩️</Icon>
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={rowTitle}>환불 정책</div>
+                <div style={rowSub}>결제 후 7일 이내 가능</div>
               </div>
               <ArrowRight />
             </button>

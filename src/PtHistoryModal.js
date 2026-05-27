@@ -35,10 +35,11 @@ export default function PtHistoryModal({ userType, memberId, trainerId, onClose 
 
   const actionStyle = (action) => {
     switch (action) {
-      case 'add':    return { bg: '#E0F2EE', color: '#2A6B5E', label: '+ 충전' }
-      case 'use':    return { bg: '#FBE8E8', color: '#C25555', label: '− 차감' }
-      case 'refund': return { bg: '#FFF7E6', color: '#B88030', label: '↻ 복구' }
-      default:       return { bg: THEME.borderLight, color: THEME.textSub, label: action }
+      case 'add':           return { bg: '#E0F2EE', color: '#2A6B5E', label: '+ 충전' }
+      case 'use':           return { bg: '#FBE8E8', color: '#C25555', label: '− 차감' }
+      case 'refund':        return { bg: '#FFF7E6', color: '#B88030', label: '↻ 복구' }
+      case 'manual_adjust': return { bg: '#EDE5DA', color: '#7A6650', label: '✕ 삭제' }
+      default:              return { bg: THEME.borderLight, color: THEME.textSub, label: action }
     }
   }
 
@@ -48,6 +49,7 @@ export default function PtHistoryModal({ userType, memberId, trainerId, onClose 
       case 'no_show':       return '결석 처리 (차감)'
       case 'cancel_refund': return '취소 / 복구'
       case 'charge':        return 'PT 충전'
+      case 'reset':         return 'PT 전체 삭제'
       case 'manual':        return '수동 조정'
       default: return reason || ''
     }
@@ -115,11 +117,12 @@ export default function PtHistoryModal({ userType, memberId, trainerId, onClose 
                 return (
                   <div key={r.id} style={{ background: THEME.cardAlt, borderRadius: 10, padding: '10px 12px', border: `0.5px solid ${THEME.border}` }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 5, gap: 6 }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 6, minWidth: 0 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0, flex: 1 }}>
                         <span style={{
                           background: st.bg, color: st.color,
-                          padding: '2px 7px', borderRadius: 4,
+                          padding: '2px 0', borderRadius: 4,
                           fontSize: 10, fontWeight: 500, whiteSpace: 'nowrap', flexShrink: 0,
+                          width: 74, textAlign: 'center',
                         }}>{st.label} {Math.abs(r.delta)}회</span>
                         {userType === 'trainer' && (
                           <span style={{ fontSize: 11, color: THEME.text, fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', minWidth: 0 }}>
@@ -127,13 +130,15 @@ export default function PtHistoryModal({ userType, memberId, trainerId, onClose 
                           </span>
                         )}
                       </div>
-                      <span style={{ fontSize: 10, color: THEME.textHint, whiteSpace: 'nowrap', flexShrink: 0 }}>
+                      <span style={{ fontSize: 10, color: THEME.textHint, whiteSpace: 'nowrap', flexShrink: 0, fontVariantNumeric: 'tabular-nums' }}>
                         {fmtDate(r.created_at)}
                       </span>
                     </div>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 6 }}>
-                      <span style={{ fontSize: 11, color: THEME.textSub }}>{reasonText(r.reason)}</span>
-                      <span style={{ fontSize: 10, color: THEME.textHint }}>
+                      <span style={{ fontSize: 11, color: THEME.textSub, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', minWidth: 0, flex: 1 }}>
+                        {reasonText(r.reason)}
+                      </span>
+                      <span style={{ fontSize: 10, color: THEME.textHint, whiteSpace: 'nowrap', flexShrink: 0, fontVariantNumeric: 'tabular-nums' }}>
                         잔여 <b style={{ color: THEME.text }}>{r.remaining_after ?? 0}</b> / 총 {r.total_after ?? 0}회
                       </span>
                     </div>
