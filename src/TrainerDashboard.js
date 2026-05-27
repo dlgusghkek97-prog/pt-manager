@@ -1295,13 +1295,21 @@ ${url}
 
     return (
       <div style={{ background: THEME.cardAlt, borderRadius: '10px', border: `0.5px solid ${THEME.border}`, padding: '10px', cursor: 'pointer', position: 'relative' }} onClick={() => openMember(member)}>
-        <button
-          onClick={e => { e.stopPropagation(); setDeleteTarget(member) }}
-          style={{ position: 'absolute', top: '6px', right: '6px', background: '#FCEBEB', border: '0.5px solid #F09595', color: '#A32D2D', width: '20px', height: '20px', borderRadius: '4px', cursor: 'pointer', fontSize: '11px', padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: '500' }}
-          title="회원 삭제"
-        >×</button>
+        {/* 우상단 액션 영역 — 코드복사 + 삭제 */}
+        <div style={{ position: 'absolute', top: '6px', right: '6px', display: 'flex', gap: '4px', alignItems: 'center' }}>
+          <button
+            onClick={e => { e.stopPropagation(); shareKakao(member.code, member.name) }}
+            style={{ background: '#FEE500', color: '#1A1A2E', border: 'none', padding: '3px 8px', borderRadius: '4px', cursor: 'pointer', fontSize: '10px', fontWeight: '500', fontFamily: 'inherit' }}
+            title="가입 안내 + 6자리 코드 카톡 안내문 클립보드 복사"
+          >코드복사</button>
+          <button
+            onClick={e => { e.stopPropagation(); setDeleteTarget(member) }}
+            style={{ background: '#FCEBEB', border: '0.5px solid #F09595', color: '#A32D2D', width: '20px', height: '20px', borderRadius: '4px', cursor: 'pointer', fontSize: '11px', padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: '500' }}
+            title="회원 삭제"
+          >×</button>
+        </div>
 
-        <div style={{ paddingRight: '24px', marginBottom: '6px', display: 'flex', alignItems: 'baseline', gap: '6px', flexWrap: 'wrap' }}>
+        <div style={{ paddingRight: '80px', marginBottom: '6px', display: 'flex', alignItems: 'baseline', gap: '6px', flexWrap: 'wrap' }}>
           <p style={{ fontSize: '13px', fontWeight: '500', color: THEME.text, margin: 0, lineHeight: 1.2 }}>{member.name}</p>
           <p style={{ fontSize: '10px', color: THEME.textSub, margin: 0, whiteSpace: 'nowrap' }}>{member.goal} · {member.gender}</p>
           {needsOccupationSetup && (
@@ -1359,43 +1367,34 @@ ${url}
           )}
         </div>
 
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '5px 0', borderTop: `0.5px solid ${THEME.border}`, borderBottom: `0.5px solid ${THEME.border}` }}>
-          <span style={{ fontSize: '10px', fontWeight: '500', color: THEME.text, letterSpacing: '1px' }}>{member.code}</span>
-          <button
-            style={{ background: '#FEE500', color: '#1A1A2E', border: 'none', padding: '2px 7px', borderRadius: '4px', cursor: 'pointer', fontSize: '9px', fontWeight: '500' }}
-            onClick={e => { e.stopPropagation(); shareKakao(member.code, member.name) }}
-          >전송</button>
-        </div>
-
-        {/* 식단 / 운동 한 줄로 — 여러 회원 한눈에 체크하기 위해 ✓/✕ 만 표시 */}
+        {/* 식단 / 운동 한 줄로 — 여러 회원 한눈에 체크 (텍스트 + ✓·– 만, 아이콘 X) */}
         {(() => {
           const dietDone = stat.calories > 0
           const workoutDone = activeParts.length > 0
-          const Badge = ({ ok, label, icon }) => (
+          const Badge = ({ ok, label }) => (
             <span style={{
-              display: 'flex', alignItems: 'center', gap: 3,
-              fontSize: 10,
+              display: 'flex', alignItems: 'center', gap: 4,
+              fontSize: 11,
               color: ok ? THEME.primaryDark : THEME.textHint,
               fontWeight: ok ? 500 : 400,
             }}>
-              <span>{icon}</span>
               <span>{label}</span>
               <span style={{
                 display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-                width: 14, height: 14, borderRadius: '50%',
+                minWidth: 16, height: 16, borderRadius: '50%',
                 background: ok ? THEME.primaryLight : '#F0E8E0',
                 color: ok ? THEME.primary : THEME.textHint,
-                fontSize: 10, fontWeight: 600,
+                fontSize: 11, fontWeight: 700,
               }}>{ok ? '✓' : '–'}</span>
             </span>
           )
           return (
             <div style={{ padding: '6px 0 0', display: 'flex', alignItems: 'center', gap: 10 }}>
-              <span style={{ fontSize: 9, color: THEME.textSub, fontWeight: 500, flexShrink: 0 }}>{dateLabel}</span>
-              <Badge ok={dietDone} label="식단" icon="🍽️" />
-              <Badge ok={workoutDone} label="운동" icon="🏋️" />
+              <span style={{ fontSize: 10, color: THEME.textSub, fontWeight: 500, flexShrink: 0 }}>{dateLabel}</span>
+              <Badge ok={dietDone} label="식단" />
+              <Badge ok={workoutDone} label="운동" />
               {stat.macro && dietDone && (
-                <span style={{ marginLeft: 'auto', fontSize: 9, color: THEME.primary, fontWeight: 500 }}>{calPct}%</span>
+                <span style={{ marginLeft: 'auto', fontSize: 10, color: THEME.primary, fontWeight: 500 }}>{calPct}%</span>
               )}
             </div>
           )
