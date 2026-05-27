@@ -1301,17 +1301,15 @@ ${url}
           title="회원 삭제"
         >×</button>
 
-        <div style={{ paddingRight: '24px', marginBottom: '6px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
-            <p style={{ fontSize: '13px', fontWeight: '500', color: THEME.text, margin: '0 0 2px', lineHeight: 1.2 }}>{member.name}</p>
-            {needsOccupationSetup && (
-              <span
-                style={{ width: '6px', height: '6px', borderRadius: '50%', background: THEME.warning, flexShrink: 0, display: 'inline-block' }}
-                title="직업 활동량 미설정"
-              />
-            )}
-          </div>
+        <div style={{ paddingRight: '24px', marginBottom: '6px', display: 'flex', alignItems: 'baseline', gap: '6px', flexWrap: 'wrap' }}>
+          <p style={{ fontSize: '13px', fontWeight: '500', color: THEME.text, margin: 0, lineHeight: 1.2 }}>{member.name}</p>
           <p style={{ fontSize: '10px', color: THEME.textSub, margin: 0, whiteSpace: 'nowrap' }}>{member.goal} · {member.gender}</p>
+          {needsOccupationSetup && (
+            <span
+              style={{ width: '6px', height: '6px', borderRadius: '50%', background: THEME.warning, flexShrink: 0, display: 'inline-block' }}
+              title="직업 활동량 미설정"
+            />
+          )}
         </div>
 
         <div
@@ -1369,47 +1367,51 @@ ${url}
           >전송</button>
         </div>
 
-        <div style={{ padding: '6px 0' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: '3px' }}>
-            <span style={{ fontSize: '9px', color: THEME.textSub, fontWeight: '500' }}>{dateLabel} 식단</span>
-            {stat.macro && <span style={{ fontSize: '9px', color: THEME.primary, fontWeight: '500' }}>{calPct}%</span>}
-          </div>
-          {stat.macro ? (
-            <>
-              <div style={{ background: THEME.borderLight, height: '3px', borderRadius: '2px' }}>
-                <div style={{ width: `${calPct}%`, height: '3px', borderRadius: '2px', background: THEME.primary }} />
-              </div>
-              <div style={{ fontSize: '9px', color: THEME.text, marginTop: '3px' }}>
-                <strong>{Math.round(stat.calories)}</strong>
-                <span style={{ color: THEME.textSub }}> / {stat.macro.target} kcal</span>
-              </div>
-              <div style={{ fontSize: '9px', color: THEME.textSub, marginTop: '4px', lineHeight: '1.55' }}>
-                <span style={{ color: THEME.nutCarbs }}>탄</span> {carbsPct}% &nbsp;
-                <span style={{ color: THEME.nutProtein }}>단</span> {proteinPct}% &nbsp;
-                <span style={{ color: THEME.nutFat }}>지</span> <span style={{ color: fatOver ? THEME.danger : THEME.nutFat }}>{fatPct}%</span>
-              </div>
-            </>
-          ) : (
-            <p style={{ fontSize: '10px', color: THEME.textSub, margin: 0 }}>{stat.calories > 0 ? `${Math.round(stat.calories)}kcal` : '기록 없음'}</p>
-          )}
-        </div>
-
-        <div style={{ borderTop: `0.5px dashed ${THEME.border}`, margin: '4px 0' }} />
-
-        <div style={{ padding: '6px 0 0' }}>
-          <p style={{ fontSize: '9px', color: THEME.textSub, fontWeight: '500', margin: '0 0 4px' }}>{dateLabel} 운동</p>
-          {activeParts.length === 0 ? (
-            <p style={{ fontSize: '10px', color: THEME.textSub, margin: 0 }}>기록 없음</p>
-          ) : (
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '3px' }}>
-              {activeParts.map(([part, vol]) => (
-                <span key={part} style={{ fontSize: '9px', color: '#FFF', background: PART_COLORS[part], padding: '2px 6px', borderRadius: '4px' }}>
-                  {part} {vol >= 1000 ? (vol / 1000).toFixed(1) + 't' : vol + 'kg'}
-                </span>
-              ))}
+        {/* 식단 / 운동 한 줄로 — 여러 회원 한눈에 체크하기 위해 ✓/✕ 만 표시 */}
+        {(() => {
+          const dietDone = stat.calories > 0
+          const workoutDone = activeParts.length > 0
+          const Badge = ({ ok, label, icon }) => (
+            <span style={{
+              display: 'flex', alignItems: 'center', gap: 3,
+              fontSize: 10,
+              color: ok ? THEME.primaryDark : THEME.textHint,
+              fontWeight: ok ? 500 : 400,
+            }}>
+              <span>{icon}</span>
+              <span>{label}</span>
+              <span style={{
+                display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+                width: 14, height: 14, borderRadius: '50%',
+                background: ok ? THEME.primaryLight : '#F0E8E0',
+                color: ok ? THEME.primary : THEME.textHint,
+                fontSize: 10, fontWeight: 600,
+              }}>{ok ? '✓' : '–'}</span>
+            </span>
+          )
+          return (
+            <div style={{ padding: '6px 0 0', display: 'flex', alignItems: 'center', gap: 10 }}>
+              <span style={{ fontSize: 9, color: THEME.textSub, fontWeight: 500, flexShrink: 0 }}>{dateLabel}</span>
+              <Badge ok={dietDone} label="식단" icon="🍽️" />
+              <Badge ok={workoutDone} label="운동" icon="🏋️" />
+              {stat.macro && dietDone && (
+                <span style={{ marginLeft: 'auto', fontSize: 9, color: THEME.primary, fontWeight: 500 }}>{calPct}%</span>
+              )}
             </div>
-          )}
-        </div>
+          )
+        })()}
+
+        {/* 옛 verbose 표시는 hidden — UI 데드 코드 (변수 사용 유지용 reference) */}
+        {false && (
+          <div style={{ fontSize: 9 }}>
+            {carbsPct} {proteinPct} {fatPct} {fatOver ? '!' : ''}
+            {activeParts.map(([part, vol]) => (
+              <span key={part} style={{ background: PART_COLORS[part] }}>
+                {part} {vol >= 1000 ? (vol / 1000).toFixed(1) + 't' : vol + 'kg'}
+              </span>
+            ))}
+          </div>
+        )}
       </div>
     )
   }
