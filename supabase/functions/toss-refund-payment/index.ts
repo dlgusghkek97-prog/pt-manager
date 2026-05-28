@@ -127,25 +127,17 @@ serve(async (req) => {
       receipt_url: tossData.receipt?.url || null,
     })
 
-    // ─── 7) 보너스 회수 ───
-    let bonusRevokeResult: any = null
-    try {
-      const { data: bonusData, error: bonusErr } = await admin.rpc('refund_revoke_bonuses', {
-        p_trainer_id: user.id,
-        p_reason: reason || 'auto_refund',
-      })
-      if (bonusErr) {
-        console.warn('[refund_revoke_bonuses]', bonusErr.message)
-        bonusRevokeResult = { error: bonusErr.message }
-      } else {
-        bonusRevokeResult = bonusData
-      }
-    } catch (e) {
-      console.warn('[refund_revoke_bonuses exception]', (e as Error).message)
-      bonusRevokeResult = { error: (e as Error).message }
-    }
+    // ─── 7) 구독 상태 업데이트 ───
+    // 보너스 모델: bonus_days_pending 은 그대로 유지 (환불은 결제 금액만 처리).
+    // paid_expires_at 만 즉시 now 로 만들고, bonus 가 있다면 cron 이 bonus 를 paid 로 흡수해서 사용 가능.
+    // 다음 자동결제는 막음 (status='cancelled' + next_billing_at=null).
+    const { data: subBefore } = await admin
+      .from('trainer_subscriptions')
+      .select('bonus_days_pending')
+      .eq('trainer_id', user.id)
+      .maybeSingle()
+    const bonusKept = Math.max(0, parseInt(subBefore?.bonus_days_pending) || 0)
 
-    // ─── 8) 구독 상태 cancelled + 즉시 만료 ───
     await admin
       .from('trainer_subscriptions')
       .update({
@@ -161,7 +153,7 @@ serve(async (req) => {
       success: true,
       refunded_amount: lastPayment.amount,
       paid_at: lastPayment.created_at,
-      bonus_revoke: bonusRevokeResult,
+      bonus_days_kept: bonusKept,  // 환불 후 사용자가 계속 쓸 수 있는 보너스 일수
     })
   } catch (e) {
     const msg = (e as Error).message || 'unknown'

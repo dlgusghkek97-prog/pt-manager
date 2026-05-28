@@ -423,28 +423,48 @@ export const loadSubscription = async (trainerId) => {
 
 // 구독 요약 — UI 표시용
 // email 인자가 ADMIN_EMAIL 이면 모든 제한 우회 ("마스터")
+//
+// 보너스 모델: bonus_days_pending = active 중 받은 쿠폰·추천 일수 (paid 와 분리 누적).
+// 실효 만료 = paid_expires_at + bonus_days_pending. paid 만료 후 cron 이 bonus 를 paid 로 흡수.
 export const summarizeSubscription = (sub, email) => {
   const proPlan = SUBSCRIPTION_PLANS[SUBSCRIPTION_PLANS.length - 1]
   if (isAdminEmail(email)) {
-    return { state: 'admin', daysLeft: Infinity, expiresAt: null, label: '마스터 · 무제한', plan: proPlan }
+    return { state: 'admin', daysLeft: Infinity, expiresAt: null, label: '마스터 · 무제한', plan: proPlan, bonusDays: 0 }
   }
   if (!sub) {
-    return { state: 'expired', daysLeft: 0, expiresAt: null, label: '구독 정보 없음', plan: SUBSCRIPTION_PLANS[0] }
+    return { state: 'expired', daysLeft: 0, expiresAt: null, label: '구독 정보 없음', plan: SUBSCRIPTION_PLANS[0], bonusDays: 0 }
   }
   const plan = getPlanByCode(sub.plan_code)
   const now = new Date()
   const trialEnd = sub.trial_expires_at ? new Date(sub.trial_expires_at) : null
   const paidEnd = sub.paid_expires_at ? new Date(sub.paid_expires_at) : null
+  const bonusDays = Math.max(0, parseInt(sub.bonus_days_pending) || 0)
+  const DAY_MS = 1000 * 60 * 60 * 24
 
-  if (paidEnd && paidEnd > now) {
-    const days = Math.ceil((paidEnd - now) / (1000 * 60 * 60 * 24))
-    return { state: 'active', daysLeft: days, expiresAt: paidEnd, label: `구독 ${days}일 남음 · ${plan.label}`, plan }
+  // 실효 만료 = paid_expires_at + bonusDays
+  if (paidEnd) {
+    const effectiveEnd = new Date(paidEnd.getTime() + bonusDays * DAY_MS)
+    if (effectiveEnd > now) {
+      const totalDays = Math.ceil((effectiveEnd - now) / DAY_MS)
+      const labelSuffix = bonusDays > 0 ? ` (보너스 ${bonusDays}일 포함)` : ''
+      return {
+        state: 'active', daysLeft: totalDays, expiresAt: effectiveEnd,
+        label: `구독 ${totalDays}일 남음 · ${plan.label}${labelSuffix}`, plan, bonusDays,
+      }
+    }
   }
-  if (trialEnd && trialEnd > now) {
-    const days = Math.ceil((trialEnd - now) / (1000 * 60 * 60 * 24))
-    return { state: 'trial', daysLeft: days, expiresAt: trialEnd, label: `무료 체험 ${days}일 남음 · ${plan.label}`, plan }
+  if (trialEnd) {
+    const effectiveTrialEnd = new Date(trialEnd.getTime() + bonusDays * DAY_MS)
+    if (effectiveTrialEnd > now) {
+      const totalDays = Math.ceil((effectiveTrialEnd - now) / DAY_MS)
+      const labelSuffix = bonusDays > 0 ? ` (보너스 ${bonusDays}일 포함)` : ''
+      return {
+        state: 'trial', daysLeft: totalDays, expiresAt: effectiveTrialEnd,
+        label: `무료 체험 ${totalDays}일 남음 · ${plan.label}${labelSuffix}`, plan, bonusDays,
+      }
+    }
   }
-  return { state: 'expired', daysLeft: 0, expiresAt: paidEnd || trialEnd, label: '구독 만료', plan }
+  return { state: 'expired', daysLeft: 0, expiresAt: paidEnd || trialEnd, label: '구독 만료', plan, bonusDays }
 }
 
 // 회원 추가 가능 여부 (서버 RPC). 반환: { ok: bool, reason?: string }

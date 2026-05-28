@@ -221,8 +221,9 @@ ${url}
   const handleRefund = async () => {
     if (!window.confirm(
       '환불을 진행하시겠습니까?\n\n' +
-      '· 최근 결제(7일 이내)가 자동 환불됩니다.\n' +
-      '· 구독은 즉시 종료되며, 사용한 추천·쿠폰 보너스도 함께 회수됩니다.\n' +
+      '· 최근 결제(7일 이내)의 금액만 자동 환불됩니다.\n' +
+      '· 다음 자동결제는 즉시 중단됩니다.\n' +
+      '· 받아둔 쿠폰·추천 보너스 일수는 유지되어 계속 사용 가능합니다.\n' +
       '· 7일이 지났거나 환불 가능 결제가 없으면 운영자 이메일로 안내됩니다.'
     )) return
 
@@ -244,10 +245,10 @@ ${url}
       setWorking(false)
 
       if (result?.success) {
-        const revoked = result.bonus_revoke || {}
         const refundedAmt = result.refunded_amount?.toLocaleString?.() || result.refunded_amount || ''
-        const bonusMsg = (revoked.coupon_days_revoked || revoked.referral_days_revoked)
-          ? `\n\n회수된 보너스:\n· 쿠폰 ${revoked.coupon_days_revoked || 0}일\n· 추천 ${revoked.referral_days_revoked || 0}일`
+        const kept = result.bonus_days_kept || 0
+        const bonusMsg = kept > 0
+          ? `\n\n남아있는 보너스: ${kept}일 (계속 사용 가능)`
           : ''
         alert(`환불이 완료되었습니다.\n· 환불 금액: ₩${refundedAmt}${bonusMsg}`)
         await reload()
