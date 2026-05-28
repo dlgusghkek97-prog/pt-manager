@@ -205,8 +205,9 @@ ${url}
     await reload()
   }
 
-  // 환불 신청 → 운영자 이메일 (mailto)
-  const handleRefund = () => {
+  // 환불 신청 → Edge Function 자동 처리 (7일 이내 + 보너스 회수)
+  // 윈도우 지났거나 실패 시 운영자 이메일 fallback
+  const openRefundMailto = () => {
     const body = encodeURIComponent(
       `안녕하세요.\n\n환불 신청합니다.\n\n` +
       `· 트레이너 ID: ${trainerId}\n` +
@@ -215,6 +216,61 @@ ${url}
       `환불 사유:\n(자유롭게 작성)\n\n감사합니다.`
     )
     window.location.href = `mailto:${ADMIN_EMAIL}?subject=PT Manager 환불 신청&body=${body}`
+  }
+
+  const handleRefund = async () => {
+    if (!window.confirm(
+      '환불을 진행하시겠습니까?\n\n' +
+      '· 최근 결제(7일 이내)가 자동 환불됩니다.\n' +
+      '· 구독은 즉시 종료되며, 사용한 추천·쿠폰 보너스도 함께 회수됩니다.\n' +
+      '· 7일이 지났거나 환불 가능 결제가 없으면 운영자 이메일로 안내됩니다.'
+    )) return
+
+    setWorking(true)
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      const token = session?.access_token
+      if (!token) { alert('인증 만료 — 다시 로그인해주세요.'); setWorking(false); return }
+
+      const resp = await fetch(
+        `${process.env.REACT_APP_SUPABASE_URL}/functions/v1/toss-refund-payment`,
+        {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+          body: JSON.stringify({ reason: '사용자 환불 요청' }),
+        }
+      )
+      const result = await resp.json().catch(() => ({}))
+      setWorking(false)
+
+      if (result?.success) {
+        const revoked = result.bonus_revoke || {}
+        const refundedAmt = result.refunded_amount?.toLocaleString?.() || result.refunded_amount || ''
+        const bonusMsg = (revoked.coupon_days_revoked || revoked.referral_days_revoked)
+          ? `\n\n회수된 보너스:\n· 쿠폰 ${revoked.coupon_days_revoked || 0}일\n· 추천 ${revoked.referral_days_revoked || 0}일`
+          : ''
+        alert(`환불이 완료되었습니다.\n· 환불 금액: ₩${refundedAmt}${bonusMsg}`)
+        await reload()
+        return
+      }
+
+      // 실패 케이스별 안내
+      const code = result?.code || ''
+      if (code === 'out_of_window' || code === 'no_payment' || code === 'no_payment_key' || code === 'already_refunded') {
+        const msg = result.message || '자동 환불 불가'
+        if (window.confirm(`${msg}\n\n운영자 이메일로 환불 신청하시겠습니까?`)) {
+          openRefundMailto()
+        }
+        return
+      }
+
+      alert('환불 처리 실패: ' + (result?.message || '알 수 없는 오류'))
+    } catch (e) {
+      setWorking(false)
+      if (window.confirm(`자동 환불 처리 중 오류가 발생했어요.\n${e?.message || ''}\n\n운영자 이메일로 진행하시겠습니까?`)) {
+        openRefundMailto()
+      }
+    }
   }
 
   // 구독 취소 — 다음 결제 막음 (status=cancelled). 현재 만료일까지는 사용 가능.
