@@ -127,8 +127,27 @@ serve(async (req) => {
       receipt_url: tossData.receipt?.url || null,
     })
 
-    // ─── 7) 구독 상태 업데이트 ───
-    // 보너스 모델: bonus_days_pending 은 그대로 유지 (환불은 결제 금액만 처리).
+    // ─── 7) 추천인 보너스 회수 ───
+    // refundee 의 결제로 인해 referrer 가 받은 보너스는 결제가 reversed 됐으므로 회수.
+    // (refundee 자신의 쿠폰·받은 추천 보너스는 유지 — 사용자 친화적 정책)
+    let referrerRevoked: any = null
+    try {
+      const { data, error } = await admin.rpc('revoke_referrer_bonus_on_refund', {
+        p_referee_id: user.id,
+      })
+      if (error) {
+        console.warn('[revoke_referrer_bonus_on_refund]', error.message)
+        referrerRevoked = { error: error.message }
+      } else {
+        referrerRevoked = data
+      }
+    } catch (e) {
+      console.warn('[revoke_referrer_bonus_on_refund exception]', (e as Error).message)
+      referrerRevoked = { error: (e as Error).message }
+    }
+
+    // ─── 8) 구독 상태 업데이트 ───
+    // 보너스 모델: refundee 의 bonus_days_pending 은 그대로 유지 (자신이 받은 보너스).
     // paid_expires_at 만 즉시 now 로 만들고, bonus 가 있다면 cron 이 bonus 를 paid 로 흡수해서 사용 가능.
     // 다음 자동결제는 막음 (status='cancelled' + next_billing_at=null).
     const { data: subBefore } = await admin
@@ -153,7 +172,8 @@ serve(async (req) => {
       success: true,
       refunded_amount: lastPayment.amount,
       paid_at: lastPayment.created_at,
-      bonus_days_kept: bonusKept,  // 환불 후 사용자가 계속 쓸 수 있는 보너스 일수
+      bonus_days_kept: bonusKept,           // 환불 후 사용자가 계속 쓸 수 있는 보너스 일수
+      referrer_bonus_revoked: referrerRevoked,  // 추천인에게서 회수한 보너스 정보 (감사용)
     })
   } catch (e) {
     const msg = (e as Error).message || 'unknown'
