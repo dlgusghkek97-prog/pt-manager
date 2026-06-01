@@ -1114,25 +1114,24 @@ export default function WorkoutLog({ user, selectedDate, setSelectedDate, exerci
 
               {recents.length > 0 && (
                 <div style={{
-                  background: THEME.primaryLight,
-                  border: `0.5px solid ${THEME.primaryAccent}`,
-                  borderRadius: '6px',
-                  padding: '5px 9px',
-                  marginBottom: '8px',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'space-between',
-                  gap: 4,
+                  gap: 6,
+                  marginBottom: '8px',
                   overflow: 'hidden',
                 }}>
-                  <span style={{ fontSize: '10px', color: THEME.primaryDark, flexShrink: 0, fontWeight: '500' }}>최근</span>
                   {recents.map((r) => (
                     <span key={r.date} style={{
-                      fontSize: '10px', color: THEME.primaryDark,
+                      fontSize: '10px',
                       whiteSpace: 'nowrap', flexShrink: 0,
                       display: 'inline-flex', alignItems: 'baseline', gap: 6,
+                      background: THEME.primaryLight,
+                      border: `0.5px solid ${THEME.primaryAccent}`,
+                      borderRadius: '12px',
+                      padding: '4px 10px',
                     }}>
-                      <span style={{ fontWeight: '500' }}>{r.date.replace(/-/g, '.').slice(5)}</span>
+                      <span style={{ fontWeight: '500', color: THEME.primaryDark }}>{r.date.replace(/-/g, '.').slice(5)}</span>
                       <span style={{ color: THEME.text }}>{r.weight}kg×{r.reps}</span>
                     </span>
                   ))}
