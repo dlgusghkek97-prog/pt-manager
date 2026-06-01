@@ -1120,14 +1120,21 @@ export default function WorkoutLog({ user, selectedDate, setSelectedDate, exerci
                   padding: '5px 9px',
                   marginBottom: '8px',
                   display: 'flex',
-                  flexDirection: 'column',
-                  gap: 2,
+                  alignItems: 'center',
+                  gap: 6,
+                  flexWrap: 'nowrap',
+                  overflow: 'hidden',
                 }}>
+                  <span style={{ fontSize: '9px', color: THEME.primaryDark, flexShrink: 0 }}>최근:</span>
                   {recents.map((r, i) => (
-                    <span key={r.date} style={{ fontSize: '10px', color: THEME.primaryDark, lineHeight: 1.4 }}>
-                      {i === 0 ? '최근: ' : <span style={{ visibility: 'hidden' }}>최근: </span>}
-                      <span style={{ fontWeight: '500' }}>{r.date.replace(/-/g, '.').slice(5)}</span> · {r.weight}kg × {r.reps}회
-                    </span>
+                    <React.Fragment key={r.date}>
+                      {i > 0 && (
+                        <span style={{ fontSize: '9px', color: THEME.primaryAccent, flexShrink: 0 }}>·</span>
+                      )}
+                      <span style={{ fontSize: '9px', color: THEME.primaryDark, whiteSpace: 'nowrap', flexShrink: 0 }}>
+                        <span style={{ fontWeight: '500' }}>{r.date.replace(/-/g, '.').slice(5)}</span> {r.weight}kg×{r.reps}
+                      </span>
+                    </React.Fragment>
                   ))}
                 </div>
               )}
