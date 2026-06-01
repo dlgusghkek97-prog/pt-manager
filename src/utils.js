@@ -638,8 +638,9 @@ export const removeWorkoutDayFavorite = async (favId, table = 'workout_day_favor
 
 // excludeDate: 해당 날짜(보통 현재 편집중인 selectedDate)는 "이전 기록" 에 포함시키지 않음.
 // 오늘 입력하는 세트가 오늘의 "최근 기록" 으로 표시되는 모순 방지.
-export const getLatestRecord = (allLogs, bodyPart, exerciseName, excludeDate = null) => {
-  if (!allLogs || !bodyPart || !exerciseName) return null
+// 각 날짜별 가장 무게가 큰 세트 1건씩, 최신순으로 N건 반환.
+export const getRecentTopRecords = (allLogs, bodyPart, exerciseName, excludeDate = null, limit = 3) => {
+  if (!allLogs || !bodyPart || !exerciseName) return []
   const matched = allLogs.filter(l =>
     l.exercise_type !== 'cardio' &&
     l.body_part === bodyPart &&
@@ -648,18 +649,23 @@ export const getLatestRecord = (allLogs, bodyPart, exerciseName, excludeDate = n
     parseInt(l.reps) > 0 &&
     (!excludeDate || l.log_date !== excludeDate)
   )
-  if (matched.length === 0) return null
-  matched.sort((a, b) => b.log_date.localeCompare(a.log_date))
-  const latestDate = matched[0].log_date
-  const sameDay = matched.filter(l => l.log_date === latestDate)
-  const best = sameDay.reduce((max, cur) =>
-    parseFloat(cur.weight) > parseFloat(max.weight) ? cur : max
-  , sameDay[0])
-  return {
-    date: latestDate,
-    weight: parseFloat(best.weight),
-    reps: parseInt(best.reps),
-  }
+  if (matched.length === 0) return []
+  // 날짜별 그룹핑 → 각 날짜에서 무게 최대 세트
+  const byDate = {}
+  matched.forEach(l => {
+    const w = parseFloat(l.weight)
+    if (!byDate[l.log_date] || w > parseFloat(byDate[l.log_date].weight)) {
+      byDate[l.log_date] = l
+    }
+  })
+  return Object.keys(byDate)
+    .sort((a, b) => b.localeCompare(a))   // 최신 날짜부터
+    .slice(0, limit)
+    .map(date => ({
+      date,
+      weight: parseFloat(byDate[date].weight),
+      reps: parseInt(byDate[date].reps),
+    }))
 }
 
 // ─── 인바디 관련 함수들 ───

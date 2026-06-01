@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react'
 import { supabase } from './supabase'
-import { PARTS, PART_COLORS, S, THEME, calcWeightCalories, checkNewPRs, getLatestRecord, addFavorite, removeFavorite, checkMediaSize } from './utils'
+import { PARTS, PART_COLORS, S, THEME, calcWeightCalories, checkNewPRs, getRecentTopRecords, addFavorite, removeFavorite, checkMediaSize } from './utils'
 import DatePicker from './DatePicker'
 import useModalBackButton from './useModalBackButton'
 import WorkoutDayFavModal from './WorkoutDayFavModal'
@@ -1021,9 +1021,9 @@ export default function WorkoutLog({ user, selectedDate, setSelectedDate, exerci
           const isRegistered = !!currentFav
           const canRegister = ex.body_part && ex.exercise_name?.trim() && !isRegistered
 
-          const latest = (ex.body_part && ex.exercise_name?.trim())
-            ? getLatestRecord(allLogs, ex.body_part, ex.exercise_name, selectedDate)
-            : null
+          const recents = (ex.body_part && ex.exercise_name?.trim())
+            ? getRecentTopRecords(allLogs, ex.body_part, ex.exercise_name, selectedDate, 3)
+            : []
 
           // 카메라 박스 색상/스타일 결정
           const cameraDisabled = ptIsZero && !hasMedia
@@ -1112,17 +1112,23 @@ export default function WorkoutLog({ user, selectedDate, setSelectedDate, exerci
                 )}
               </div>
 
-              {latest && (
+              {recents.length > 0 && (
                 <div style={{
                   background: THEME.primaryLight,
                   border: `0.5px solid ${THEME.primaryAccent}`,
                   borderRadius: '6px',
                   padding: '5px 9px',
                   marginBottom: '8px',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: 2,
                 }}>
-                  <span style={{ fontSize: '10px', color: THEME.primaryDark }}>
-                    최근: <span style={{ fontWeight: '500' }}>{latest.date.replace(/-/g, '.').slice(5)}</span> · {latest.weight}kg × {latest.reps}회
-                  </span>
+                  {recents.map((r, i) => (
+                    <span key={r.date} style={{ fontSize: '10px', color: THEME.primaryDark, lineHeight: 1.4 }}>
+                      {i === 0 ? '최근: ' : <span style={{ visibility: 'hidden' }}>최근: </span>}
+                      <span style={{ fontWeight: '500' }}>{r.date.replace(/-/g, '.').slice(5)}</span> · {r.weight}kg × {r.reps}회
+                    </span>
+                  ))}
                 </div>
               )}
 
