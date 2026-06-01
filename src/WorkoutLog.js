@@ -1121,20 +1121,20 @@ export default function WorkoutLog({ user, selectedDate, setSelectedDate, exerci
                   marginBottom: '8px',
                   display: 'flex',
                   alignItems: 'center',
-                  gap: 6,
-                  flexWrap: 'nowrap',
+                  justifyContent: 'space-between',
+                  gap: 4,
                   overflow: 'hidden',
                 }}>
-                  <span style={{ fontSize: '9px', color: THEME.primaryDark, flexShrink: 0 }}>최근:</span>
-                  {recents.map((r, i) => (
-                    <React.Fragment key={r.date}>
-                      {i > 0 && (
-                        <span style={{ fontSize: '9px', color: THEME.primaryAccent, flexShrink: 0 }}>·</span>
-                      )}
-                      <span style={{ fontSize: '9px', color: THEME.primaryDark, whiteSpace: 'nowrap', flexShrink: 0 }}>
-                        <span style={{ fontWeight: '500' }}>{r.date.replace(/-/g, '.').slice(5)}</span> {r.weight}kg×{r.reps}
-                      </span>
-                    </React.Fragment>
+                  <span style={{ fontSize: '10px', color: THEME.primaryDark, flexShrink: 0, fontWeight: '500' }}>최근</span>
+                  {recents.map((r) => (
+                    <span key={r.date} style={{
+                      fontSize: '10px', color: THEME.primaryDark,
+                      whiteSpace: 'nowrap', flexShrink: 0,
+                      display: 'inline-flex', alignItems: 'baseline', gap: 6,
+                    }}>
+                      <span style={{ fontWeight: '500' }}>{r.date.replace(/-/g, '.').slice(5)}</span>
+                      <span style={{ color: THEME.text }}>{r.weight}kg×{r.reps}</span>
+                    </span>
                   ))}
                 </div>
               )}
