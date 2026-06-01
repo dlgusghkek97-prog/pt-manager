@@ -989,7 +989,22 @@ export default function WorkoutLog({ user, selectedDate, setSelectedDate, exerci
 
       <div style={{ ...S.card, paddingBottom: '90px' }}>
         <div style={{ display: 'flex', alignItems: 'center', marginBottom: '10px', gap: 8 }}>
-          <p style={{ ...S.cardTitle, margin: 0, flex: 1 }}>운동 기록</p>
+          <p style={{ ...S.cardTitle, margin: 0 }}>운동 기록</p>
+          {totalSets > 0 && (
+            <span style={{
+              background: THEME.primaryLight,
+              border: `0.5px solid ${THEME.primaryAccent}`,
+              color: THEME.primaryDark,
+              padding: '3px 9px',
+              borderRadius: 12,
+              fontSize: 11,
+              fontWeight: 500,
+              whiteSpace: 'nowrap',
+            }}>
+              총 {totalSets}세트
+            </span>
+          )}
+          <div style={{ flex: 1 }} />
           {!readOnly && (
             <button
               onClick={() => setDayFavOpen(true)}
