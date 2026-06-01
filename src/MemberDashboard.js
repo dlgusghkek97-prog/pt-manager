@@ -235,6 +235,7 @@ export default function MemberDashboard({ user, onLogout }) {
   const [bodyFat, setBodyFat] = useState(() => localStorage.getItem(`macro_body_fat_${user.id}`) || '')
   const [activity, setActivity] = useState(() => localStorage.getItem(`macro_activity_${user.id}`) || '보통 운동 (주 4~5회)')
   const [intensity, setIntensity] = useState(() => localStorage.getItem(`macro_intensity_${user.id}`) || '일반')
+  const [customKcal, setCustomKcal] = useState(() => localStorage.getItem(`macro_custom_kcal_${user.id}`) || '')
   const [cyclePhase, setCyclePhase] = useState(() => localStorage.getItem(`macro_cycle_${user.id}`) || '')
   const [occupation, setOccupation] = useState(() => localStorage.getItem(`macro_occupation_${user.id}`) || '')
   const [hasOccupation, setHasOccupation] = useState(false)
@@ -305,7 +306,7 @@ export default function MemberDashboard({ user, onLogout }) {
   const loadMacroFromDB = async () => {
     const { data, error } = await supabase
       .from('members')
-      .select('goal, gender, target_calories, target_carbs, target_protein, target_fat, macro_weight, macro_muscle, macro_body_fat, macro_activity, macro_intensity, macro_cycle, macro_occupation')
+      .select('goal, gender, target_calories, target_carbs, target_protein, target_fat, macro_weight, macro_muscle, macro_body_fat, macro_activity, macro_intensity, macro_custom_kcal, macro_cycle, macro_occupation')
       .eq('id', user.id)
       .single()
 
@@ -333,6 +334,7 @@ export default function MemberDashboard({ user, onLogout }) {
     if (data.macro_body_fat != null) setBodyFat(String(data.macro_body_fat))
     if (data.macro_activity) setActivity(data.macro_activity)
     if (data.macro_intensity) setIntensity(data.macro_intensity)
+    if (data.macro_custom_kcal != null) setCustomKcal(String(data.macro_custom_kcal))
     if (data.macro_cycle) setCyclePhase(data.macro_cycle)
     if (data.macro_occupation) {
       setOccupation(data.macro_occupation)
@@ -357,6 +359,7 @@ export default function MemberDashboard({ user, onLogout }) {
       payload.macro_body_fat = parseFloat(inputs.bodyFat) || null
       payload.macro_activity = inputs.activity
       payload.macro_intensity = inputs.intensity
+      payload.macro_custom_kcal = (inputs.intensity === '자가설정' && inputs.customKcal) ? parseInt(inputs.customKcal) : null
       payload.macro_cycle = inputs.cyclePhase || null
       payload.macro_occupation = inputs.occupation || null
     }
@@ -424,8 +427,11 @@ export default function MemberDashboard({ user, onLogout }) {
   const calculateMacro = async () => {
     if (!weight || !muscle) { alert('체중과 골격근량을 입력해주세요.'); return }
     if (!occupation) { alert('직업 활동량을 선택해주세요.'); return }
-    const result = calcMacro({ goal, gender, weight: parseFloat(weight), muscle: parseFloat(muscle), activity, intensity, cyclePhase, occupation })
-    const ok = await saveMacroToDB(result, { goal, gender, weight, muscle, bodyFat, activity, intensity, cyclePhase, occupation })
+    if (intensity === '자가설정' && (!customKcal || parseInt(customKcal) <= 0)) {
+      alert('자가설정 kcal 을 1 이상으로 입력해주세요.'); return
+    }
+    const result = calcMacro({ goal, gender, weight: parseFloat(weight), muscle: parseFloat(muscle), activity, intensity, cyclePhase, occupation, customKcal })
+    const ok = await saveMacroToDB(result, { goal, gender, weight, muscle, bodyFat, activity, intensity, customKcal, cyclePhase, occupation })
     if (!ok) return
     setMacroResult(result)
     setHasOccupation(true)
@@ -438,6 +444,8 @@ export default function MemberDashboard({ user, onLogout }) {
     else localStorage.removeItem(`macro_body_fat_${user.id}`)
     localStorage.setItem(`macro_activity_${user.id}`, activity)
     localStorage.setItem(`macro_intensity_${user.id}`, intensity)
+    if (intensity === '자가설정') localStorage.setItem(`macro_custom_kcal_${user.id}`, customKcal)
+    else localStorage.removeItem(`macro_custom_kcal_${user.id}`)
     localStorage.setItem(`macro_cycle_${user.id}`, cyclePhase)
     localStorage.setItem(`macro_occupation_${user.id}`, occupation)
     setShowCalcModal(false)
@@ -856,7 +864,27 @@ export default function MemberDashboard({ user, onLogout }) {
                 <option value="완만">완만 {goal === '벌크업' ? '(+300kcal)' : '(-300kcal)'}</option>
                 <option value="일반">일반 {goal === '벌크업' ? '(+400kcal)' : '(-500kcal)'}</option>
                 <option value="공격적">공격적 {goal === '벌크업' ? '(+500kcal)' : '(-700kcal)'}</option>
+                <option value="자가설정">자가설정 (직접 입력)</option>
               </select>
+              {intensity === '자가설정' && (
+                <div style={{ marginBottom: '8px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <span style={{ fontSize: '13px', color: THEME.text, flexShrink: 0, fontWeight: '500' }}>
+                      {goal === '벌크업' ? '+' : '-'}
+                    </span>
+                    <input
+                      type="number" inputMode="numeric" min="1" placeholder="예: 250"
+                      value={customKcal}
+                      onChange={e => setCustomKcal(e.target.value.replace(/[^\d]/g, ''))}
+                      style={{ ...S.input, padding: '10px', fontSize: '13px', flex: 1 }}
+                    />
+                    <span style={{ fontSize: '13px', color: THEME.text, flexShrink: 0 }}>kcal</span>
+                  </div>
+                  <p style={{ fontSize: '10px', color: THEME.textSub, margin: '4px 2px 0' }}>
+                    TDEE 기준 {goal === '벌크업' ? '잉여(+)' : '결손(-)'} 칼로리. 절댓값만 입력.
+                  </p>
+                </div>
+              )}
               {gender === '여성' && (
                 <select style={{ ...S.input, padding: '10px', marginBottom: '12px', fontSize: '13px' }} value={cyclePhase} onChange={e => setCyclePhase(e.target.value)}>
                   <option value="">생리 주기 (선택사항)</option>

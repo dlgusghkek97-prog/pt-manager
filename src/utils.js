@@ -47,7 +47,7 @@ export const OCCUPATION_DESCRIPTION = {
   '매우 활동적': '택배, 이사, 건설, 농업',
 }
 
-export const calcMacro = ({ goal, gender, weight, muscle, activity, intensity, cyclePhase, occupation }) => {
+export const calcMacro = ({ goal, gender, weight, muscle, activity, intensity, cyclePhase, occupation, customKcal }) => {
   const leanMass = muscle * 1.4
   const bmr = Math.round(370 + 21.6 * leanMass)
   const actMap = { '가벼운 운동 (주 2~3회)': 1.375, '보통 운동 (주 4~5회)': 1.55, '고강도 운동 (주 6회+)': 1.725 }
@@ -56,8 +56,15 @@ export const calcMacro = ({ goal, gender, weight, muscle, activity, intensity, c
   const adjMap = goal === '벌크업'
     ? { '완만': 300, '일반': 400, '공격적': 500 }
     : { '완만': -300, '일반': -500, '공격적': -700 }
+  // 자가설정: customKcal 절댓값을 받아 goal 에 따라 부호 결정 (벌크업=+, 다이어트=-)
+  const goalSign = goal === '벌크업' ? 1 : -1
+  const customAdj = (intensity === '자가설정' && customKcal != null && !isNaN(parseInt(customKcal)))
+    ? Math.abs(parseInt(customKcal)) * goalSign
+    : null
+  const presetAdj = adjMap[intensity] || (goal === '벌크업' ? 400 : -500)
+  const adjustment = customAdj != null ? customAdj : presetAdj
   const cycleAdj = (gender === '여성' && cyclePhase) ? (CYCLE_PHASES[cyclePhase] || 0) : 0
-  const rawTarget = tdee + (adjMap[intensity] || (goal === '벌크업' ? 400 : -500)) + 100 + cycleAdj
+  const rawTarget = tdee + adjustment + 100 + cycleAdj
   const minTarget = gender === '여성' ? 1200 : 1500
   const target = Math.max(rawTarget, minTarget)
   const protein = Math.round(weight * (gender === '여성' ? 2.0 : 2.2))
