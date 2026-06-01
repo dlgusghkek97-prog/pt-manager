@@ -989,17 +989,19 @@ export default function WorkoutLog({ user, selectedDate, setSelectedDate, exerci
 
       <div style={{ ...S.card, paddingBottom: '90px' }}>
         <div style={{ display: 'flex', alignItems: 'center', marginBottom: '10px', gap: 8 }}>
-          <p style={{ ...S.cardTitle, margin: 0 }}>운동 기록</p>
+          <p style={{ ...S.cardTitle, margin: 0, lineHeight: 1 }}>운동 기록</p>
           {totalSets > 0 && (
             <span style={{
               background: THEME.primaryLight,
               border: `0.5px solid ${THEME.primaryAccent}`,
               color: THEME.primaryDark,
-              padding: '3px 9px',
-              borderRadius: 12,
+              padding: '5px 10px',
+              borderRadius: 14,
               fontSize: 11,
               fontWeight: 500,
+              lineHeight: 1,
               whiteSpace: 'nowrap',
+              fontVariantNumeric: 'tabular-nums',
             }}>
               총 {totalSets}세트
             </span>
@@ -1011,7 +1013,7 @@ export default function WorkoutLog({ user, selectedDate, setSelectedDate, exerci
               style={{
                 background: THEME.warningLight, border: `0.5px solid ${THEME.warningBorder}`,
                 color: THEME.warningDark, padding: '5px 10px', borderRadius: 14,
-                fontSize: 11, fontWeight: 500, cursor: 'pointer', fontFamily: 'inherit',
+                fontSize: 11, fontWeight: 500, lineHeight: 1, cursor: 'pointer', fontFamily: 'inherit',
                 whiteSpace: 'nowrap',
               }}
               title="오늘 운동 통째로 저장 / 저장된 일일 운동 불러오기"
@@ -1129,22 +1131,24 @@ export default function WorkoutLog({ user, selectedDate, setSelectedDate, exerci
 
               {recents.length > 0 && (
                 <div style={{
-                  display: 'flex',
+                  display: 'grid',
+                  gridTemplateColumns: `repeat(${recents.length}, 1fr)`,
                   alignItems: 'center',
-                  justifyContent: 'space-between',
                   gap: 6,
                   marginBottom: '8px',
-                  overflow: 'hidden',
                 }}>
                   {recents.map((r) => (
                     <span key={r.date} style={{
                       fontSize: '10px',
-                      whiteSpace: 'nowrap', flexShrink: 0,
-                      display: 'inline-flex', alignItems: 'baseline', gap: 6,
+                      whiteSpace: 'nowrap',
+                      display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 6,
                       background: THEME.primaryLight,
                       border: `0.5px solid ${THEME.primaryAccent}`,
                       borderRadius: '12px',
-                      padding: '4px 10px',
+                      padding: '4px 8px',
+                      fontVariantNumeric: 'tabular-nums',
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
                     }}>
                       <span style={{ fontWeight: '500', color: THEME.primaryDark }}>{r.date.replace(/-/g, '.').slice(5)}</span>
                       <span style={{ color: THEME.text }}>{r.weight}kg×{r.reps}</span>
