@@ -889,7 +889,7 @@ export default function WorkoutStats({
                         }}>{part}</span>
                         <span style={{ fontSize: '10px', color: THEME.textSub }}>{partPRs.length}개 운동</span>
                       </div>
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px' }}>
                         {partPRs.map((pr, i) => (
                           <PrSparklineRow
                             key={i}
@@ -953,13 +953,14 @@ function PrSparklineRow({ pr, allLogs, color }) {
       background: THEME.cardAlt,
       border: `0.5px solid ${THEME.border}`,
       borderRadius: 8,
-      padding: '7px 10px',
+      padding: '6px 8px',
+      minWidth: 0,
     }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 3 }}>
-        <span style={{ fontSize: 11, fontWeight: 500, color: THEME.text, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '60%' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 3, gap: 4 }}>
+        <span style={{ fontSize: 10, fontWeight: 500, color: THEME.text, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', minWidth: 0 }}>
           {pr.exercise_name}
         </span>
-        <span style={{ fontSize: 10, color: THEME.textSub, fontVariantNumeric: 'tabular-nums', flexShrink: 0 }}>
+        <span style={{ fontSize: 9, color: THEME.textSub, fontVariantNumeric: 'tabular-nums', flexShrink: 0 }}>
           최고 <span style={{ color, fontWeight: 500 }}>{Math.round(peakV).toLocaleString()}</span>
         </span>
       </div>
@@ -980,9 +981,9 @@ function PrSparklineRow({ pr, allLogs, color }) {
         </svg>
       )}
       {dates.length >= 2 && (
-        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 9, color: THEME.textHint, marginTop: 2, fontVariantNumeric: 'tabular-nums' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 8.5, color: THEME.textHint, marginTop: 2, fontVariantNumeric: 'tabular-nums' }}>
           <span>{dates[0].slice(5).replace('-', '.')}</span>
-          <span>{dates[dates.length - 1].slice(5).replace('-', '.')} · {dates.length}회</span>
+          <span>{dates[dates.length - 1].slice(5).replace('-', '.')}·{dates.length}회</span>
         </div>
       )}
     </div>
