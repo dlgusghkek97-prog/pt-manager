@@ -22,9 +22,8 @@ export default function WorkoutStats({
   const [big4Draft, setBig4Draft] = useState({})
   const [prPreview, setPRPreview] = useState(null)  // { url, isVideo, label }
 
-  // 즐겨찾기 — PR 탭 진입 시 로드. 라인차트용 운동 선택 칩.
+  // 즐겨찾기 — PR 탭 스파크라인 그리드용 운동 목록
   const [favList, setFavList] = useState([])
-  const [selectedFav, setSelectedFav] = useState(null)  // { body_part, exercise_name }
 
   // 월별 막대 차트 — 부위 필터 ('전체' | PARTS)
   const [monthlyPart, setMonthlyPart] = useState('전체')
@@ -657,18 +656,16 @@ export default function WorkoutStats({
             </div>
           )}
 
-          {/* ─── PR 추이 — 부위별 즐겨찾기 운동 라인차트 (최근 60일, 일자별 최대 세트 볼륨) ─── */}
+          {/* ─── PR 추이 — 즐겨찾기 운동별 60일 스파크라인 그리드 ─── */}
           {(() => {
             const big4Names = new Set(BIG4_EXERCISES.map(e => e.label))
             const favs = favList.filter(f => !big4Names.has((f.exercise_name || '').trim()))
-            const partsWithFav = PARTS.filter(p => favs.some(f => f.body_part === p))
-            const activePart = (selectedFav && partsWithFav.includes(selectedFav.body_part))
-              ? selectedFav.body_part
-              : (partsWithFav[0] || null)
-            const partFavs = activePart ? favs.filter(f => f.body_part === activePart) : []
+            const since = new Date(); since.setDate(since.getDate() - 60)
+            const sinceStr = since.toISOString().split('T')[0]
+            const recentLogs = allLogs.filter(l => l.log_date && l.log_date >= sinceStr)
             return (
               <div style={{ ...S.card, padding: '12px' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
                   <p style={{ ...S.cardTitle, margin: 0 }}>PR 추이</p>
                   <span style={{ fontSize: '11px', color: THEME.textHint }}>최근 60일 · 최대 세트 볼륨</span>
                 </div>
@@ -678,128 +675,32 @@ export default function WorkoutStats({
                   </p>
                 ) : (
                   <>
-                    {/* 1차: 부위 칩 */}
-                    <div style={{ display: 'flex', gap: 5, overflowX: 'auto', paddingBottom: 6, marginBottom: 8 }}>
-                      {partsWithFav.map(p => {
-                        const active = activePart === p
-                        const color = PART_COLORS[p] || THEME.primary
-                        return (
-                          <button key={p}
-                            onClick={() => {
-                              const first = favs.find(f => f.body_part === p)
-                              if (first) setSelectedFav({ body_part: p, exercise_name: first.exercise_name })
-                            }}
-                            style={{
-                              flexShrink: 0,
-                              background: active ? color : '#FFF',
-                              color: active ? '#FFF' : THEME.text,
-                              border: `0.5px solid ${active ? color : THEME.border}`,
-                              borderRadius: 14, padding: '6px 14px',
-                              fontSize: 12, fontWeight: active ? 600 : 400,
-                              cursor: 'pointer', fontFamily: 'inherit',
-                              whiteSpace: 'nowrap',
-                            }}>{p}</button>
-                        )
-                      })}
-                    </div>
-                    {/* 2차: 그 부위 운동 칩 */}
-                    <div style={{ display: 'flex', gap: 5, overflowX: 'auto', paddingBottom: 6, marginBottom: 10 }}>
-                      {partFavs.map(f => {
-                        const active = selectedFav?.exercise_name === f.exercise_name
-                        const color = PART_COLORS[f.body_part] || THEME.primary
-                        return (
-                          <button key={f.id}
-                            onClick={() => setSelectedFav({ body_part: f.body_part, exercise_name: f.exercise_name })}
-                            style={{
-                              flexShrink: 0,
-                              background: active ? color : THEME.cardAlt,
-                              color: active ? '#FFF' : THEME.textSub,
-                              border: `0.5px solid ${active ? color : THEME.borderLight}`,
-                              borderRadius: 12, padding: '5px 11px',
-                              fontSize: 11, fontWeight: active ? 500 : 400,
-                              cursor: 'pointer', fontFamily: 'inherit',
-                              whiteSpace: 'nowrap',
-                            }}>
-                            {f.exercise_name}
-                          </button>
-                        )
-                      })}
-                    </div>
-                    {(() => {
-                      if (!selectedFav) {
-                        return <p style={{ fontSize: '12px', color: THEME.textHint, textAlign: 'center', padding: '14px 0', margin: 0 }}>운동을 선택하세요</p>
-                      }
-                      const since = new Date(); since.setDate(since.getDate() - 60)
-                      const sinceStr = since.toISOString().split('T')[0]
-                      const rows = allLogs.filter(r =>
-                        (r.exercise_name || '').trim() === selectedFav.exercise_name &&
-                        r.log_date && r.log_date >= sinceStr
-                      )
-                      if (rows.length === 0) {
-                        return <p style={{ fontSize: '12px', color: THEME.textHint, textAlign: 'center', padding: '14px 0', margin: 0 }}>최근 60일 기록이 없어요</p>
-                      }
-                      // 일자별 최대 세트 볼륨
-                      const byDate = {}
-                      rows.forEach(r => {
-                        const v = r.volume || 0
-                        if (!byDate[r.log_date] || v > byDate[r.log_date]) byDate[r.log_date] = v
-                      })
-                      const dates = Object.keys(byDate).sort()
-                      const values = dates.map(d => byDate[d])
-                      const maxV = Math.max(...values)
-                      // y축 항상 0부터, 그리드라인 5개 (0% / 25% / 50% / 75% / 100%) 고정
-                      // gridStep × 4 가 데이터 최대값(+10%) 이상이 되는 가장 작은 "둥근 단위" 선택
-                      const target = maxV * 1.1
-                      const niceUnits = [1, 2, 5, 10, 15, 20, 25, 50, 75, 100, 125, 150, 200, 250, 300, 500, 750, 1000, 1250, 1500, 2000, 2500, 5000, 7500, 10000]
-                      const gridStep = niceUnits.find(s => s * 4 >= target) || Math.ceil(target / 4)
-                      const yMin = 0
-                      const yMax = gridStep * 4
-                      const ticks = [0, gridStep, gridStep * 2, gridStep * 3, yMax]
-                      // 차트 drawing area
-                      const W = 320, H = 210, padL = 36, padR = 12, padT = 40, padB = 50
-                      const dateLabelGap = 20
-                      const innerW = W - padL - padR, innerH = H - padT - padB
-                      const xOf = (i) => dates.length === 1 ? padL + innerW / 2 : padL + (i / (dates.length - 1)) * innerW
-                      const yOf = (v) => padT + (1 - (v - yMin) / (yMax - yMin)) * innerH
-                      const pts = dates.map((d, i) => `${xOf(i)},${yOf(byDate[d])}`).join(' ')
-                      const color = PART_COLORS[selectedFav.body_part] || THEME.primary
-                      const fmtDate = (s) => `${parseInt(s.split('-')[1])}/${parseInt(s.split('-')[2])}`
-                      const dateAnchor = (i) => {
-                        if (i === 0) return 'start'
-                        if (i === dates.length - 1) return 'end'
-                        return 'middle'
-                      }
+                    {PARTS.map(part => {
+                      const partFavs = favs.filter(f => f.body_part === part)
+                      if (partFavs.length === 0) return null
                       return (
-                        <svg viewBox={`0 0 ${W} ${H}`} style={{ width: '100%', height: 'auto', overflow: 'visible' }}>
-                          {/* gridline + y축 라벨 — 모든 niceStep 단위에 표시 */}
-                          {ticks.map((t, i) => {
-                            const y = yOf(t)
-                            return (
-                              <g key={i}>
-                                <line x1={padL} y1={y} x2={W - padR} y2={y} stroke={THEME.borderLight} strokeWidth="0.5" />
-                                <text x={padL - 5} y={y} textAnchor="end" dominantBaseline="middle" fontSize="5" fill={THEME.textHint}>
-                                  {t}
-                                </text>
-                              </g>
-                            )
-                          })}
-                          <polyline points={pts} fill="none" stroke={color} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
-                          {dates.map((d, i) => (
-                            <g key={d}>
-                              <circle cx={xOf(i)} cy={yOf(byDate[d])} r="2.6" fill={color} />
-                              {(i === 0 || i === dates.length - 1 || (dates.length > 2 && i === Math.floor(dates.length / 2))) && (
-                                <text x={xOf(i)} y={padT + innerH + dateLabelGap} textAnchor={dateAnchor(i)} fontSize="5.5" fill={THEME.textSub}>
-                                  {fmtDate(d)}
-                                </text>
-                              )}
-                            </g>
-                          ))}
-                          <text x={W - padR} y={padT - 4} textAnchor="end" fontSize="5" fill={THEME.textHint}>
-                            kg·회
-                          </text>
-                        </svg>
+                        <div key={part} style={{ marginBottom: '14px' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '7px' }}>
+                            <span style={{
+                              fontSize: '10px', color: '#FFF',
+                              background: PART_COLORS[part],
+                              padding: '2px 8px', borderRadius: '4px', fontWeight: '500',
+                            }}>{part}</span>
+                            <span style={{ fontSize: '10px', color: THEME.textSub }}>{partFavs.length}개 운동</span>
+                          </div>
+                          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px' }}>
+                            {partFavs.map(f => (
+                              <PrSparklineRow
+                                key={f.id}
+                                pr={{ body_part: f.body_part, exercise_name: f.exercise_name }}
+                                allLogs={recentLogs}
+                                color={PART_COLORS[part] || THEME.primary}
+                              />
+                            ))}
+                          </div>
+                        </div>
                       )
-                    })()}
+                    })}
                   </>
                 )}
               </div>
