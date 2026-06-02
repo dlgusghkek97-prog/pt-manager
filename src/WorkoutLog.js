@@ -522,6 +522,14 @@ export default function WorkoutLog({ user, selectedDate, setSelectedDate, exerci
 
   const totalSets = weightExercises.reduce((sum, ex) => sum + ex.sets.filter(s => s.weight !== '' && s.reps !== '').length, 0)
 
+  // 부위별 유효 세트 수 (weight·reps 둘 다 입력된 세트만)
+  const setsByPart = weightExercises.reduce((acc, ex) => {
+    if (!ex.body_part) return acc
+    const valid = ex.sets.filter(s => s.weight !== '' && s.reps !== '').length
+    if (valid > 0) acc[ex.body_part] = (acc[ex.body_part] || 0) + valid
+    return acc
+  }, {})
+
   const weightCalories = calcWeightCalories({ volume: dailyTotal, totalSets, weight, muscle })
   const cardioCaloriesTotal = cardioExercises.reduce((s, ex) => s + (ex.calories_burned || 0), 0)
   const totalBurnedCalories = weightCalories + cardioCaloriesTotal
@@ -988,25 +996,8 @@ export default function WorkoutLog({ user, selectedDate, setSelectedDate, exerci
       )}
 
       <div style={{ ...S.card, paddingBottom: '90px' }}>
-        <div style={{ display: 'flex', alignItems: 'center', marginBottom: '10px', gap: 8 }}>
-          <p style={{ ...S.cardTitle, margin: 0, lineHeight: 1 }}>운동 기록</p>
-          {totalSets > 0 && (
-            <span style={{
-              background: THEME.primaryLight,
-              border: `0.5px solid ${THEME.primaryAccent}`,
-              color: THEME.primaryDark,
-              padding: '5px 10px',
-              borderRadius: 14,
-              fontSize: 11,
-              fontWeight: 500,
-              lineHeight: 1,
-              whiteSpace: 'nowrap',
-              fontVariantNumeric: 'tabular-nums',
-            }}>
-              총 {totalSets}세트
-            </span>
-          )}
-          <div style={{ flex: 1 }} />
+        <div style={{ display: 'flex', alignItems: 'center', marginBottom: '8px', gap: 8 }}>
+          <p style={{ ...S.cardTitle, margin: 0, lineHeight: 1, flex: 1 }}>운동 기록</p>
           {!readOnly && (
             <button
               onClick={() => setDayFavOpen(true)}
@@ -1020,6 +1011,26 @@ export default function WorkoutLog({ user, selectedDate, setSelectedDate, exerci
             >★ 일일 운동</button>
           )}
         </div>
+        {totalSets > 0 && (
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5, marginBottom: '10px' }}>
+            {PARTS.filter(p => setsByPart[p] > 0).map(p => (
+              <span key={p} style={{
+                background: '#FFF',
+                border: `0.5px solid ${PART_COLORS[p] || THEME.border}`,
+                color: PART_COLORS[p] || THEME.text,
+                padding: '4px 9px',
+                borderRadius: 12,
+                fontSize: 10,
+                fontWeight: 500,
+                lineHeight: 1,
+                whiteSpace: 'nowrap',
+                fontVariantNumeric: 'tabular-nums',
+              }}>
+                {p} {setsByPart[p]}세트
+              </span>
+            ))}
+          </div>
+        )}
         {readOnly && (
           <div style={{ background: THEME.primaryLight, border: `0.5px solid ${THEME.primaryAccent}`, borderRadius: '8px', padding: '7px 10px', marginBottom: '10px', fontSize: '11px', color: THEME.primaryDark }}>
             참고용 — 편집 불가 (트레이너의 기록)
