@@ -22,8 +22,9 @@ export default function WorkoutStats({
   const [big4Draft, setBig4Draft] = useState({})
   const [prPreview, setPRPreview] = useState(null)  // { url, isVideo, label }
 
-  // 즐겨찾기 — PR 탭 스파크라인 그리드용 운동 목록
+  // 즐겨찾기 — PR 탭 진입 시 로드. 라인차트용 운동 선택 칩.
   const [favList, setFavList] = useState([])
+  const [selectedFav, setSelectedFav] = useState(null)  // { body_part, exercise_name }
 
   // 월별 막대 차트 — 부위 필터 ('전체' | PARTS)
   const [monthlyPart, setMonthlyPart] = useState('전체')
@@ -656,16 +657,21 @@ export default function WorkoutStats({
             </div>
           )}
 
-          {/* ─── PR 추이 — 즐겨찾기 운동별 60일 스파크라인 그리드 ─── */}
+          {/* ─── PR 추이 — 부위/운동 칩 선택 + 60일 스파크라인 카드 ─── */}
           {(() => {
             const big4Names = new Set(BIG4_EXERCISES.map(e => e.label))
             const favs = favList.filter(f => !big4Names.has((f.exercise_name || '').trim()))
+            const partsWithFav = PARTS.filter(p => favs.some(f => f.body_part === p))
+            const activePart = (selectedFav && partsWithFav.includes(selectedFav.body_part))
+              ? selectedFav.body_part
+              : (partsWithFav[0] || null)
+            const partFavs = activePart ? favs.filter(f => f.body_part === activePart) : []
             const since = new Date(); since.setDate(since.getDate() - 60)
             const sinceStr = since.toISOString().split('T')[0]
             const recentLogs = allLogs.filter(l => l.log_date && l.log_date >= sinceStr)
             return (
               <div style={{ ...S.card, padding: '12px' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
                   <p style={{ ...S.cardTitle, margin: 0 }}>PR 추이</p>
                   <span style={{ fontSize: '11px', color: THEME.textHint }}>최근 60일 · 최대 세트 볼륨</span>
                 </div>
@@ -675,32 +681,63 @@ export default function WorkoutStats({
                   </p>
                 ) : (
                   <>
-                    {PARTS.map(part => {
-                      const partFavs = favs.filter(f => f.body_part === part)
-                      if (partFavs.length === 0) return null
-                      return (
-                        <div key={part} style={{ marginBottom: '14px' }}>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '7px' }}>
-                            <span style={{
-                              fontSize: '10px', color: '#FFF',
-                              background: PART_COLORS[part],
-                              padding: '2px 8px', borderRadius: '4px', fontWeight: '500',
-                            }}>{part}</span>
-                            <span style={{ fontSize: '10px', color: THEME.textSub }}>{partFavs.length}개 운동</span>
-                          </div>
-                          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px' }}>
-                            {partFavs.map(f => (
-                              <PrSparklineRow
-                                key={f.id}
-                                pr={{ body_part: f.body_part, exercise_name: f.exercise_name }}
-                                allLogs={recentLogs}
-                                color={PART_COLORS[part] || THEME.primary}
-                              />
-                            ))}
-                          </div>
-                        </div>
-                      )
-                    })}
+                    {/* 1차: 부위 칩 */}
+                    <div style={{ display: 'flex', gap: 5, overflowX: 'auto', paddingBottom: 6, marginBottom: 8 }}>
+                      {partsWithFav.map(p => {
+                        const active = activePart === p
+                        const color = PART_COLORS[p] || THEME.primary
+                        return (
+                          <button key={p}
+                            onClick={() => {
+                              const first = favs.find(f => f.body_part === p)
+                              if (first) setSelectedFav({ body_part: p, exercise_name: first.exercise_name })
+                            }}
+                            style={{
+                              flexShrink: 0,
+                              background: active ? color : '#FFF',
+                              color: active ? '#FFF' : THEME.text,
+                              border: `0.5px solid ${active ? color : THEME.border}`,
+                              borderRadius: 14, padding: '6px 14px',
+                              fontSize: 12, fontWeight: active ? 600 : 400,
+                              cursor: 'pointer', fontFamily: 'inherit',
+                              whiteSpace: 'nowrap',
+                            }}>{p}</button>
+                        )
+                      })}
+                    </div>
+                    {/* 2차: 그 부위 운동 칩 */}
+                    <div style={{ display: 'flex', gap: 5, overflowX: 'auto', paddingBottom: 6, marginBottom: 10 }}>
+                      {partFavs.map(f => {
+                        const active = selectedFav?.exercise_name === f.exercise_name
+                        const color = PART_COLORS[f.body_part] || THEME.primary
+                        return (
+                          <button key={f.id}
+                            onClick={() => setSelectedFav({ body_part: f.body_part, exercise_name: f.exercise_name })}
+                            style={{
+                              flexShrink: 0,
+                              background: active ? color : THEME.cardAlt,
+                              color: active ? '#FFF' : THEME.textSub,
+                              border: `0.5px solid ${active ? color : THEME.borderLight}`,
+                              borderRadius: 12, padding: '5px 11px',
+                              fontSize: 11, fontWeight: active ? 500 : 400,
+                              cursor: 'pointer', fontFamily: 'inherit',
+                              whiteSpace: 'nowrap',
+                            }}>
+                            {f.exercise_name}
+                          </button>
+                        )
+                      })}
+                    </div>
+                    {/* 선택된 운동의 스파크라인 카드 (60일) */}
+                    {selectedFav ? (
+                      <PrSparklineRow
+                        pr={{ body_part: selectedFav.body_part, exercise_name: selectedFav.exercise_name }}
+                        allLogs={recentLogs}
+                        color={PART_COLORS[selectedFav.body_part] || THEME.primary}
+                      />
+                    ) : (
+                      <p style={{ fontSize: '12px', color: THEME.textHint, textAlign: 'center', padding: '14px 0', margin: 0 }}>운동을 선택하세요</p>
+                    )}
                   </>
                 )}
               </div>
