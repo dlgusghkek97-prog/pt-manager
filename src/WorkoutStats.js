@@ -522,18 +522,10 @@ export default function WorkoutStats({
                           <span style={{ flex: 1, textAlign: 'center', color: THEME.textSub, fontWeight: 500 }}>{compact(d.total)}</span>
                           <span style={{ flex: 1, textAlign: 'center', color: THEME.textHint }}>{compact(d.avg)}</span>
                         </div>
-                        {/* 두 바 side-by-side */}
+                        {/* 두 바 side-by-side — 모든 월 동일 컬러 */}
                         <div style={{ display: 'flex', alignItems: 'flex-end', gap: 2, width: '100%', maxWidth: 36, height: 110 }}>
-                          <div style={{
-                            flex: 1, height: `${totalH}px`,
-                            background: isLast ? totalColor : THEME.borderLight,
-                            borderRadius: '4px 4px 0 0',
-                          }} />
-                          <div style={{
-                            flex: 1, height: `${avgH}px`,
-                            background: isLast ? avgColor : THEME.borderLight,
-                            borderRadius: '4px 4px 0 0',
-                          }} />
+                          <div style={{ flex: 1, height: `${totalH}px`, background: totalColor, borderRadius: '4px 4px 0 0' }} />
+                          <div style={{ flex: 1, height: `${avgH}px`,   background: avgColor,   borderRadius: '4px 4px 0 0' }} />
                         </div>
                         <span style={{ fontSize: '10px', color: isLast ? THEME.text : THEME.textHint, fontWeight: isLast ? '500' : '400', lineHeight: 1 }}>
                           {d.month}월
