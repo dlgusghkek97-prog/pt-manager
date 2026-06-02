@@ -14,6 +14,28 @@ import CloseButton from './CloseButton'
 const TOSS_CLIENT_KEY = process.env.REACT_APP_TOSS_CLIENT_KEY || ''
 const TOSS_ENABLED = TOSS_CLIENT_KEY && !TOSS_CLIENT_KEY.includes('PLACEHOLDER')
 
+// 인프라 월 비용 (KRW) — 실제 청구액 들어오면 여기 업데이트
+// 현재 모두 무료 티어, 도메인만 Cloudflare 연간 약 $12 (~₩16,000) → 월 평균 ₩1,300
+const MONTHLY_COSTS = [
+  { name: 'Supabase',   krw: 0,    note: 'Free (DB 500MB / Storage 1GB / 50K MAU)' },
+  { name: 'Vercel',     krw: 0,    note: 'Hobby (100GB bandwidth)' },
+  { name: 'Resend',     krw: 0,    note: 'Free (3,000 mails/월)' },
+  { name: 'Sentry',     krw: 0,    note: 'Developer (5K errors/월)' },
+  { name: 'Cloudflare', krw: 1300, note: '도메인 연 $12 ÷ 12' },
+]
+const TOTAL_MONTHLY_COST = MONTHLY_COSTS.reduce((s, c) => s + c.krw, 0)
+
+const fmtKRW = (n) => '₩' + (n || 0).toLocaleString()
+const fmtBytes = (b) => {
+  if (b == null || b === 0) return '0 B'
+  const units = ['B', 'KB', 'MB', 'GB', 'TB']
+  let i = 0; let v = Number(b)
+  while (v >= 1024 && i < units.length - 1) { v /= 1024; i++ }
+  return `${v.toFixed(v >= 100 ? 0 : 1)} ${units[i]}`
+}
+const PLAN_LABEL = { starter_10: 'Starter', standard_30: 'Standard', pro_unlimited: 'Pro' }
+const STATUS_LABEL = { trial: '무료체험', active: '결제중', cancelled: '취소', expired: '만료', refunded: '환불' }
+
 // 구독 관리 모달
 // - 현재 상태(trial / active / expired) + 사용 중인 플랜
 // - 3개 플랜 비교 카드 (Starter / Standard / Pro) + 플랜 선택·변경
@@ -49,6 +71,11 @@ export default function SubscriptionModal({ trainerId, trainerEmail, onClose }) 
   const [acGenerated, setAcGenerated] = useState(null)
   const [acIssuing, setAcIssuing] = useState(false)
 
+  // 마스터 운영 현황
+  const [adminStats, setAdminStats] = useState(null)
+  const [adminStatsLoading, setAdminStatsLoading] = useState(false)
+  const [adminStatsError, setAdminStatsError] = useState(null)
+
   const reload = async () => {
     setLoading(true)
     const [s, { count }, tInfo, refStats] = await Promise.all([
@@ -68,6 +95,20 @@ export default function SubscriptionModal({ trainerId, trainerEmail, onClose }) 
     setLoading(false)
   }
   useEffect(() => { reload() /* eslint-disable-next-line */ }, [trainerId])
+
+  // 마스터 — 운영 현황 로드 (모달 열릴 때 1회)
+  const loadAdminStats = async () => {
+    setAdminStatsLoading(true)
+    setAdminStatsError(null)
+    const { data, error } = await supabase.rpc('master_dashboard_stats')
+    setAdminStatsLoading(false)
+    if (error) { setAdminStatsError(error.message); return }
+    setAdminStats(data)
+  }
+  useEffect(() => {
+    if (trainerEmail === ADMIN_EMAIL) loadAdminStats()
+    /* eslint-disable-next-line */
+  }, [trainerEmail])
 
   const handleRedeemCoupon = async () => {
     const code = couponInput.trim().toUpperCase()
@@ -341,6 +382,15 @@ ${url}
                     <p style={{ fontSize: '11px', color: THEME.textSub, textAlign: 'center', margin: '0 0 10px', lineHeight: 1.5 }}>
                       운영자(마스터) 계정 — 구독·회원 한도 검사가 적용되지 않습니다.
                     </p>
+
+                    {/* 운영 현황 대시보드 */}
+                    <AdminDashboard
+                      stats={adminStats}
+                      loading={adminStatsLoading}
+                      error={adminStatsError}
+                      onReload={loadAdminStats}
+                    />
+
                     <button
                       onClick={() => setAdminCouponOpen(true)}
                       style={{
@@ -582,5 +632,132 @@ ${url}
         </div>
       )}
     </>
+  )
+}
+
+// ─── 마스터 운영 현황 대시보드 ─────────────────────────────
+function AdminDashboard({ stats, loading, error, onReload }) {
+  const cardBg = '#F8F7F0'
+  const sectionBg = '#FFF'
+  const border = `0.5px solid ${THEME.border}`
+
+  if (loading) {
+    return (
+      <div style={{ background: cardBg, border, borderRadius: 10, padding: 14, marginBottom: 12, textAlign: 'center', fontSize: 11, color: THEME.textHint }}>
+        운영 현황 로드 중…
+      </div>
+    )
+  }
+  if (error) {
+    return (
+      <div style={{ background: cardBg, border, borderRadius: 10, padding: 14, marginBottom: 12, fontSize: 11, color: THEME.danger }}>
+        운영 현황 조회 실패: {error}
+        <button onClick={onReload} style={{ marginLeft: 8, fontSize: 10, background: 'transparent', border: `0.5px solid ${THEME.border}`, padding: '3px 7px', borderRadius: 6, cursor: 'pointer', fontFamily: 'inherit' }}>재시도</button>
+      </div>
+    )
+  }
+  if (!stats) return null
+
+  const revMonth = stats.revenue_month || 0
+  const revTotal = stats.revenue_total || 0
+  const refMonth = stats.refunded_month || 0
+  const refTotal = stats.refunded_total || 0
+  const netMonth = revMonth - refMonth - TOTAL_MONTHLY_COST
+  const netTotal = revTotal - refTotal  // 누적은 비용은 알 수 없어 매출-환불만
+
+  const trainerStatus = stats.trainer_by_status || {}
+  const trainerPlan = stats.trainer_by_plan || {}
+
+  const SectionHeader = ({ children }) => (
+    <p style={{ fontSize: 10, fontWeight: 500, color: THEME.textSub, margin: '0 0 6px', letterSpacing: '-0.2px' }}>{children}</p>
+  )
+  const Row = ({ label, value, accent }) => (
+    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', padding: '3px 0', fontSize: 11 }}>
+      <span style={{ color: THEME.textSub }}>{label}</span>
+      <span style={{ color: accent || THEME.text, fontWeight: 500, fontVariantNumeric: 'tabular-nums' }}>{value}</span>
+    </div>
+  )
+  const SubCard = ({ children, title }) => (
+    <div style={{ background: sectionBg, border, borderRadius: 8, padding: '8px 10px', marginBottom: 8 }}>
+      {title && <SectionHeader>{title}</SectionHeader>}
+      {children}
+    </div>
+  )
+
+  return (
+    <div style={{ background: cardBg, border, borderRadius: 10, padding: 12, marginBottom: 12 }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+        <p style={{ fontSize: 12, fontWeight: 500, color: THEME.primaryDark, margin: 0 }}>📊 운영 현황</p>
+        <button onClick={onReload} style={{ fontSize: 10, background: 'transparent', border: `0.5px solid ${THEME.border}`, color: THEME.textSub, padding: '3px 8px', borderRadius: 6, cursor: 'pointer', fontFamily: 'inherit' }}>새로고침</button>
+      </div>
+
+      {/* 트레이너 & 회원 */}
+      <SubCard title="트레이너 · 회원">
+        <Row label="총 트레이너" value={`${stats.trainer_total || 0}명`} />
+        {Object.entries(trainerStatus).map(([s, c]) => (
+          <Row key={s} label={`└ ${STATUS_LABEL[s] || s}`} value={`${c}명`} />
+        ))}
+        <Row label="총 회원" value={`${stats.member_total || 0}명`} />
+      </SubCard>
+
+      {/* 플랜 분포 (결제중 트레이너만) */}
+      {Object.keys(trainerPlan).length > 0 && (
+        <SubCard title="결제중 플랜 분포">
+          {Object.entries(trainerPlan).map(([code, c]) => (
+            <Row key={code} label={PLAN_LABEL[code] || code} value={`${c}명`} />
+          ))}
+        </SubCard>
+      )}
+
+      {/* 매출 / 환불 */}
+      <SubCard title="매출 · 환불">
+        <Row label="이번 달 매출" value={fmtKRW(revMonth)} accent={THEME.primary} />
+        <Row label="이번 달 환불" value={fmtKRW(refMonth)} accent={refMonth > 0 ? THEME.danger : THEME.text} />
+        <Row label="누적 매출" value={fmtKRW(revTotal)} />
+        <Row label="누적 환불" value={fmtKRW(refTotal)} />
+      </SubCard>
+
+      {/* 인프라 비용 (월) */}
+      <SubCard title={`인프라 월 비용 (합계 ${fmtKRW(TOTAL_MONTHLY_COST)})`}>
+        {MONTHLY_COSTS.map(c => (
+          <div key={c.name} style={{ padding: '3px 0', fontSize: 11 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+              <span style={{ color: THEME.textSub }}>{c.name}</span>
+              <span style={{ color: c.krw > 0 ? THEME.text : THEME.textHint, fontWeight: 500, fontVariantNumeric: 'tabular-nums' }}>{fmtKRW(c.krw)}</span>
+            </div>
+            <p style={{ fontSize: 9, color: THEME.textHint, margin: '1px 0 0', lineHeight: 1.4 }}>{c.note}</p>
+          </div>
+        ))}
+      </SubCard>
+
+      {/* 순수익 */}
+      <SubCard title="순수익">
+        <Row
+          label="이번 달 (매출 − 환불 − 비용)"
+          value={fmtKRW(netMonth)}
+          accent={netMonth >= 0 ? THEME.primary : THEME.danger}
+        />
+        <Row
+          label="누적 (매출 − 환불)"
+          value={fmtKRW(netTotal)}
+          accent={netTotal >= 0 ? THEME.primary : THEME.danger}
+        />
+      </SubCard>
+
+      {/* 데이터 사용량 */}
+      <SubCard title="데이터 사용량">
+        <Row label="DB 크기" value={fmtBytes(stats.db_size_bytes)} />
+        <Row label="Storage" value={fmtBytes(stats.storage_bytes)} />
+        <Row label="운동 로그" value={`${(stats.workout_log_count || 0).toLocaleString()}건`} />
+        <Row label="식단 로그" value={`${(stats.diet_log_count || 0).toLocaleString()}건`} />
+        <Row label="PT 세션" value={`${(stats.class_session_count || 0).toLocaleString()}건`} />
+      </SubCard>
+
+      {stats.generated_at && (
+        <p style={{ fontSize: 9, color: THEME.textHint, textAlign: 'right', margin: '4px 2px 0' }}>
+          기준: {new Date(stats.generated_at).toLocaleString('ko-KR')}
+        </p>
+      )}
+    </div>
   )
 }
