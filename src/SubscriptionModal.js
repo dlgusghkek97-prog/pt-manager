@@ -15,7 +15,6 @@ const TOSS_CLIENT_KEY = process.env.REACT_APP_TOSS_CLIENT_KEY || ''
 const TOSS_ENABLED = TOSS_CLIENT_KEY && !TOSS_CLIENT_KEY.includes('PLACEHOLDER')
 
 // 인프라 월 비용 (KRW) — 실제 청구액 들어오면 여기 업데이트
-// 현재 모두 무료 티어, 도메인만 Cloudflare 연간 약 $12 (~₩16,000) → 월 평균 ₩1,300
 const MONTHLY_COSTS = [
   { name: 'Supabase',   krw: 0,    note: 'Free (DB 500MB / Storage 1GB / 50K MAU)' },
   { name: 'Vercel',     krw: 0,    note: 'Hobby (100GB bandwidth)' },
@@ -24,6 +23,21 @@ const MONTHLY_COSTS = [
   { name: 'Cloudflare', krw: 1300, note: '도메인 연 $12 ÷ 12' },
 ]
 const TOTAL_MONTHLY_COST = MONTHLY_COSTS.reduce((s, c) => s + c.krw, 0)
+
+// 무료 티어 한도 (DB·Storage 는 자동 측정, 나머지는 외부 대시보드 확인 링크 제공)
+const TIER_LIMITS = {
+  db_bytes:      500 * 1024 * 1024,        // Supabase Free DB 500MB
+  storage_bytes: 1024 * 1024 * 1024,       // Supabase Free Storage 1GB
+}
+
+// 외부에서 확인 필요한 서비스들 — 한도 + 대시보드 URL
+const EXTERNAL_USAGE = [
+  { name: 'Supabase Egress',       limitText: '월 5 GB',     url: 'https://supabase.com/dashboard/project/_/usage' },
+  { name: 'Supabase Edge Functions', limitText: '월 500K invocations', url: 'https://supabase.com/dashboard/project/_/functions' },
+  { name: 'Vercel Bandwidth',      limitText: '월 100 GB',   url: 'https://vercel.com/dashboard/usage' },
+  { name: 'Resend 이메일',         limitText: '월 3,000건',  url: 'https://resend.com/emails' },
+  { name: 'Sentry Errors',         limitText: '월 5,000건',  url: 'https://sentry.io/organizations/_/stats/' },
+]
 
 const fmtKRW = (n) => '₩' + (n || 0).toLocaleString()
 const fmtBytes = (b) => {
@@ -35,6 +49,13 @@ const fmtBytes = (b) => {
 }
 const PLAN_LABEL = { starter_10: 'Starter', standard_30: 'Standard', pro_unlimited: 'Pro' }
 const STATUS_LABEL = { trial: '무료체험', active: '결제중', cancelled: '취소', expired: '만료', refunded: '환불' }
+
+// 사용률 → 색상/상태
+const pctState = (pct) => {
+  if (pct >= 90) return { color: '#C25555', bg: '#FBE8E8', label: '⚠️ 업그레이드 권장' }
+  if (pct >= 70) return { color: '#B88030', bg: '#FFF7E6', label: '주의' }
+  return { color: THEME.primary, bg: THEME.primaryLight, label: '정상' }
+}
 
 // 구독 관리 모달
 // - 현재 상태(trial / active / expired) + 사용 중인 플랜
@@ -684,6 +705,30 @@ function AdminDashboard({ stats, loading, error, onReload }) {
     </div>
   )
 
+  // 진행률 바 — DB / Storage 사용률
+  const UsageBar = ({ label, used, limit, fmt }) => {
+    const pct = Math.min(100, Math.round((used / limit) * 1000) / 10)  // 0.1% 정밀도
+    const state = pctState(pct)
+    return (
+      <div style={{ padding: '4px 0' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', fontSize: 11 }}>
+          <span style={{ color: THEME.textSub }}>{label}</span>
+          <span style={{ color: state.color, fontWeight: 500, fontVariantNumeric: 'tabular-nums' }}>
+            {fmt(used)} / {fmt(limit)} · {pct}%
+          </span>
+        </div>
+        <div style={{ height: 6, background: THEME.borderLight, borderRadius: 3, marginTop: 3, overflow: 'hidden' }}>
+          <div style={{ width: `${pct}%`, height: '100%', background: state.color, transition: 'width 0.3s' }} />
+        </div>
+        {pct >= 70 && (
+          <p style={{ fontSize: 9, color: state.color, margin: '3px 0 0', fontWeight: 500 }}>
+            {state.label}
+          </p>
+        )}
+      </div>
+    )
+  }
+
   return (
     <div style={{ background: cardBg, border, borderRadius: 10, padding: 12, marginBottom: 12 }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
@@ -744,13 +789,34 @@ function AdminDashboard({ stats, loading, error, onReload }) {
         />
       </SubCard>
 
-      {/* 데이터 사용량 */}
-      <SubCard title="데이터 사용량">
-        <Row label="DB 크기" value={fmtBytes(stats.db_size_bytes)} />
-        <Row label="Storage" value={fmtBytes(stats.storage_bytes)} />
+      {/* 데이터 사용량 — DB / Storage 자동 측정 + 진행률 바 */}
+      <SubCard title="데이터 사용량 (Supabase Free Tier)">
+        <UsageBar label="DB" used={stats.db_size_bytes || 0} limit={TIER_LIMITS.db_bytes} fmt={fmtBytes} />
+        <UsageBar label="Storage" used={stats.storage_bytes || 0} limit={TIER_LIMITS.storage_bytes} fmt={fmtBytes} />
+        <div style={{ borderTop: `0.5px dashed ${THEME.border}`, margin: '8px 0 6px' }} />
         <Row label="운동 로그" value={`${(stats.workout_log_count || 0).toLocaleString()}건`} />
         <Row label="식단 로그" value={`${(stats.diet_log_count || 0).toLocaleString()}건`} />
         <Row label="PT 세션" value={`${(stats.class_session_count || 0).toLocaleString()}건`} />
+      </SubCard>
+
+      {/* 외부 서비스 사용량 — 외부 대시보드 링크 */}
+      <SubCard title="외부 서비스 (대시보드에서 직접 확인)">
+        {EXTERNAL_USAGE.map(s => (
+          <div key={s.name} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '4px 0', fontSize: 11 }}>
+            <div style={{ minWidth: 0, flex: 1 }}>
+              <div style={{ color: THEME.text }}>{s.name}</div>
+              <div style={{ color: THEME.textHint, fontSize: 9 }}>한도 {s.limitText}</div>
+            </div>
+            <a href={s.url} target="_blank" rel="noreferrer"
+              style={{ fontSize: 10, color: THEME.primary, textDecoration: 'none', border: `0.5px solid ${THEME.primaryAccent}`, padding: '3px 8px', borderRadius: 6, whiteSpace: 'nowrap' }}>
+              확인 →
+            </a>
+          </div>
+        ))}
+        <p style={{ fontSize: 9, color: THEME.textHint, margin: '6px 2px 0', lineHeight: 1.5 }}>
+          외부 서비스는 자체 대시보드에서만 정확한 사용량 확인 가능.
+          ≥80% 도달 시 알림 메일이 각 서비스 등록 이메일로 발송됨.
+        </p>
       </SubCard>
 
       {stats.generated_at && (
