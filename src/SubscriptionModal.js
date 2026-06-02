@@ -809,7 +809,7 @@ function AdminDashboard({ stats, loading, error, onReload }) {
             </div>
             <a href={s.url} target="_blank" rel="noreferrer"
               style={{ fontSize: 10, color: THEME.primary, textDecoration: 'none', border: `0.5px solid ${THEME.primaryAccent}`, padding: '3px 8px', borderRadius: 6, whiteSpace: 'nowrap' }}>
-              확인 →
+              확인
             </a>
           </div>
         ))}

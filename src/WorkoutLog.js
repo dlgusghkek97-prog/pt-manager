@@ -838,7 +838,7 @@ export default function WorkoutLog({ user, selectedDate, setSelectedDate, exerci
                     justifyContent: 'center',
                     gap: '4px',
                   }}
-                >▶ 시작</button>
+                >시작</button>
               ) : (
                 <button
                   onClick={togglePauseTimer}

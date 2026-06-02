@@ -37,7 +37,7 @@ export default function PtHistoryModal({ userType, memberId, trainerId, onClose 
     switch (action) {
       case 'add':           return { bg: '#E0F2EE', color: '#2A6B5E', label: '+ 충전' }
       case 'use':           return { bg: '#FBE8E8', color: '#C25555', label: '− 차감' }
-      case 'refund':        return { bg: '#FFF7E6', color: '#B88030', label: '↻ 복구' }
+      case 'refund':        return { bg: '#FFF7E6', color: '#B88030', label: '복구' }
       case 'manual_adjust': return { bg: '#EDE5DA', color: '#7A6650', label: '✕ 삭제' }
       default:              return { bg: THEME.borderLight, color: THEME.textSub, label: action }
     }

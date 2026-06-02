@@ -598,7 +598,7 @@ export default function App() {
           </p>
           <ConsentRow agreed={agreed} setAgreed={markAgreed} onOpen={setLegalOpen} />
           <button style={S.btnPrimary} onClick={trainerSignup} disabled={loading || !agreed}>{loading ? '가입 중...' : '가입하기'}</button>
-          <button style={S.btnSecondary} onClick={() => { setMode('select'); setError(''); setInfo('') }}>← 뒤로가기</button>
+          <button style={S.btnSecondary} onClick={() => { setMode('select'); setError(''); setInfo('') }}>뒤로가기</button>
           <p style={{ fontSize: '10px', color: THEME.textHint, textAlign: 'center', margin: '8px 0 0', lineHeight: 1.5 }}>
             가입 후 입력한 이메일로 확인 메일이 발송될 수 있어요.<br/>메일에서 인증 링크를 누르면 로그인 가능합니다.
           </p>
@@ -624,7 +624,7 @@ export default function App() {
             <span style={{ color: THEME.textHint, fontSize: '11px' }}>·</span>
             <button onClick={() => { setMode('forgot-password'); setError(''); setInfo('') }} style={{ background: 'none', border: 'none', color: THEME.textSub, padding: '4px', fontSize: '11px', cursor: 'pointer', textDecoration: 'underline', fontFamily: 'inherit' }}>비밀번호 찾기</button>
           </div>
-          <button style={S.btnSecondary} onClick={() => setMode('select')}>← 뒤로가기</button>
+          <button style={S.btnSecondary} onClick={() => setMode('select')}>뒤로가기</button>
         </div>
       )}
 
@@ -641,7 +641,7 @@ export default function App() {
           {info && <p style={{ color: THEME.primary, fontSize: '12px', textAlign: 'center', margin: '0 0 8px', lineHeight: 1.5 }}>{info}</p>}
           <input style={S.input} type="email" placeholder="이메일" value={email} onChange={e => setEmail(e.target.value)} onKeyDown={e => e.key === 'Enter' && sendPasswordReset()} />
           <button style={S.btnPrimary} onClick={sendPasswordReset} disabled={loading}>{loading ? '발송 중...' : '재설정 메일 보내기'}</button>
-          <button style={S.btnSecondary} onClick={() => { setMode('trainer'); setError(''); setInfo('') }}>← 뒤로가기</button>
+          <button style={S.btnSecondary} onClick={() => { setMode('trainer'); setError(''); setInfo('') }}>뒤로가기</button>
         </div>
       )}
 
@@ -663,7 +663,7 @@ export default function App() {
           <input style={S.input} type="text" placeholder="이름" value={findName} onChange={e => setFindName(e.target.value)} />
           <input style={S.input} type="tel" placeholder="휴대폰 (숫자만)" value={findPhone} onChange={e => setFindPhone(e.target.value.replace(/[^0-9]/g, ''))} maxLength={11} onKeyDown={e => e.key === 'Enter' && findEmail()} />
           <button style={S.btnPrimary} onClick={findEmail} disabled={loading}>{loading ? '조회 중...' : '이메일 찾기'}</button>
-          <button style={S.btnSecondary} onClick={() => { setMode('trainer'); setError(''); setInfo(''); setFoundEmail('') }}>← 뒤로가기</button>
+          <button style={S.btnSecondary} onClick={() => { setMode('trainer'); setError(''); setInfo(''); setFoundEmail('') }}>뒤로가기</button>
         </div>
       )}
 
@@ -681,7 +681,7 @@ export default function App() {
           <input style={S.input} type="text" placeholder="접속 코드 (예: AB1234)" value={memberCode} onChange={e => setMemberCode(e.target.value.toUpperCase())} maxLength={6} />
           <ConsentRow agreed={agreed} setAgreed={markAgreed} onOpen={setLegalOpen} />
           <button style={S.btnPrimary} onClick={memberLogin} disabled={loading || !agreed}>{loading ? '확인 중...' : '접속하기'}</button>
-          <button style={S.btnSecondary} onClick={() => setMode('select')}>← 뒤로가기</button>
+          <button style={S.btnSecondary} onClick={() => setMode('select')}>뒤로가기</button>
         </div>
       )}
 
