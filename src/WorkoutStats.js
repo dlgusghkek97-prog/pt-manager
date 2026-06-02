@@ -144,15 +144,18 @@ export default function WorkoutStats({
   const monthlyBars = last6Months.map(({ year, month }) => {
     const prefix = `${year}-${String(month).padStart(2, '0')}`
     const rows = allLogs.filter(r => r.log_date && r.log_date.startsWith(prefix))
-    const total = rows
-      .filter(r => monthlyPart === '전체' || r.body_part === monthlyPart)
-      .reduce((sum, r) => sum + (r.volume || 0), 0)
-    return { year, month, total }
+    const filtered = rows.filter(r => monthlyPart === '전체' || r.body_part === monthlyPart)
+    const total = filtered.reduce((sum, r) => sum + (r.volume || 0), 0)
+    // 운동한 unique 날짜 수 (해당 부위 볼륨이 0 초과인 날만)
+    const days = new Set(filtered.filter(r => (r.volume || 0) > 0).map(r => r.log_date)).size
+    const avg = days > 0 ? Math.round(total / days) : 0
+    return { year, month, total, avg, days }
   })
-  const maxBar = Math.max(...monthlyBars.map(d => d.total), 1)
+  const maxTotalBar = Math.max(...monthlyBars.map(d => d.total), 1)
+  const maxAvgBar = Math.max(...monthlyBars.map(d => d.avg), 1)
   const currentMonthBar = monthlyBars[monthlyBars.length - 1]
   const prevMonthBar = monthlyBars[monthlyBars.length - 2]
-  const monthDiff = currentMonthBar.total - (prevMonthBar?.total || 0)
+  const monthAvgDiff = currentMonthBar.avg - (prevMonthBar?.avg || 0)
 
   const yearOptions = []
   for (let y = today.getFullYear(); y >= today.getFullYear() - 3; y--) yearOptions.push(y)
@@ -448,14 +451,15 @@ export default function WorkoutStats({
       )}
 
       {statsTab === 'workout' && (() => {
-        // 비교 텍스트
-        const partLabel = monthlyPart === '전체' ? '볼륨' : `${monthlyPart} 볼륨`
+        // 비교 텍스트 — 평균 볼륨(운동일 1회당) 기준
+        const partLabel = monthlyPart === '전체' ? '평균 볼륨' : `${monthlyPart} 평균 볼륨`
         const prevLabel = prevMonthBar ? `${prevMonthBar.month}월` : '지난달'
-        const diffAbs = Math.abs(monthDiff)
-        const diffWord = monthDiff >= 0 ? '늘었어요' : '줄었어요'
-        const diffColor = monthDiff >= 0 ? THEME.primary : THEME.danger
+        const diffAbs = Math.abs(monthAvgDiff)
+        const diffWord = monthAvgDiff >= 0 ? '늘었어요' : '줄었어요'
+        const diffColor = monthAvgDiff >= 0 ? THEME.primary : THEME.danger
         const compact = (v) => v >= 1000 ? `${(v / 1000).toFixed(v >= 10000 ? 0 : 1)}t` : `${v}`
-        const barColor = monthlyPart === '전체' ? THEME.primary : (PART_COLORS[monthlyPart] || THEME.primary)
+        const totalColor = monthlyPart === '전체' ? THEME.primary : (PART_COLORS[monthlyPart] || THEME.primary)
+        const avgColor = totalColor + '88'  // 동일 색 알파 88 (~ 53% 투명) — 평균 바
         const allZero = monthlyBars.every(d => d.total === 0)
         return (
           <div style={S.card}>
@@ -495,30 +499,50 @@ export default function WorkoutStats({
                 최근 6개월간 {monthlyPart === '전체' ? '' : `${monthlyPart} `}운동 기록이 없습니다
               </p>
             ) : (
-              <div style={{ display: 'flex', alignItems: 'flex-end', gap: '6px', height: '140px', padding: '4px 2px 0' }}>
-                {monthlyBars.map((d, i) => {
-                  const isLast = i === monthlyBars.length - 1
-                  const ratio = d.total / maxBar
-                  const barH = d.total > 0 ? Math.max(ratio * 110, 6) : 4
-                  return (
-                    <div key={`${d.year}-${d.month}`} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', minWidth: 0, gap: '5px' }}>
-                      <span style={{ fontSize: '9px', color: THEME.textSub, fontWeight: '500', lineHeight: 1, whiteSpace: 'nowrap' }}>
-                        {compact(d.total)}
-                      </span>
-                      <div style={{
-                        width: '100%', maxWidth: '32px',
-                        height: `${barH}px`,
-                        background: isLast ? barColor : THEME.borderLight,
-                        borderRadius: '6px 6px 0 0',
-                        transition: 'background 0.2s',
-                      }} />
-                      <span style={{ fontSize: '10px', color: isLast ? THEME.text : THEME.textHint, fontWeight: isLast ? '500' : '400', lineHeight: 1 }}>
-                        {d.month}월
-                      </span>
-                    </div>
-                  )
-                })}
-              </div>
+              <>
+                {/* 범례 */}
+                <div style={{ display: 'flex', justifyContent: 'center', gap: 14, marginBottom: 6, fontSize: 10, color: THEME.textSub }}>
+                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}>
+                    <span style={{ width: 9, height: 9, background: totalColor, borderRadius: 2, display: 'inline-block' }} />총
+                  </span>
+                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}>
+                    <span style={{ width: 9, height: 9, background: avgColor, borderRadius: 2, display: 'inline-block' }} />평균
+                  </span>
+                </div>
+
+                <div style={{ display: 'flex', alignItems: 'flex-end', gap: '6px', height: '140px', padding: '4px 2px 0' }}>
+                  {monthlyBars.map((d, i) => {
+                    const isLast = i === monthlyBars.length - 1
+                    const totalH = d.total > 0 ? Math.max((d.total / maxTotalBar) * 110, 6) : 4
+                    const avgH = d.avg > 0 ? Math.max((d.avg / maxAvgBar) * 110, 6) : 4
+                    return (
+                      <div key={`${d.year}-${d.month}`} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', minWidth: 0, gap: '5px' }}>
+                        {/* 값 라벨 — 두 바 위에 각각 */}
+                        <div style={{ display: 'flex', gap: 2, width: '100%', justifyContent: 'center', fontSize: 8.5, lineHeight: 1, whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums' }}>
+                          <span style={{ flex: 1, textAlign: 'center', color: THEME.textSub, fontWeight: 500 }}>{compact(d.total)}</span>
+                          <span style={{ flex: 1, textAlign: 'center', color: THEME.textHint }}>{compact(d.avg)}</span>
+                        </div>
+                        {/* 두 바 side-by-side */}
+                        <div style={{ display: 'flex', alignItems: 'flex-end', gap: 2, width: '100%', maxWidth: 36, height: 110 }}>
+                          <div style={{
+                            flex: 1, height: `${totalH}px`,
+                            background: isLast ? totalColor : THEME.borderLight,
+                            borderRadius: '4px 4px 0 0',
+                          }} />
+                          <div style={{
+                            flex: 1, height: `${avgH}px`,
+                            background: isLast ? avgColor : THEME.borderLight,
+                            borderRadius: '4px 4px 0 0',
+                          }} />
+                        </div>
+                        <span style={{ fontSize: '10px', color: isLast ? THEME.text : THEME.textHint, fontWeight: isLast ? '500' : '400', lineHeight: 1 }}>
+                          {d.month}월
+                        </span>
+                      </div>
+                    )
+                  })}
+                </div>
+              </>
             )}
           </div>
         )
