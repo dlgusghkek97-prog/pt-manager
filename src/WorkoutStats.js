@@ -860,11 +860,11 @@ export default function WorkoutStats({
             )
           })()}
 
-          {/* ─── 기존 PR 그리드 ─── */}
+          {/* ─── PR 부위별 볼륨 추이 (스파크라인) ─── */}
           <div style={S.card}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
               <p style={{ ...S.cardTitle, margin: 0 }}>개인 최고 기록 (PR)</p>
-              <span style={{ fontSize: '10px', color: THEME.textHint }}>{prs.length}개 운동</span>
+              <span style={{ fontSize: '10px', color: THEME.textHint }}>{prs.length}개 운동 · 볼륨 추이</span>
             </div>
 
             {prs.length === 0 ? (
@@ -889,24 +889,14 @@ export default function WorkoutStats({
                         }}>{part}</span>
                         <span style={{ fontSize: '10px', color: THEME.textSub }}>{partPRs.length}개 운동</span>
                       </div>
-                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px' }}>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
                         {partPRs.map((pr, i) => (
-                          <div key={i} style={{
-                            background: THEME.cardAlt,
-                            border: `0.5px solid ${THEME.border}`,
-                            borderRadius: '8px',
-                            padding: '8px 10px',
-                          }}>
-                            <p style={{ fontSize: '10px', color: THEME.textSub, margin: '0 0 3px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                              {pr.exercise_name}
-                            </p>
-                            <p style={{ fontSize: '15px', color: THEME.primary, fontWeight: '500', margin: '0 0 2px', letterSpacing: '-0.3px' }}>
-                              {pr.maxWeight}<span style={{ fontSize: '9px', color: THEME.textSub, fontWeight: '400' }}>kg × {pr.maxWeightReps}회</span>
-                            </p>
-                            <p style={{ fontSize: '9px', color: THEME.textHint, margin: 0 }}>
-                              {pr.maxWeightDate.replace(/-/g, '.')} · {pr.totalSessions}회 운동
-                            </p>
-                          </div>
+                          <PrSparklineRow
+                            key={i}
+                            pr={pr}
+                            allLogs={allLogs}
+                            color={PART_COLORS[part] || THEME.primary}
+                          />
                         ))}
                       </div>
                     </div>
@@ -916,6 +906,84 @@ export default function WorkoutStats({
             )}
           </div>
         </>
+      )}
+    </div>
+  )
+}
+
+// ─── PR 운동별 스파크라인 카드 ─────────────────────────────
+// 같은 종목의 일자별 일일 볼륨(weight × reps 합) 시계열 + 미니 SVG 라인 차트
+function PrSparklineRow({ pr, allLogs, color }) {
+  // 같은 종목 일자별 볼륨 집계
+  const rows = (allLogs || []).filter(l =>
+    l.exercise_type !== 'cardio' &&
+    l.body_part === pr.body_part &&
+    l.exercise_name === pr.exercise_name &&
+    parseFloat(l.weight) > 0 &&
+    parseInt(l.reps) > 0
+  )
+  const byDate = {}
+  rows.forEach(l => {
+    const v = (parseFloat(l.weight) || 0) * (parseInt(l.reps) || 0)
+    byDate[l.log_date] = (byDate[l.log_date] || 0) + v
+  })
+  const dates = Object.keys(byDate).sort()
+  const values = dates.map(d => byDate[d])
+  const maxV = Math.max(...values, 1)
+  const minV = 0
+  const lastV = values[values.length - 1] || 0
+  const peakV = Math.max(...values)
+  const peakIdx = values.indexOf(peakV)
+
+  // SVG 좌표
+  const W = 280, H = 56, padL = 4, padR = 4, padT = 6, padB = 6
+  const innerW = W - padL - padR
+  const innerH = H - padT - padB
+  const xOf = (i) => dates.length === 1
+    ? padL + innerW / 2
+    : padL + (i / (dates.length - 1)) * innerW
+  const yOf = (v) => padT + (1 - (v - minV) / (maxV - minV || 1)) * innerH
+  const pts = dates.map((_, i) => `${xOf(i)},${yOf(values[i])}`).join(' ')
+  const areaPts = pts && (
+    `${padL},${padT + innerH} ${pts} ${padL + innerW},${padT + innerH}`
+  )
+
+  return (
+    <div style={{
+      background: THEME.cardAlt,
+      border: `0.5px solid ${THEME.border}`,
+      borderRadius: 8,
+      padding: '7px 10px',
+    }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 3 }}>
+        <span style={{ fontSize: 11, fontWeight: 500, color: THEME.text, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '60%' }}>
+          {pr.exercise_name}
+        </span>
+        <span style={{ fontSize: 10, color: THEME.textSub, fontVariantNumeric: 'tabular-nums', flexShrink: 0 }}>
+          최고 <span style={{ color, fontWeight: 500 }}>{Math.round(peakV).toLocaleString()}</span>
+        </span>
+      </div>
+      {dates.length === 0 ? (
+        <p style={{ fontSize: 10, color: THEME.textHint, margin: 0, textAlign: 'center', padding: '12px 0' }}>볼륨 데이터 없음</p>
+      ) : dates.length === 1 ? (
+        <p style={{ fontSize: 10, color: THEME.textHint, margin: 0, textAlign: 'center', padding: '12px 0', fontVariantNumeric: 'tabular-nums' }}>
+          {dates[0].replace(/-/g, '.')} · 1회 기록 · {Math.round(values[0]).toLocaleString()} volume
+        </p>
+      ) : (
+        <svg viewBox={`0 0 ${W} ${H}`} style={{ width: '100%', height: 'auto', display: 'block' }} preserveAspectRatio="none">
+          <polygon points={areaPts} fill={color} fillOpacity="0.12" />
+          <polyline points={pts} fill="none" stroke={color} strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" />
+          <circle cx={xOf(peakIdx)} cy={yOf(peakV)} r="2.4" fill={color} />
+          {peakIdx !== values.length - 1 && (
+            <circle cx={xOf(values.length - 1)} cy={yOf(lastV)} r="2" fill={color} fillOpacity="0.55" />
+          )}
+        </svg>
+      )}
+      {dates.length >= 2 && (
+        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 9, color: THEME.textHint, marginTop: 2, fontVariantNumeric: 'tabular-nums' }}>
+          <span>{dates[0].slice(5).replace('-', '.')}</span>
+          <span>{dates[dates.length - 1].slice(5).replace('-', '.')} · {dates.length}회</span>
+        </div>
       )}
     </div>
   )
