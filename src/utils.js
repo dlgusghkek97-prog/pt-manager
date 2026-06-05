@@ -1804,7 +1804,7 @@ export const setFeedNotifEnabled = async (userId, userType, enabled) => {
 }
 
 // 1:1 카카오톡 상담 오픈채팅 URL — 미설정 시 안내
-export const KAKAO_SUPPORT_URL = process.env.REACT_APP_KAKAO_OPENCHAT_URL || ''
+export const KAKAO_SUPPORT_URL = process.env.REACT_APP_KAKAO_OPENCHAT_URL || 'https://open.kakao.com/o/s0tPndyi'
 
 // ─── 스케줄 ON/OFF 토글 (trainers/members.schedule_enabled) ───
 export const getScheduleEnabled = async (userId, userType) => {
