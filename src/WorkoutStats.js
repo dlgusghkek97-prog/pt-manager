@@ -705,8 +705,8 @@ export default function WorkoutStats({
                         )
                       })}
                     </div>
-                    {/* 2차: 그 부위 운동 칩 — 2열 그리드 (가로 스크롤 X) */}
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 5, marginBottom: 10 }}>
+                    {/* 2차: 그 부위 운동 칩 — 4열 그리드 (가로 스크롤 X) */}
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 4, marginBottom: 10 }}>
                       {partFavs.map(f => {
                         const active = selectedFav?.exercise_name === f.exercise_name
                         const color = PART_COLORS[f.body_part] || THEME.primary
@@ -717,11 +717,11 @@ export default function WorkoutStats({
                               background: active ? color : THEME.cardAlt,
                               color: active ? '#FFF' : THEME.textSub,
                               border: `0.5px solid ${active ? color : THEME.borderLight}`,
-                              borderRadius: 12, padding: '6px 10px',
-                              fontSize: 11, fontWeight: active ? 500 : 400,
+                              borderRadius: 10, padding: '5px 6px',
+                              fontSize: 10, fontWeight: active ? 500 : 400,
                               cursor: 'pointer', fontFamily: 'inherit',
                               overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-                              minWidth: 0,
+                              minWidth: 0, lineHeight: 1.3,
                             }}
                             title={f.exercise_name}
                           >
