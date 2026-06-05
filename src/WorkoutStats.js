@@ -730,13 +730,24 @@ export default function WorkoutStats({
                         )
                       })}
                     </div>
-                    {/* 선택된 운동의 스파크라인 카드 (60일) */}
+                    {/* 선택된 운동의 스파크라인 카드 2개 (60일) — 볼륨 / 최대무게 */}
                     {selectedFav ? (
-                      <PrSparklineRow
-                        pr={{ body_part: selectedFav.body_part, exercise_name: selectedFav.exercise_name }}
-                        allLogs={recentLogs}
-                        color={PART_COLORS[selectedFav.body_part] || THEME.primary}
-                      />
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
+                        <PrSparklineRow
+                          pr={{ body_part: selectedFav.body_part, exercise_name: selectedFav.exercise_name }}
+                          allLogs={recentLogs}
+                          color={PART_COLORS[selectedFav.body_part] || THEME.primary}
+                          metric="volume"
+                          title="볼륨"
+                        />
+                        <PrSparklineRow
+                          pr={{ body_part: selectedFav.body_part, exercise_name: selectedFav.exercise_name }}
+                          allLogs={recentLogs}
+                          color={PART_COLORS[selectedFav.body_part] || THEME.primary}
+                          metric="weight"
+                          title="최대 무게"
+                        />
+                      </div>
                     ) : (
                       <p style={{ fontSize: '12px', color: THEME.textHint, textAlign: 'center', padding: '14px 0', margin: 0 }}>운동을 선택하세요</p>
                     )}
@@ -868,9 +879,9 @@ export default function WorkoutStats({
 }
 
 // ─── PR 운동별 스파크라인 카드 ─────────────────────────────
-// 같은 종목의 일자별 일일 볼륨(weight × reps 합) 시계열 + 미니 SVG 라인 차트
-function PrSparklineRow({ pr, allLogs, color }) {
-  // 같은 종목 일자별 볼륨 집계
+// 같은 종목의 일자별 시계열 + 미니 SVG 라인 차트
+// metric: 'volume' (한 세트 weight × reps 최댓값) | 'weight' (그 날 든 무게 최댓값)
+function PrSparklineRow({ pr, allLogs, color, metric = 'volume', title }) {
   const rows = (allLogs || []).filter(l =>
     l.exercise_type !== 'cardio' &&
     l.body_part === pr.body_part &&
@@ -878,10 +889,12 @@ function PrSparklineRow({ pr, allLogs, color }) {
     parseFloat(l.weight) > 0 &&
     parseInt(l.reps) > 0
   )
-  // 날짜별 "최대 한 세트 볼륨" — 그 날 가장 무거운 한 세트의 weight × reps
+  // 날짜별 최댓값 집계
   const byDate = {}
   rows.forEach(l => {
-    const v = (parseFloat(l.weight) || 0) * (parseInt(l.reps) || 0)
+    const w = parseFloat(l.weight) || 0
+    const r = parseInt(l.reps) || 0
+    const v = metric === 'weight' ? w : w * r
     if (!byDate[l.log_date] || v > byDate[l.log_date]) byDate[l.log_date] = v
   })
   const dates = Object.keys(byDate).sort()
@@ -915,17 +928,17 @@ function PrSparklineRow({ pr, allLogs, color }) {
     }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 3, gap: 4 }}>
         <span style={{ fontSize: 10, fontWeight: 500, color: THEME.text, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', minWidth: 0 }}>
-          {pr.exercise_name}
+          {title || pr.exercise_name}
         </span>
         <span style={{ fontSize: 9, color: THEME.textSub, fontVariantNumeric: 'tabular-nums', flexShrink: 0 }}>
-          최고 <span style={{ color, fontWeight: 500 }}>{Math.round(peakV).toLocaleString()}</span>
+          최고 <span style={{ color, fontWeight: 500 }}>{Math.round(peakV).toLocaleString()}{metric === 'weight' ? 'kg' : ''}</span>
         </span>
       </div>
       {dates.length === 0 ? (
-        <p style={{ fontSize: 10, color: THEME.textHint, margin: 0, textAlign: 'center', padding: '12px 0' }}>볼륨 데이터 없음</p>
+        <p style={{ fontSize: 10, color: THEME.textHint, margin: 0, textAlign: 'center', padding: '12px 0' }}>데이터 없음</p>
       ) : dates.length === 1 ? (
         <p style={{ fontSize: 10, color: THEME.textHint, margin: 0, textAlign: 'center', padding: '12px 0', fontVariantNumeric: 'tabular-nums' }}>
-          {dates[0].replace(/-/g, '.')} · 1회 기록 · {Math.round(values[0]).toLocaleString()} volume
+          {dates[0].replace(/-/g, '.')} · 1회 기록 · {Math.round(values[0]).toLocaleString()}{metric === 'weight' ? 'kg' : ''}
         </p>
       ) : (
         <svg viewBox={`0 0 ${W} ${H}`} style={{ width: '100%', height: 'auto', display: 'block' }} preserveAspectRatio="none">
