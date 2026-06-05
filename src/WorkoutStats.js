@@ -876,10 +876,11 @@ function PrSparklineRow({ pr, allLogs, color }) {
     parseFloat(l.weight) > 0 &&
     parseInt(l.reps) > 0
   )
+  // 날짜별 "최대 한 세트 볼륨" — 그 날 가장 무거운 한 세트의 weight × reps
   const byDate = {}
   rows.forEach(l => {
     const v = (parseFloat(l.weight) || 0) * (parseInt(l.reps) || 0)
-    byDate[l.log_date] = (byDate[l.log_date] || 0) + v
+    if (!byDate[l.log_date] || v > byDate[l.log_date]) byDate[l.log_date] = v
   })
   const dates = Object.keys(byDate).sort()
   const values = dates.map(d => byDate[d])
