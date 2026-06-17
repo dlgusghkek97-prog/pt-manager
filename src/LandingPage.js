@@ -293,8 +293,19 @@ export default function LandingPage({ onStart, onMemberLogin, onTrainerLogin }) 
               <a href="#" onClick={(e) => { e.preventDefault(); onMemberLogin() }} style={{ color: '#9EB5A8', textDecoration: 'none' }}>회원 접속</a>
             </div>
           </div>
-          <p style={{ fontSize: 10, color: '#6B8579', margin: '18px 0 0', lineHeight: 1.6 }}>
-            © {new Date().getFullYear()} PT Manager · 사업자 문의는 dlgusghkek97@gmail.com
+
+          {/* 사업자 정보 — 토스페이먼츠/카드사 심사 필수 */}
+          <div style={{ fontSize: 10, color: '#9EB5A8', margin: '18px 0 0', lineHeight: 1.75, display: 'flex', flexWrap: 'wrap', gap: '4px 14px' }}>
+            <span>상호명 <span style={{ color: '#C5DAD0' }}>현</span></span>
+            <span>대표자 <span style={{ color: '#C5DAD0' }}>이현화</span></span>
+            <span>사업자등록번호 <span style={{ color: '#C5DAD0' }}>380-23-02636</span></span>
+            <span style={{ flexBasis: '100%' }}>주소 <span style={{ color: '#C5DAD0' }}>경기도 부천시 오정구 원종로29번길 55 대성주택 A동 201호</span></span>
+            <span>연락처 <span style={{ color: '#C5DAD0' }}>010-2797-7389</span></span>
+            <span>이메일 <span style={{ color: '#C5DAD0' }}>dlgusghkek97@gmail.com</span></span>
+          </div>
+
+          <p style={{ fontSize: 10, color: '#6B8579', margin: '14px 0 0', lineHeight: 1.6 }}>
+            © {new Date().getFullYear()} PT Manager. All rights reserved.
           </p>
         </div>
       </footer>
