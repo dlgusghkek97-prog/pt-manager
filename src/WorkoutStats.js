@@ -28,6 +28,7 @@ export default function WorkoutStats({
 
   // 월별 막대 차트 — 부위 필터 ('전체' | PARTS)
   const [monthlyPart, setMonthlyPart] = useState('전체')
+  const [prPart, setPrPart] = useState(null)  // PR 섹션 부위 필터 (null = 자동 선택)
 
   useEffect(() => {
     if (statsTab === 'pr' && memberId) {
@@ -838,39 +839,47 @@ export default function WorkoutStats({
               <p style={{ color: THEME.textSub, fontSize: '12px', textAlign: 'center', padding: '20px 0' }}>
                 아직 운동 기록이 없습니다
               </p>
-            ) : (
-              <>
-                {PARTS.map(part => {
-                  const partPRs = prs.filter(p => p.body_part === part)
-                  if (partPRs.length === 0) return null
-                  return (
-                    <div key={part} style={{ marginBottom: '14px' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '7px' }}>
-                        <span style={{
-                          fontSize: '10px',
-                          color: '#FFF',
-                          background: PART_COLORS[part],
-                          padding: '2px 8px',
-                          borderRadius: '4px',
-                          fontWeight: '500',
-                        }}>{part}</span>
-                        <span style={{ fontSize: '10px', color: THEME.textSub }}>{partPRs.length}개 운동</span>
-                      </div>
-                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px' }}>
-                        {partPRs.map((pr, i) => (
-                          <PrSparklineRow
-                            key={i}
-                            pr={pr}
-                            allLogs={allLogs}
-                            color={PART_COLORS[part] || THEME.primary}
-                          />
-                        ))}
-                      </div>
-                    </div>
-                  )
-                })}
-              </>
-            )}
+            ) : (() => {
+              const partsWithPR = PARTS.filter(p => prs.some(pr => pr.body_part === p))
+              const activePart = (prPart && partsWithPR.includes(prPart)) ? prPart : partsWithPR[0]
+              const activePartPRs = prs.filter(p => p.body_part === activePart)
+              return (
+                <>
+                  {/* 부위 필터 칩 — 클릭하면 그 부위 운동만 노출 */}
+                  <div style={{ display: 'flex', gap: 5, overflowX: 'auto', paddingBottom: 6, marginBottom: 10 }}>
+                    {partsWithPR.map(p => {
+                      const active = activePart === p
+                      const color = PART_COLORS[p] || THEME.primary
+                      const count = prs.filter(pr => pr.body_part === p).length
+                      return (
+                        <button key={p} onClick={() => setPrPart(p)} style={{
+                          flexShrink: 0,
+                          background: active ? color : '#FFF',
+                          color: active ? '#FFF' : THEME.textSub,
+                          border: `0.5px solid ${active ? color : THEME.border}`,
+                          borderRadius: 14, padding: '5px 12px',
+                          fontSize: 11, fontWeight: active ? 500 : 400,
+                          cursor: 'pointer', fontFamily: 'inherit', whiteSpace: 'nowrap',
+                        }}>
+                          {p} <span style={{ opacity: 0.75 }}>{count}</span>
+                        </button>
+                      )
+                    })}
+                  </div>
+
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px' }}>
+                    {activePartPRs.map((pr, i) => (
+                      <PrSparklineRow
+                        key={i}
+                        pr={pr}
+                        allLogs={allLogs}
+                        color={PART_COLORS[activePart] || THEME.primary}
+                      />
+                    ))}
+                  </div>
+                </>
+              )
+            })()}
           </div>
         </>
       )}
