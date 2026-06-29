@@ -643,6 +643,22 @@ export const removeWorkoutDayFavorite = async (favId, table = 'workout_day_favor
   return { success: true }
 }
 
+// 같은 종목의 가장 최근 비어있지 않은 memo 반환 (특이사항 자동 carry-over 용).
+// excludeDate 는 오늘 편집 중인 날짜 — 그 날 입력한 memo 가 본인 memo 로 다시 들어오는 self-fill 방지.
+export const getLatestMemo = (allLogs, bodyPart, exerciseName, excludeDate = null) => {
+  if (!allLogs || !bodyPart || !exerciseName) return ''
+  const matched = (allLogs || [])
+    .filter(l =>
+      l.exercise_type !== 'cardio' &&
+      l.body_part === bodyPart &&
+      l.exercise_name === exerciseName &&
+      l.memo && l.memo.trim() &&
+      (!excludeDate || l.log_date !== excludeDate)
+    )
+    .sort((a, b) => (b.log_date || '').localeCompare(a.log_date || ''))
+  return matched[0]?.memo?.trim() || ''
+}
+
 // excludeDate: 해당 날짜(보통 현재 편집중인 selectedDate)는 "이전 기록" 에 포함시키지 않음.
 // 오늘 입력하는 세트가 오늘의 "최근 기록" 으로 표시되는 모순 방지.
 // 각 날짜별 가장 무게가 큰 세트 1건씩, 최신순으로 N건 반환.

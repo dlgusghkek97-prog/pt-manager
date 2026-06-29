@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react'
 import { supabase } from './supabase'
-import { PARTS, PART_COLORS, S, THEME, calcWeightCalories, checkNewPRs, getRecentTopRecords, addFavorite, removeFavorite, checkMediaSize } from './utils'
+import { PARTS, PART_COLORS, S, THEME, calcWeightCalories, checkNewPRs, getRecentTopRecords, getLatestMemo, addFavorite, removeFavorite, checkMediaSize } from './utils'
 import DatePicker from './DatePicker'
 import useModalBackButton from './useModalBackButton'
 import WorkoutDayFavModal from './WorkoutDayFavModal'
@@ -244,6 +244,15 @@ export default function WorkoutLog({ user, selectedDate, setSelectedDate, exerci
     dirtyRef.current = true
     const u = JSON.parse(JSON.stringify(exercises))
     u[exIdx][field] = value
+    // 특이사항 자동 carry-over — body_part 또는 exercise_name 바뀔 때
+    // memo 가 비어있으면 같은 종목의 가장 최근 memo 를 자동으로 채움
+    if (field === 'body_part' || field === 'exercise_name') {
+      const ex = u[exIdx]
+      if (ex.body_part && ex.exercise_name?.trim() && !ex.memo?.trim()) {
+        const latestMemo = getLatestMemo(allLogs, ex.body_part, ex.exercise_name.trim(), selectedDate)
+        if (latestMemo) ex.memo = latestMemo
+      }
+    }
     setExercises(u)
   }
 
@@ -1149,21 +1158,31 @@ export default function WorkoutLog({ user, selectedDate, setSelectedDate, exerci
                   marginBottom: '8px',
                 }}>
                   {recents.map((r) => (
-                    <span key={r.date} style={{
-                      fontSize: '10px',
-                      whiteSpace: 'nowrap',
-                      display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 6,
-                      background: THEME.primaryLight,
-                      border: `0.5px solid ${THEME.primaryAccent}`,
-                      borderRadius: '12px',
-                      padding: '4px 8px',
-                      fontVariantNumeric: 'tabular-nums',
-                      overflow: 'hidden',
-                      textOverflow: 'ellipsis',
-                    }}>
+                    <button
+                      key={r.date}
+                      onClick={() => {
+                        if (dirtyRef.current) persistSets()
+                        setSelectedDate(r.date)
+                      }}
+                      title={`${r.date} 로 이동`}
+                      style={{
+                        fontSize: '10px',
+                        whiteSpace: 'nowrap',
+                        display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+                        background: THEME.primaryLight,
+                        border: `0.5px solid ${THEME.primaryAccent}`,
+                        borderRadius: '12px',
+                        padding: '4px 8px',
+                        fontVariantNumeric: 'tabular-nums',
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                        cursor: 'pointer',
+                        fontFamily: 'inherit',
+                      }}
+                    >
                       <span style={{ fontWeight: '500', color: THEME.primaryDark }}>{r.date.replace(/-/g, '.').slice(5)}</span>
                       <span style={{ color: THEME.text }}>{r.weight}kg×{r.reps}</span>
-                    </span>
+                    </button>
                   ))}
                 </div>
               )}
