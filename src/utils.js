@@ -643,49 +643,56 @@ export const removeWorkoutDayFavorite = async (favId, table = 'workout_day_favor
   return { success: true }
 }
 
-// 같은 종목의 가장 최근 비어있지 않은 memo 반환 (특이사항 자동 carry-over 용).
+// 같은 종목의 가장 최근 비어있지 않은 필드값 반환 (특이사항·운동설명 carry-over 용).
+// field: 'memo' (특이사항) | 'description' (운동 설명)
 // 1순위: localStorage 캐시 (세트 미입력 시에도 작동 + 즉시 동기화)
 // 2순위: allLogs DB 행 (cross-device 동기화 — onUpdate 후 refetch 된 데이터)
-// excludeDate 는 오늘 편집 중인 날짜 — 그 날 입력한 memo 가 본인 memo 로 다시 들어오는 self-fill 방지.
-export const getLatestMemo = (allLogs, bodyPart, exerciseName, excludeDate = null, userId = null) => {
+// excludeDate 는 오늘 편집 중인 날짜 — 자기가 자기를 채우는 self-fill 루프 방지.
+export const getLatestExerciseField = (allLogs, bodyPart, exerciseName, field, excludeDate = null, userId = null) => {
   const part = (bodyPart || '').trim()
   const name = (exerciseName || '').trim()
-  if (!part || !name) return ''
+  if (!part || !name || !field) return ''
 
-  // 1순위 localStorage — 가장 최근 사용자가 입력한 memo
+  // 1순위 localStorage
   if (userId) {
     try {
-      const key = `wm_memo_${userId}_${part}_${name}`
+      const key = `wm_${field}_${userId}_${part}_${name}`
       const cached = localStorage.getItem(key)
       if (cached && cached.trim()) return cached.trim()
     } catch {}
   }
 
-  // 2순위 DB — workout_logs 안의 memo 컬럼
+  // 2순위 DB — workout_logs 안의 해당 필드
   const matched = (allLogs || [])
     .filter(l =>
       l.exercise_type !== 'cardio' &&
       (l.body_part || '').trim() === part &&
       (l.exercise_name || '').trim() === name &&
-      l.memo && l.memo.trim() &&
+      l[field] && String(l[field]).trim() &&
       (!excludeDate || l.log_date !== excludeDate)
     )
     .sort((a, b) => (b.log_date || '').localeCompare(a.log_date || ''))
-  return matched[0]?.memo?.trim() || ''
+  return (matched[0]?.[field] || '').toString().trim()
 }
 
-// memo 입력 시 localStorage 캐시에 저장 (세트 미입력 시에도 carry-over 가능)
-export const saveMemoCache = (userId, bodyPart, exerciseName, memo) => {
-  if (!userId) return
+// 필드 입력 시 localStorage 캐시에 저장 (세트 미입력 시에도 carry-over 가능)
+export const saveExerciseFieldCache = (userId, bodyPart, exerciseName, field, value) => {
+  if (!userId || !field) return
   const part = (bodyPart || '').trim()
   const name = (exerciseName || '').trim()
   if (!part || !name) return
   try {
-    const key = `wm_memo_${userId}_${part}_${name}`
-    if (memo && memo.trim()) localStorage.setItem(key, memo.trim())
+    const key = `wm_${field}_${userId}_${part}_${name}`
+    if (value && String(value).trim()) localStorage.setItem(key, String(value).trim())
     else localStorage.removeItem(key)
   } catch {}
 }
+
+// 하위 호환 — 기존 호출처 (호출하는 곳 없으면 추후 제거 가능)
+export const getLatestMemo = (allLogs, bodyPart, exerciseName, excludeDate = null, userId = null) =>
+  getLatestExerciseField(allLogs, bodyPart, exerciseName, 'memo', excludeDate, userId)
+export const saveMemoCache = (userId, bodyPart, exerciseName, memo) =>
+  saveExerciseFieldCache(userId, bodyPart, exerciseName, 'memo', memo)
 
 // excludeDate: 해당 날짜(보통 현재 편집중인 selectedDate)는 "이전 기록" 에 포함시키지 않음.
 // 오늘 입력하는 세트가 오늘의 "최근 기록" 으로 표시되는 모순 방지.
