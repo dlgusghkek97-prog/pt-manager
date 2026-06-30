@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react'
 import { supabase } from './supabase'
-import { PARTS, PART_COLORS, S, THEME, calcWeightCalories, checkNewPRs, getRecentTopRecords, getLatestMemo, addFavorite, removeFavorite, checkMediaSize } from './utils'
+import { PARTS, PART_COLORS, S, THEME, calcWeightCalories, checkNewPRs, getRecentTopRecords, getLatestMemo, saveMemoCache, addFavorite, removeFavorite, checkMediaSize } from './utils'
 import DatePicker from './DatePicker'
 import useModalBackButton from './useModalBackButton'
 import WorkoutDayFavModal from './WorkoutDayFavModal'
@@ -244,15 +244,22 @@ export default function WorkoutLog({ user, selectedDate, setSelectedDate, exerci
     dirtyRef.current = true
     const u = JSON.parse(JSON.stringify(exercises))
     u[exIdx][field] = value
+    const ex = u[exIdx]
+
     // 특이사항 자동 carry-over — body_part 또는 exercise_name 바뀔 때
     // memo 가 비어있으면 같은 종목의 가장 최근 memo 를 자동으로 채움
     if (field === 'body_part' || field === 'exercise_name') {
-      const ex = u[exIdx]
       if (ex.body_part && ex.exercise_name?.trim() && !ex.memo?.trim()) {
-        const latestMemo = getLatestMemo(allLogs, ex.body_part, ex.exercise_name.trim(), selectedDate)
+        const latestMemo = getLatestMemo(allLogs, ex.body_part, ex.exercise_name.trim(), selectedDate, user.id)
         if (latestMemo) ex.memo = latestMemo
       }
     }
+
+    // memo 입력 시 localStorage 캐시 즉시 저장 (세트 미입력 시에도 carry-over 가능)
+    if (field === 'memo' && ex.body_part && ex.exercise_name?.trim()) {
+      saveMemoCache(user.id, ex.body_part, ex.exercise_name.trim(), value)
+    }
+
     setExercises(u)
   }
 
