@@ -145,8 +145,22 @@ export default function LandingPage({ onStart, onMemberLogin, onTrainerLogin }) 
         </div>
       </section>
 
-      {/* FEATURES */}
+      {/* SCREENS PREVIEW — 실제 앱 화면 미리보기 */}
       <section className="lp-section">
+        <div className="lp-container">
+          <h2 className="lp-h2">실제 앱 화면 미리보기</h2>
+          <p className="lp-h2sub">회원 관리·운동·식단·PT 스케줄까지 한 앱에서</p>
+          <div className="lp-screens-grid">
+            <ScreenMemberList C={C} />
+            <ScreenWorkoutLog C={C} />
+            <ScreenDietLog C={C} />
+            <ScreenSchedule C={C} />
+          </div>
+        </div>
+      </section>
+
+      {/* FEATURES */}
+      <section className="lp-section" style={{ background: C.card, borderTop: `0.5px solid ${C.border}`, borderBottom: `0.5px solid ${C.border}` }}>
         <div className="lp-container">
           <h2 className="lp-h2">핵심 기능</h2>
           <p className="lp-h2sub">회원 관리·코칭·결제·소통 — 트레이너에게 필요한 모든 것</p>
@@ -387,6 +401,29 @@ const RESPONSIVE_CSS = `
   grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
   gap: 14px;
 }
+.lp-screens-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 16px;
+}
+.lp-screen {
+  background: #F8F7F0;
+  border: 0.5px solid ${THEME.border};
+  border-radius: 16px;
+  padding: 14px;
+  box-shadow: 0 4px 14px rgba(0,0,0,0.04);
+  min-height: 340px;
+  display: flex;
+  flex-direction: column;
+}
+.lp-screen-title {
+  font-size: 11px;
+  font-weight: 600;
+  color: ${THEME.primaryDark};
+  margin-bottom: 10px;
+  padding-bottom: 8px;
+  border-bottom: 0.5px solid ${THEME.border};
+}
 .lp-grid3 {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
@@ -482,4 +519,161 @@ const S = {
     transform: 'translate(-50%, -50%)',
     zIndex: 1,
   },
+}
+
+// ─── 스크린 mockup 컴포넌트 ─────────────────────────────
+// 실제 앱 UI 를 축소·재현. 이미지 파일 없이 SVG/CSS 로만 구성 → 항상 선명함.
+
+function ScreenMemberList({ C }) {
+  const members = [
+    { name: '김민준', goal: '벌크업 · 남', pt: 'PT 8/10', dietDone: true, workoutDone: true },
+    { name: '이수진', goal: '다이어트 · 여', pt: 'PT 3/20', dietDone: true, workoutDone: false },
+    { name: '박도현', goal: '체형교정 · 남', pt: 'PT 미등록', dietDone: false, workoutDone: false },
+  ]
+  return (
+    <div className="lp-screen">
+      <div className="lp-screen-title">회원 관리</div>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8, fontSize: 10 }}>
+        <span style={{ color: C.sub }}>◄  2026.07.02  ►</span>
+        <span style={{ background: C.accent, color: '#FFF', padding: '3px 8px', borderRadius: 10, fontSize: 9, fontWeight: 500 }}>+ 회원 추가</span>
+      </div>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 6, flex: 1 }}>
+        {members.map((m, i) => (
+          <div key={i} style={{ background: '#FFF', border: `0.5px solid ${C.border}`, borderRadius: 8, padding: '8px 9px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 4 }}>
+              <span style={{ fontSize: 11, fontWeight: 600, color: C.dark }}>{m.name}</span>
+              <span style={{ fontSize: 9, color: C.hint }}>{m.goal}</span>
+            </div>
+            <div style={{ fontSize: 9, color: m.pt.includes('미등록') ? '#B88030' : C.accent, marginBottom: 4, background: m.pt.includes('미등록') ? '#FFF7E6' : C.light, padding: '3px 6px', borderRadius: 4, display: 'inline-block' }}>
+              {m.pt}
+            </div>
+            <div style={{ display: 'flex', gap: 10, fontSize: 9, color: C.sub, marginTop: 3 }}>
+              <span>식단 {m.dietDone ? <span style={{ color: C.accent }}>✓</span> : <span style={{ color: '#C25555' }}>○</span>}</span>
+              <span>운동 {m.workoutDone ? <span style={{ color: C.accent }}>✓</span> : <span style={{ color: '#C25555' }}>○</span>}</span>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+function ScreenWorkoutLog({ C }) {
+  const sets = [
+    { n: 1, w: 100, r: 10, v: 1000 },
+    { n: 2, w: 100, r: 8,  v: 800 },
+    { n: 3, w: 95,  r: 10, v: 950 },
+  ]
+  return (
+    <div className="lp-screen">
+      <div className="lp-screen-title">운동 기록</div>
+      <div style={{ display: 'flex', gap: 5, marginBottom: 8, flexWrap: 'wrap' }}>
+        <span style={{ background: '#FFF', border: `0.5px solid #C57878`, color: '#C57878', padding: '2px 6px', borderRadius: 10, fontSize: 9, fontWeight: 500 }}>가슴 12세트</span>
+        <span style={{ background: '#FFF', border: `0.5px solid #8AB55C`, color: '#8AB55C', padding: '2px 6px', borderRadius: 10, fontSize: 9, fontWeight: 500 }}>등 6세트</span>
+      </div>
+      <div style={{ background: '#FFF', border: `0.5px solid ${C.border}`, borderRadius: 8, padding: 8, flex: 1 }}>
+        <div style={{ display: 'flex', gap: 4, marginBottom: 6 }}>
+          <span style={{ background: '#F5F5F0', padding: '3px 8px', borderRadius: 6, fontSize: 9, color: C.text, fontWeight: 500 }}>가슴</span>
+          <span style={{ flex: 1, background: '#F5F5F0', padding: '3px 8px', borderRadius: 6, fontSize: 9, color: C.text }}>벤치 프레스</span>
+        </div>
+        <div style={{ display: 'grid', gridTemplateColumns: '18px 1fr 1fr 32px', gap: 4, fontSize: 8, color: C.sub, marginBottom: 4, textAlign: 'center' }}>
+          <span>세트</span><span>무게(kg)</span><span>횟수</span><span>볼륨</span>
+        </div>
+        {sets.map(s => (
+          <div key={s.n} style={{ display: 'grid', gridTemplateColumns: '18px 1fr 1fr 32px', gap: 4, fontSize: 10, marginBottom: 3, alignItems: 'center', textAlign: 'center' }}>
+            <span style={{ color: C.sub }}>{s.n}</span>
+            <span style={{ background: '#F5F5F0', padding: '3px', borderRadius: 3, color: C.text, fontWeight: 500 }}>{s.w}</span>
+            <span style={{ background: '#F5F5F0', padding: '3px', borderRadius: 3, color: C.text, fontWeight: 500 }}>{s.r}</span>
+            <span style={{ color: C.accent, fontWeight: 500 }}>{s.v}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+function ScreenDietLog({ C }) {
+  const macros = [
+    { l: '칼로리', v: '1,850', max: '2,200', pct: 84, c: '#E8A87C' },
+    { l: '탄수',   v: '160',   max: '180',   pct: 89, c: '#A8D5BA' },
+    { l: '단백',   v: '190',   max: '220',   pct: 86, c: '#E8B4BC' },
+    { l: '지방',   v: '52',    max: '60',    pct: 87, c: '#F2D5B5' },
+  ]
+  const meals = [
+    { time: '아침', name: '오트밀 + 계란', kcal: 480 },
+    { time: '점심', name: '닭가슴살 샐러드', kcal: 620 },
+    { time: '저녁', name: '연어 + 현미밥', kcal: 750 },
+  ]
+  return (
+    <div className="lp-screen">
+      <div className="lp-screen-title">식단 기록</div>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 5, marginBottom: 8 }}>
+        {macros.map((m, i) => (
+          <div key={i} style={{ background: '#FFF', borderRadius: 6, padding: '5px 7px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 8.5, color: C.sub }}>
+              <span>{m.l}</span><span>{m.pct}%</span>
+            </div>
+            <div style={{ fontSize: 12, fontWeight: 700, color: m.c, lineHeight: 1.1, marginTop: 1 }}>{m.v}<span style={{ fontSize: 8, color: C.hint }}> / {m.max}</span></div>
+            <div style={{ height: 3, background: '#F0EEE4', borderRadius: 2, marginTop: 3 }}>
+              <div style={{ width: `${m.pct}%`, height: '100%', background: m.c, borderRadius: 2 }} />
+            </div>
+          </div>
+        ))}
+      </div>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 4, flex: 1 }}>
+        {meals.map((m, i) => (
+          <div key={i} style={{ background: '#FFF', border: `0.5px solid ${C.border}`, borderRadius: 6, padding: '5px 8px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <div>
+              <span style={{ fontSize: 9, color: C.sub, marginRight: 5 }}>{m.time}</span>
+              <span style={{ fontSize: 10, color: C.text }}>{m.name}</span>
+            </div>
+            <span style={{ fontSize: 10, color: C.accent, fontWeight: 500 }}>{m.kcal}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+function ScreenSchedule({ C }) {
+  const week = ['월', '화', '수', '목', '금', '토', '일']
+  const slots = [
+    { day: 0, time: '10 AM', member: '김민준', status: '확정' },
+    { day: 2, time: '2 PM',  member: '이수진', status: '확정' },
+    { day: 4, time: '11 AM', member: '박도현', status: '대기' },
+  ]
+  return (
+    <div className="lp-screen">
+      <div className="lp-screen-title">PT 스케줄</div>
+      <div style={{ background: '#FFF', border: `0.5px solid ${C.border}`, borderRadius: 8, padding: 8, marginBottom: 8 }}>
+        <div style={{ fontSize: 9, color: C.sub, marginBottom: 6 }}>7월 첫째 주</div>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 3, textAlign: 'center' }}>
+          {week.map((d, i) => (
+            <div key={i}>
+              <div style={{ fontSize: 8, color: C.hint, marginBottom: 2 }}>{d}</div>
+              <div style={{
+                fontSize: 9, padding: '4px 0', borderRadius: 4,
+                background: slots.some(s => s.day === i) ? C.light : 'transparent',
+                color: slots.some(s => s.day === i) ? C.dark : C.hint,
+                fontWeight: slots.some(s => s.day === i) ? 500 : 400,
+              }}>
+                {slots.some(s => s.day === i) ? '●' : '·'}
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 4, flex: 1 }}>
+        {slots.map((s, i) => (
+          <div key={i} style={{ background: '#FFF', border: `0.5px solid ${C.border}`, borderRadius: 6, padding: '6px 8px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
+              <span style={{ fontSize: 10, fontWeight: 500, color: C.text }}>{s.member}</span>
+              <span style={{ fontSize: 8, color: s.status === '확정' ? C.accent : '#B88030', background: s.status === '확정' ? C.light : '#FFF7E6', padding: '1px 6px', borderRadius: 8, fontWeight: 500 }}>{s.status}</span>
+            </div>
+            <div style={{ fontSize: 9, color: C.sub, marginTop: 2 }}>{week[s.day]}요일 · {s.time}</div>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
 }
