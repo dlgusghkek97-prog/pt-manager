@@ -92,6 +92,9 @@ export default function SubscriptionModal({ trainerId, trainerEmail, onClose }) 
   const [acGenerated, setAcGenerated] = useState(null)
   const [acIssuing, setAcIssuing] = useState(false)
 
+  // 계좌이체 결제 채널
+  const [bankTransferPlan, setBankTransferPlan] = useState(null)  // 선택된 플랜 or null
+
   // 마스터 운영 현황
   const [adminStats, setAdminStats] = useState(null)
   const [adminStatsLoading, setAdminStatsLoading] = useState(false)
@@ -426,8 +429,8 @@ ${url}
 
                 {/* 플랜 3개 카드 — 마스터는 숨김 */}
                 {!isAdmin && (<>
-                <p style={{ fontSize: '11px', color: THEME.textSub, fontWeight: '500', margin: '0 0 6px' }}>플랜 선택</p>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '14px' }}>
+                <p style={{ fontSize: '11px', color: THEME.textSub, fontWeight: '500', margin: '0 0 6px' }}>플랜 선택 · 자동결제 (토스)</p>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '10px' }}>
                   {SUBSCRIPTION_PLANS.map(plan => {
                     const isCurrent = plan.code === currentPlanCode
                     return (
@@ -456,6 +459,35 @@ ${url}
                       </button>
                     )
                   })}
+                </div>
+
+                {/* 계좌이체 결제 채널 — 토스 자동결제 대신 은행 이체로 결제 */}
+                <div style={{ background: THEME.cardAlt, border: `0.5px solid ${THEME.border}`, borderRadius: '10px', padding: '10px 12px', marginBottom: '14px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+                    <p style={{ fontSize: '11px', fontWeight: '500', color: THEME.text, margin: 0 }}>💳 계좌이체로 결제</p>
+                    <span style={{ fontSize: '9px', color: THEME.textHint }}>토스 자동결제 대체</span>
+                  </div>
+                  <p style={{ fontSize: '10px', color: THEME.textSub, margin: '0 0 8px', lineHeight: 1.5 }}>
+                    계좌이체 후 관리자 확인 → 쿠폰 자동 발급 → 구독 시작. 자동결제 미사용이므로 매달 수동 갱신 필요.
+                  </p>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
+                    {SUBSCRIPTION_PLANS.map(plan => (
+                      <button
+                        key={plan.code}
+                        onClick={() => setBankTransferPlan(plan)}
+                        style={{
+                          background: '#FFF', border: `0.5px solid ${THEME.border}`,
+                          borderRadius: '8px', padding: '8px 10px', cursor: 'pointer', fontFamily: 'inherit',
+                          display: 'flex', justifyContent: 'space-between', alignItems: 'center', textAlign: 'left',
+                        }}
+                      >
+                        <span style={{ fontSize: '11px', color: THEME.text, fontWeight: '500' }}>{plan.label}</span>
+                        <span style={{ fontSize: '11px', color: THEME.primary, fontWeight: '500' }}>
+                          ₩{plan.amount.toLocaleString()}<span style={{ fontSize: '9px', color: THEME.textSub, fontWeight: '400' }}>/월</span>
+                        </span>
+                      </button>
+                    ))}
+                  </div>
                 </div>
                 </>)}
 
@@ -573,6 +605,15 @@ ${url}
       </div>
 
       {legalOpen && <LegalModal kind="refund" onClose={() => setLegalOpen(false)} />}
+
+      {/* 계좌이체 안내 모달 */}
+      {bankTransferPlan && (
+        <BankTransferModal
+          plan={bankTransferPlan}
+          trainerEmail={trainerEmail}
+          onClose={() => setBankTransferPlan(null)}
+        />
+      )}
 
       {/* 마스터 전용 쿠폰 발급 다이얼로그 */}
       {adminCouponOpen && (
@@ -827,3 +868,131 @@ function AdminDashboard({ stats, loading, error, onReload }) {
     </div>
   )
 }
+
+// ─── 계좌이체 결제 안내 모달 ─────────────────────────────
+// 사용자가 플랜 선택 → 계좌 정보 + 입금 후 카톡 상담 안내
+function BankTransferModal({ plan, trainerEmail, onClose }) {
+  const BANK_INFO = {
+    bank: '토스뱅크',
+    account: '1002-6180-3593',
+    holder: '이현화 (현)',
+  }
+  const [transferName, setTransferName] = useState('')
+
+  const copyAccount = async () => {
+    try {
+      await navigator.clipboard.writeText(BANK_INFO.account)
+      alert('계좌번호가 복사됐어요.')
+    } catch { alert(`계좌번호: ${BANK_INFO.account}`) }
+  }
+
+  const openKakao = () => {
+    const url = process.env.REACT_APP_KAKAO_OPENCHAT_URL || 'https://open.kakao.com/o/s0tPndyi'
+    const msg =
+`[PT Manager 계좌이체 결제 요청]
+
+가입 이메일: ${trainerEmail || '(로그인 이메일)'}
+플랜: ${plan.label}
+금액: ₩${plan.amount.toLocaleString()} / 월
+입금자명: ${transferName || '(입금하실 때 사용한 이름)'}
+
+입금 완료 후 이 메시지를 그대로 보내주시면
+관리자 확인 후 30일 쿠폰 발급해드립니다.`
+    // 클립보드에 안내문 자동 복사
+    try { navigator.clipboard.writeText(msg) } catch {}
+    // 카카오톡 오픈채팅 열기 (새 탭)
+    window.open(url, '_blank', 'noopener,noreferrer')
+    alert('카카오톡 상담 채널이 열렸어요.\n안내문이 클립보드에 복사되었으니 붙여넣기만 하면 돼요.')
+  }
+
+  return (
+    <div
+      onClick={onClose}
+      style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 1700, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}
+    >
+      <div onClick={e => e.stopPropagation()} style={{ background: '#FFF', borderRadius: 14, padding: 18, width: '100%', maxWidth: 380, maxHeight: '85vh', overflowY: 'auto' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+          <p style={{ fontSize: 14, fontWeight: 500, color: THEME.primary, margin: 0 }}>💳 계좌이체 결제</p>
+          <CloseButton onClick={onClose} />
+        </div>
+
+        {/* 선택 플랜 */}
+        <div style={{ background: THEME.primaryLight, border: `0.5px solid ${THEME.primaryAccent}`, borderRadius: 10, padding: '12px 14px', marginBottom: 12 }}>
+          <p style={{ fontSize: 13, fontWeight: 500, color: THEME.primaryDark, margin: '0 0 4px' }}>{plan.label}</p>
+          <p style={{ fontSize: 17, fontWeight: 600, color: THEME.primary, margin: 0 }}>
+            ₩{plan.amount.toLocaleString()}
+            <span style={{ fontSize: 11, color: THEME.textSub, fontWeight: 400 }}> / 월</span>
+          </p>
+        </div>
+
+        {/* 계좌 정보 */}
+        <div style={{ background: THEME.cardAlt, border: `0.5px solid ${THEME.border}`, borderRadius: 10, padding: 12, marginBottom: 12 }}>
+          <p style={{ fontSize: 11, fontWeight: 500, color: THEME.textSub, margin: '0 0 8px' }}>입금 계좌</p>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 4 }}>
+            <span style={{ fontSize: 12, color: THEME.textSub }}>은행</span>
+            <span style={{ fontSize: 13, fontWeight: 500, color: THEME.text }}>{BANK_INFO.bank}</span>
+          </div>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4, gap: 8 }}>
+            <span style={{ fontSize: 12, color: THEME.textSub, flexShrink: 0 }}>계좌번호</span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, minWidth: 0 }}>
+              <span style={{ fontSize: 13, fontWeight: 500, color: THEME.text, fontVariantNumeric: 'tabular-nums' }}>{BANK_INFO.account}</span>
+              <button onClick={copyAccount} style={{
+                background: THEME.primary, color: '#FFF', border: 'none',
+                padding: '4px 10px', borderRadius: 6, fontSize: 10, fontWeight: 500,
+                cursor: 'pointer', fontFamily: 'inherit', flexShrink: 0,
+              }}>복사</button>
+            </div>
+          </div>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
+            <span style={{ fontSize: 12, color: THEME.textSub }}>예금주</span>
+            <span style={{ fontSize: 13, fontWeight: 500, color: THEME.text }}>{BANK_INFO.holder}</span>
+          </div>
+        </div>
+
+        {/* 입금자명 입력 (구분용) */}
+        <div style={{ marginBottom: 12 }}>
+          <p style={{ fontSize: 11, fontWeight: 500, color: THEME.text, margin: '0 0 4px' }}>
+            입금자명 <span style={{ color: THEME.textHint, fontWeight: 400 }}>(구분용, 필수)</span>
+          </p>
+          <input
+            type="text"
+            value={transferName}
+            onChange={e => setTransferName(e.target.value)}
+            placeholder="예: 홍길동 7389"
+            maxLength={20}
+            style={{
+              width: '100%', padding: '9px 11px', borderRadius: 6,
+              border: `0.5px solid ${THEME.border}`, fontSize: 12,
+              fontFamily: 'inherit', outline: 'none', background: '#FFF', color: THEME.text,
+              boxSizing: 'border-box',
+            }}
+          />
+          <p style={{ fontSize: 10, color: THEME.textHint, margin: '4px 2px 0', lineHeight: 1.5 }}>
+            동명이인 구분을 위해 이름 + 전화번호 뒷 4자리 입력 권장.
+          </p>
+        </div>
+
+        {/* 입금 후 카톡 안내 버튼 */}
+        <button
+          onClick={openKakao}
+          disabled={!transferName.trim()}
+          style={{
+            width: '100%',
+            background: transferName.trim() ? '#FEE500' : THEME.borderLight,
+            color: transferName.trim() ? '#1A1A2E' : THEME.textHint,
+            border: 'none', padding: 12, borderRadius: 8,
+            fontSize: 13, fontWeight: 500,
+            cursor: transferName.trim() ? 'pointer' : 'not-allowed',
+            fontFamily: 'inherit', marginBottom: 10,
+          }}
+        >입금 완료 · 카톡 상담으로 확인 요청</button>
+
+        <p style={{ fontSize: 10, color: THEME.textHint, textAlign: 'center', margin: 0, lineHeight: 1.6 }}>
+          입금 확인 후 관리자가 30일 쿠폰을 발급해드립니다.<br/>
+          받은 쿠폰은 [🎟️ 쿠폰 코드 사용] 에 입력하면 즉시 적용돼요.
+        </p>
+      </div>
+    </div>
+  )
+}
+
